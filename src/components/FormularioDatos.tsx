@@ -1,0 +1,377 @@
+import React, { useState, useEffect } from 'react';
+import { TipoIdentificacion, DatosPersonales } from '../types';
+import { ShieldCheck, RefreshCw, AlertCircle, Sparkles, Check } from 'lucide-react';
+
+interface FormularioDatosProps {
+  initialData?: DatosPersonales;
+  onSuccess: (data: DatosPersonales) => void;
+}
+
+export default function FormularioDatos({ initialData, onSuccess }: FormularioDatosProps) {
+  const [tipoIdentificacion, setTipoIdentificacion] = useState<TipoIdentificacion>(
+    initialData?.tipoIdentificacion || 'Cedula'
+  );
+  const [identificacion, setIdentificacion] = useState(initialData?.identificacion || '');
+  const [fechaNacimiento, setFechaNacimiento] = useState(initialData?.fechaNacimiento || '');
+  const [telefono, setTelefono] = useState(initialData?.telefono || '');
+  const [correo, setCorreo] = useState(initialData?.correo || '');
+
+  // Math Captcha state
+  const [num1, setNum1] = useState(0);
+  const [num2, setNum2] = useState(0);
+  const [operativo, setOperativo] = useState<'+' | '-'>('+');
+  const [captchaRes, setCaptchaRes] = useState('');
+  const [captchaCorrectState, setCaptchaCorrectState] = useState<boolean | null>(null);
+
+  // Error messages
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Generate math captcha
+  const generateCaptcha = () => {
+    const n1 = Math.floor(Math.random() * 12) + 5; // 5 to 16
+    const n2 = Math.floor(Math.random() * 10) + 1; // 1 to 10
+    const ops: ('+' | '-')[] = ['+', '-'];
+    const op = ops[Math.floor(Math.random() * ops.length)];
+    
+    setNum1(n1);
+    setNum2(n2);
+    setOperativo(op);
+    setCaptchaRes('');
+    setCaptchaCorrectState(null);
+  };
+
+  useEffect(() => {
+    generateCaptcha();
+  }, []);
+
+  // Validate the answer dynamically or while editing
+  useEffect(() => {
+    if (captchaRes.trim() === '') {
+      setCaptchaCorrectState(null);
+      return;
+    }
+    const parsedAns = parseInt(captchaRes, 10);
+    const correctAns = operativo === '+' ? num1 + num2 : num1 - num2;
+    if (parsedAns === correctAns) {
+      setCaptchaCorrectState(true);
+    } else {
+      setCaptchaCorrectState(false);
+    }
+  }, [captchaRes, num1, num2, operativo]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newErrors: { [key: string]: string } = {};
+
+    // Basic Fields validation
+    if (!identificacion.trim()) {
+      newErrors.identificacion = 'Ingrese su número de documento o cédula';
+    } else if (tipoIdentificacion === 'Cedula' && !/^\d+-(\d+)-\d+$/.test(identificacion.trim()) && identificacion.length < 5) {
+      newErrors.identificacion = 'Por favor, ingrese un formato de cédula válido (ej. 8-712-345)';
+    }
+
+    if (!fechaNacimiento) {
+      newErrors.fechaNacimiento = 'La fecha de nacimiento es de carácter obligatorio';
+    } else {
+      // Check if rational age
+      const birth = new Date(fechaNacimiento);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      if (age < 0 || age > 115) {
+        newErrors.fechaNacimiento = 'Ingrese una fecha de nacimiento válida';
+      } else if (tipoIdentificacion === 'Cedula' && age < 18) {
+        newErrors.fechaNacimiento = 'La cédula de adulto es válida únicamente para mayores de 18 años';
+      } else if (tipoIdentificacion === 'CedulaJuvenil' && age >= 18) {
+        newErrors.fechaNacimiento = 'La cédula juvenil corresponde únicamente a menores de 18 años';
+      }
+    }
+
+    if (!telefono.trim()) {
+      newErrors.telefono = 'Ingrese su número telefónico de contacto';
+    } else if (!/^[2368]\d{3}-?\d{4}$/.test(telefono.trim().replace(/\s/g, '')) && telefono.trim().length < 7) {
+      newErrors.telefono = 'Ingrese un número de teléfono válido en Panamá (ej: 6123-4567)';
+    }
+
+    if (!correo.trim()) {
+      newErrors.correo = 'El correo electrónico es obligatorio';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+      newErrors.correo = 'Ingrese un formato de correo electrónico válido';
+    }
+
+    // Verify Catcha math
+    const correctAns = operativo === '+' ? num1 + num2 : num1 - num2;
+    const userAns = parseInt(captchaRes, 10);
+    if (!captchaRes) {
+      newErrors.captcha = 'Debe resolver la operación matemática de control';
+    } else if (isNaN(userAns) || userAns !== correctAns) {
+      newErrors.captcha = 'Operación errónea. Inténtelo de nuevo o genere otro desafío';
+      setCaptchaCorrectState(false);
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+    onSuccess({
+      tipoIdentificacion,
+      identificacion: identificacion.trim(),
+      fechaNacimiento,
+      telefono: telefono.trim(),
+      correo: correo.trim(),
+    });
+  };
+
+  const getPlaceholder = () => {
+    switch (tipoIdentificacion) {
+      case 'Cedula':
+        return 'Ej: 8-824-1109';
+      case 'CedulaJuvenil':
+        return 'Ej: 8-1024-998PE';
+      case 'Extranjero':
+        return 'Ej: PE-4-1234';
+      case 'Pasaporte':
+        return 'Ej: PA0987152';
+    }
+  };
+
+  const getHelperText = () => {
+    switch (tipoIdentificacion) {
+      case 'Cedula':
+        return 'Cédula de identidad nacional para ciudadanos adultos.';
+      case 'CedulaJuvenil':
+        return 'Válida para personas panameñas menores de edad.';
+      case 'Extranjero':
+        return 'Documento de identidad nacional para residentes extranjeros permanentes.';
+      case 'Pasaporte':
+        return 'Válido para ciudadanos extranjeros que aún no poseen cédula PE.';
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} id="form-datos-personales" className="space-y-6">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 md:p-6 space-y-6">
+        <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-900 text-white flex items-center justify-center font-bold text-sm">
+            1
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Datos Personales del Solicitante</h3>
+            <p className="text-xs text-slate-500 font-medium">Ingrese la información del titular de la cita tal como aparece en su documento oficial.</p>
+          </div>
+        </div>
+
+        {/* Tipo de Identificación */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="tipo_id" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Tipo de Identificación <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="tipo_id"
+              value={tipoIdentificacion}
+              onChange={(e) => {
+                setTipoIdentificacion(e.target.value as TipoIdentificacion);
+                setIdentificacion('');
+                setErrors((prev) => ({ ...prev, identificacion: '' }));
+              }}
+              className="h-11 w-full bg-white border border-slate-300 rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-700 transition cursor-pointer"
+            >
+              <option value="Cedula">Cédula de adulto (Nacional)</option>
+              <option value="CedulaJuvenil">Cédula Juvenil (Menor de edad)</option>
+              <option value="Extranjero">Cédula de Extranjero (PE)</option>
+              <option value="Pasaporte">Pasaporte extranjero</option>
+            </select>
+            <span className="text-[11px] text-slate-500 font-medium mt-1">
+              {getHelperText()}
+            </span>
+          </div>
+
+          {/* Cédula o Identificación */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="input_id" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Número de Identificación <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="input_id"
+              value={identificacion}
+              onChange={(e) => setIdentificacion(e.target.value)}
+              placeholder={getPlaceholder()}
+              className={`h-11 w-full bg-white border ${
+                errors.identificacion ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+              } rounded px-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition`}
+            />
+            {errors.identificacion ? (
+              <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium">
+                <AlertCircle className="w-3.5 h-3.5" /> {errors.identificacion}
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400 font-medium mt-1">
+                Ingrese el número exactamente como aparece en su documento físico.
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Fecha de nacimiento, teléfono y correo */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Fecha Nacimiento */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="fecha_nac" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Fecha de Nacimiento <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              id="fecha_nac"
+              value={fechaNacimiento}
+              onChange={(e) => setFechaNacimiento(e.target.value)}
+              className={`h-11 w-full bg-white border ${
+                errors.fechaNacimiento ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+              } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition cursor-pointer`}
+            />
+            {errors.fechaNacimiento && (
+              <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium">
+                <AlertCircle className="w-3.5 h-3.5" /> {errors.fechaNacimiento}
+              </span>
+            )}
+          </div>
+
+          {/* Teléfono */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="tel_id" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Teléfono de Contacto <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              id="tel_id"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="Ej: 6123-4567"
+              className={`h-11 w-full bg-white border ${
+                errors.telefono ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+              } rounded px-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition`}
+            />
+            {errors.telefono ? (
+              <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium">
+                <AlertCircle className="w-3.5 h-3.5" /> {errors.telefono}
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400 font-medium mt-1">Celular o residencial de 7 u 8 dígitos.</span>
+            )}
+          </div>
+
+          {/* Correo Electrónico */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="correo_id" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Correo Electrónico <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              id="correo_id"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              placeholder="Ej: usuario@outlook.com"
+              className={`h-11 w-full bg-white border ${
+                errors.correo ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+              } rounded px-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition`}
+            />
+            {errors.correo ? (
+              <span className="flex items-center gap-1 text-[11px] text-red-500 mt-1 font-medium">
+                <AlertCircle className="w-3.5 h-3.5" /> {errors.correo}
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400 font-medium mt-1">Se enviará el comprobante digital a este email.</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Control Matemática - CAPTCHA (Cacsha) */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 md:p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-dashed border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-blue-700" />
+            <div>
+              <h4 className="text-sm font-bold text-slate-800 tracking-tight">Filtro de Seguridad Antirobot</h4>
+              <p className="text-xs text-slate-500 font-medium">Resuelva este cálculo para autorizar el acceso a los servicios.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={generateCaptcha}
+            title="Generar otra operación matemática"
+            className="p-1 px-2.5 rounded hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 text-xs font-bold border border-slate-300 bg-white cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Generar otro</span>
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 justify-between pt-1">
+          {/* Visual Equation Card */}
+          <div className="flex items-center gap-3 bg-white border border-slate-300 shadow-sm rounded px-5 py-2.5 select-none font-mono text-xl font-bold text-slate-700">
+            <span>{num1}</span>
+            <span className="text-blue-700 text-xl font-bold">{operativo}</span>
+            <span>{num2}</span>
+            <span className="text-slate-400 font-normal">=</span>
+            <span className="text-slate-300">?</span>
+          </div>
+
+          {/* User Answer Field */}
+          <div className="flex-1 w-full max-w-xs">
+            <div className="relative">
+              <input
+                type="number"
+                value={captchaRes}
+                onChange={(e) => setCaptchaRes(e.target.value)}
+                placeholder="Respuesta"
+                className={`w-full h-11 bg-white border text-center font-bold text-lg rounded focus:outline-none focus:ring-2 transition ${
+                  captchaCorrectState === true
+                    ? 'border-emerald-500 text-emerald-700 focus:ring-emerald-200 bg-emerald-50/25'
+                    : captchaCorrectState === false
+                    ? 'border-red-400 text-red-700 focus:ring-red-200'
+                    : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                }`}
+              />
+              {captchaCorrectState === true && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 bg-emerald-100 p-0.5 rounded-full">
+                  <Check className="w-3.5 h-3.5 text-emerald-700" />
+                </div>
+              )}
+            </div>
+            
+            {errors.captcha && (
+              <span className="flex items-center gap-1 text-[11px] text-red-500 mt-1.5 justify-center sm:justify-start font-medium">
+                <AlertCircle className="w-3.5 h-3.5" /> {errors.captcha}
+              </span>
+            )}
+            {captchaCorrectState === true && (
+              <span className="flex items-center gap-1 text-[11px] text-emerald-600 mt-1.5 font-bold justify-center sm:justify-start">
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" /> ¡Filtro de seguridad superado con éxito!
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-2">
+        <button
+          type="submit"
+          className="w-full sm:w-auto h-12 bg-blue-700 hover:bg-blue-800 text-white font-bold px-8 rounded shadow-lg shadow-blue-100 transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+        >
+          <span>Siguiente: Elegir Servicio</span>
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </button>
+      </div>
+    </form>
+  );
+}
+
