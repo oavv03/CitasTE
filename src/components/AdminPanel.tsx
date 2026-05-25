@@ -123,6 +123,14 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     }
   });
 
+  const [pasadoEdadLinkBase, setPasadoEdadLinkBase] = useState(() => {
+    try {
+      const stored = localStorage.getItem('te_panama_pasado_edad_link_base');
+      if (stored) return stored;
+    } catch {}
+    return typeof window !== 'undefined' ? window.location.origin : 'https://ais-dev-d62mtcleay3xdcmqivcktx-389293937197.us-east1.run.app';
+  });
+
   const handleGenerateExpediente = (e: React.FormEvent) => {
     e.preventDefault();
     if (!expName.trim() || !expIdentificacion.trim() || !expCorreo.trim() || !expTelefono.trim()) {
@@ -134,8 +142,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     const uniqueNumber = `EXP-2026-TE-${Math.floor(100000 + Math.random() * 900000)}`;
     
     // Create direct URL link
-    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-dev-d62mtcleay3xdcmqivcktx-389293937197.us-east1.run.app';
-    const directLink = `${baseOrigin}/?tramite=ced_pasados_edad&seguimiento=${uniqueNumber}`;
+    let base = pasadoEdadLinkBase.trim();
+    if (base.endsWith('/')) {
+      base = base.slice(0, -1);
+    }
+    const directLink = `${base}/?tramite=ced_pasados_edad&seguimiento=${uniqueNumber}`;
 
     const textMessage = `Estimado(a) ${expName.trim()}, el Tribunal Electoral le informa que su expediente de inscripción tardía (Pasado de Edad) ha sido procesado con éxito.
 
@@ -1334,6 +1345,44 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                         onChange={(e) => setEnableEmailAlerts(e.target.checked)}
                         className="rounded cursor-pointer accent-blue-600 w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
+                    </div>
+
+                    {/* PASADO DE EDAD LINK BASE CUSTOMIZATION */}
+                    <div className="flex flex-col gap-2.5 bg-slate-900 p-3 rounded border border-slate-800">
+                      <div>
+                        <span className="text-[11px] font-extrabold uppercase text-slate-250 block">Enlace Base de Agendamiento (Pasados de Edad)</span>
+                        <span className="text-[10px] text-slate-450">URL base donde se redirigirá a los ciudadanos con su número de seguimiento pre-cargado</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          disabled={currentRole !== 'super'}
+                          value={pasadoEdadLinkBase}
+                          onChange={(e) => setPasadoEdadLinkBase(e.target.value)}
+                          placeholder="Ej: https://citas.tribunal.gob.pa"
+                          className="flex-1 bg-slate-950 border border-slate-800 text-slate-200 p-2 rounded text-xs px-3 focus:outline-none focus:border-blue-650 font-mono disabled:opacity-50"
+                        />
+                        {currentRole === 'super' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try {
+                                localStorage.setItem('te_panama_pasado_edad_link_base', pasadoEdadLinkBase.trim());
+                                alert('El enlace base para el trámite de Pasado de Edad ha sido guardado exitosamente.');
+                              } catch (err) {
+                                alert('Error al guardar el enlace base.');
+                              }
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] uppercase tracking-wider px-4 py-2 rounded transition shrink-0 cursor-pointer"
+                          >
+                            Guardar
+                          </button>
+                        )}
+                      </div>
+                      <div className="text-[9.5px] text-blue-400 bg-blue-950/20 p-2 rounded border border-blue-900/10 font-mono leading-relaxed">
+                        <span className="font-extrabold text-blue-300 block uppercase mb-0.5">Enlace Resultante de Ejemplo:</span>
+                        {pasadoEdadLinkBase.trim().endsWith('/') ? pasadoEdadLinkBase.trim().slice(0, -1) : pasadoEdadLinkBase.trim()}/?tramite=ced_pasados_edad&seguimiento=EXP-2026-TE-123456
+                      </div>
                     </div>
 
                     {/* SECURITY SYSTEM LOGO WARNING */}
