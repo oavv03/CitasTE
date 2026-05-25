@@ -103,7 +103,8 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
           sucursalDireccion: currentSucursal?.direccion || '',
           identificacion: cita.datosPersonales.identificacion,
           telefono: cita.datosPersonales.telefono,
-          requisitos: currentSubService?.requisitos || []
+          requisitos: currentSubService?.requisitos || [],
+          numeroSeguimiento: cita.datosPersonales.numeroSeguimiento
         }),
       });
 
@@ -174,7 +175,8 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
           sucursalDireccion: currentSucursal?.direccion || '',
           identificacion: cita.datosPersonales.identificacion,
           telefono: cita.datosPersonales.telefono,
-          requisitos: currentSubService?.requisitos || []
+          requisitos: currentSubService?.requisitos || [],
+          numeroSeguimiento: cita.datosPersonales.numeroSeguimiento
         }),
       });
 
@@ -335,6 +337,12 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
                 <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span className="truncate">Correo: <strong className="font-bold text-slate-800">{cita.datosPersonales.correo}</strong></span>
               </div>
+              {cita.datosPersonales.numeroSeguimiento && (
+                <div className="flex items-center gap-2 text-[11px] text-blue-900 col-span-1 sm:col-span-2 border-t border-blue-200 bg-blue-50/50 p-1.5 rounded mt-1 font-mono">
+                  <span className="font-bold text-blue-750 bg-blue-100 text-[9px] px-1 rounded uppercase tracking-wider">EXPEDIENTE</span>
+                  <span className="truncate">N°: <strong className="font-black text-blue-950">{cita.datosPersonales.numeroSeguimiento}</strong></span>
+                </div>
+              )}
             </div>
 
           </div>

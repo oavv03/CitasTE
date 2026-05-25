@@ -941,6 +941,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                                 <span className="text-[10px] text-slate-450 leading-tight">
                                   {cit.datosPersonales.tipoIdentificacion} • {cit.datosPersonales.telefono}
                                 </span>
+                                {cit.datosPersonales.numeroSeguimiento && (
+                                  <span className="text-[10px] text-amber-400 font-mono font-bold leading-tight mt-0.5">
+                                    Seg: {cit.datosPersonales.numeroSeguimiento}
+                                  </span>
+                                )}
                               </div>
                             </td>
 

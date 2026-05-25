@@ -459,6 +459,7 @@ export default function App() {
                       initialData={datosPersonales || undefined}
                       onSuccess={handleStep1Success} 
                       onBack={() => setCurrentStep(1)}
+                      selectedSubServicioId={selectedSubServicioId}
                     />
                   )}
 

@@ -125,6 +125,7 @@ interface ServerCita {
   requisitos: string[];
   estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire';
   fechaCreacion: string;
+  numeroSeguimiento?: string;
 }
 
 function getAppointments(): ServerCita[] {
@@ -368,7 +369,8 @@ async function startServer() {
         sucursalDireccion, 
         identificacion, 
         telefono,
-        requisitos = []
+        requisitos = [],
+        numeroSeguimiento
       } = req.body;
 
       if (!email) {
@@ -394,7 +396,8 @@ async function startServer() {
           telefono: telefono || "",
           requisitos: requisitos || [],
           estado: existingIdx >= 0 ? appointments[existingIdx].estado : 'confirmada',
-          fechaCreacion: existingIdx >= 0 ? appointments[existingIdx].fechaCreacion : new Date().toISOString()
+          fechaCreacion: existingIdx >= 0 ? appointments[existingIdx].fechaCreacion : new Date().toISOString(),
+          numeroSeguimiento: numeroSeguimiento || undefined
         };
 
         if (existingIdx >= 0) {
@@ -982,7 +985,8 @@ async function startServer() {
         telefono: datosPersonales?.telefono || req.body.telefono || "",
         requisitos: requisitos || [],
         estado: estado || "confirmada",
-        fechaCreacion: fechaCreacion || new Date().toISOString()
+        fechaCreacion: fechaCreacion || new Date().toISOString(),
+        numeroSeguimiento: datosPersonales?.numeroSeguimiento || req.body.numeroSeguimiento || undefined
       };
 
       if (existingIdx >= 0) {
@@ -1187,7 +1191,8 @@ async function startServer() {
         sucursalDireccion, 
         identificacion, 
         telefono,
-        requisitos = []
+        requisitos = [],
+        numeroSeguimiento
       } = req.body;
 
       if (!email) {
@@ -1212,7 +1217,8 @@ async function startServer() {
         telefono: telefono || "",
         requisitos: requisitos || [],
         estado: existingIdx >= 0 ? appointments[existingIdx].estado : 'confirmada',
-        fechaCreacion: existingIdx >= 0 ? appointments[existingIdx].fechaCreacion : new Date().toISOString()
+        fechaCreacion: existingIdx >= 0 ? appointments[existingIdx].fechaCreacion : new Date().toISOString(),
+        numeroSeguimiento: numeroSeguimiento || undefined
       };
 
       if (existingIdx >= 0) {

@@ -6,9 +6,10 @@ interface FormularioDatosProps {
   initialData?: DatosPersonales;
   onSuccess: (data: DatosPersonales) => void;
   onBack?: () => void;
+  selectedSubServicioId?: string | null;
 }
 
-export default function FormularioDatos({ initialData, onSuccess, onBack }: FormularioDatosProps) {
+export default function FormularioDatos({ initialData, onSuccess, onBack, selectedSubServicioId }: FormularioDatosProps) {
   const [tipoIdentificacion, setTipoIdentificacion] = useState<TipoIdentificacion>(
     initialData?.tipoIdentificacion || 'Cedula'
   );
@@ -16,6 +17,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack }: Form
   const [fechaNacimiento, setFechaNacimiento] = useState(initialData?.fechaNacimiento || '');
   const [telefono, setTelefono] = useState(initialData?.telefono || '');
   const [correo, setCorreo] = useState(initialData?.correo || '');
+  const [numeroSeguimiento, setNumeroSeguimiento] = useState(initialData?.numeroSeguimiento || '');
 
   // Math Captcha state
   const [num1, setNum1] = useState(0);
@@ -105,6 +107,16 @@ export default function FormularioDatos({ initialData, onSuccess, onBack }: Form
       newErrors.correo = 'Ingrese un formato de correo electrónico válido';
     }
 
+    // Tracking number is mandatory for pasada de edad
+    const isPasadoEdad = selectedSubServicioId === 'ced_pasados_edad';
+    if (isPasadoEdad) {
+      if (!numeroSeguimiento.trim()) {
+        newErrors.numeroSeguimiento = 'El número de seguimiento de expediente es obligatorio para este trámite';
+      } else if (numeroSeguimiento.trim().length < 4) {
+        newErrors.numeroSeguimiento = 'Ingrese un número de seguimiento válido de mínimo 4 caracteres';
+      }
+    }
+
     // Verify Catcha math
     const correctAns = operativo === '+' ? num1 + num2 : num1 - num2;
     const userAns = parseInt(captchaRes, 10);
@@ -158,6 +170,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack }: Form
       fechaNacimiento,
       telefono: telefono.trim(),
       correo: correo.trim(),
+      numeroSeguimiento: isPasadoEdad ? numeroSeguimiento.trim() : undefined,
     });
   };
 
@@ -324,6 +337,35 @@ export default function FormularioDatos({ initialData, onSuccess, onBack }: Form
             )}
           </div>
         </div>
+
+        {/* Tracking number conditional input field */}
+        {selectedSubServicioId === 'ced_pasados_edad' && (
+          <div className="border-t border-slate-100 pt-5 mt-5 flex flex-col gap-1.5 animate-fade-in">
+            <label htmlFor="num_seg_id" className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 text-blue-900">
+              <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded animate-pulse">Requerido</span>
+              Número de Seguimiento de Expediente <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="num_seg_id"
+              value={numeroSeguimiento}
+              onChange={(e) => setNumeroSeguimiento(e.target.value)}
+              placeholder="Ej: EXP-2026-TE-84729"
+              className={`h-11 w-full bg-slate-50 border ${
+                errors.numeroSeguimiento ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+              } rounded px-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition font-mono`}
+            />
+            {errors.numeroSeguimiento ? (
+              <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium">
+                <AlertCircle className="w-3.5 h-3.5" /> {errors.numeroSeguimiento}
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-550 font-medium mt-1">
+                Ingrese el número de expediente de trámite tardío que le fue asignado previamente por la Dirección General de Registro Civil o Cedulación.
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Control Matemática - CAPTCHA (Cacsha) */}

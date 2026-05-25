@@ -6,6 +6,7 @@ export interface DatosPersonales {
   fechaNacimiento: string;
   telefono: string;
   correo: string;
+  numeroSeguimiento?: string;
 }
 
 export type ServicioCategoriaId = 'extranjeria' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil' | 'panamenos_extranjero';

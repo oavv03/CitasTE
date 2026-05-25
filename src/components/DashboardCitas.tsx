@@ -210,7 +210,12 @@ export default function DashboardCitas({
                         <p className="text-[11px] text-slate-600 mt-1.5 font-medium">
                           Identificación: <strong className="font-bold text-slate-800">{cita.datosPersonales.identificacion}</strong>
                         </p>
-                        <p className="text-[10px] text-slate-400 font-mono">
+                        {cita.datosPersonales.numeroSeguimiento && (
+                          <p className="text-[11px] text-blue-700 font-extrabold bg-blue-50 px-2 py-0.5 rounded inline-block mt-1 font-mono uppercase tracking-wider text-[9px] border border-blue-100">
+                            Seguimiento: {cita.datosPersonales.numeroSeguimiento}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">
                           {cita.datosPersonales.correo}
                         </p>
                       </div>
