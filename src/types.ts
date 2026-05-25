@@ -7,6 +7,15 @@ export interface DatosPersonales {
   telefono: string;
   correo: string;
   numeroSeguimiento?: string;
+  // Campos específicos para el trámite de extranjería
+  primerNombre?: string;
+  segundoNombre?: string;
+  primerApellido?: string;
+  segundoApellido?: string;
+  pasaporte?: string;
+  nacionalidad?: string;
+  fechaResolucion?: string;
+  numeroResolucion?: string;
 }
 
 export type ServicioCategoriaId = 'extranjeria' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil' | 'panamenos_extranjero';

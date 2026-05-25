@@ -227,7 +227,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       setIsAdminLoggedIn(true);
       setActiveSubTab('extranjeria');
       setLoginError('');
-    } else if (username.trim() === 'adminPEdad' && password === 'PasaDodeEdad2026') {
+    } else if ((username.trim() === 'adminPEdad' || lcUser === 'adminpedad') && password === 'PasaDodeEdad2026') {
       setCurrentRole('pasado_edad');
       setIsAdminLoggedIn(true);
       setActiveSubTab('pasado_edad' as any);
@@ -283,7 +283,11 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
   const filteredCitas = useMemo(() => {
     return citas.filter(cita => {
       // Search
-      const text = `${cita.codigoTransaccion} ${cita.datosPersonales.identificacion} ${cita.datosPersonales.correo} ${cita.datosPersonales.telefono}`.toLowerCase();
+      let extraText = '';
+      if (cita.servicioCategoria === 'extranjeria') {
+        extraText = ` ${cita.datosPersonales.primerNombre || ''} ${cita.datosPersonales.segundoNombre || ''} ${cita.datosPersonales.primerApellido || ''} ${cita.datosPersonales.segundoApellido || ''} ${cita.datosPersonales.pasaporte || ''} ${cita.datosPersonales.numeroResolucion || ''} ${cita.datosPersonales.nacionalidad || ''}`;
+      }
+      const text = `${cita.codigoTransaccion} ${cita.datosPersonales.identificacion} ${cita.datosPersonales.correo} ${cita.datosPersonales.telefono}${extraText}`.toLowerCase();
       const matchesSearch = text.includes(searchQuery.toLowerCase());
 
       // Category filter
@@ -663,23 +667,27 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
              {/* Role indicator label */}
              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border shadow-sm ${
                currentRole === 'super' 
-                 ? 'bg-red-950 text-red-400 border-red-800' 
+                 ? 'bg-red-950 text-red-100 border-red-800' 
                  : currentRole === 'extranjeria'
-                   ? 'bg-amber-950 text-amber-400 border-amber-800'
-                   : 'bg-blue-950 text-blue-400 border-blue-800'
+                   ? 'bg-amber-955 text-amber-100 border-amber-800'
+                   : currentRole === 'pasado_edad'
+                     ? 'bg-blue-950 text-blue-100 border-blue-800'
+                     : 'bg-emerald-950 text-emerald-100 border-emerald-800'
              }`}>
-               Perfil: {currentRole === 'super' ? '⚡ SUPER ADMIN' : currentRole === 'extranjeria' ? '🛂 ADMIN EXTRANJERÍA' : '👤 ADMIN SENCILLO'}
+               Perfil: {currentRole === 'super' ? '⚡ SUPER ADMIN' : currentRole === 'extranjeria' ? '🛂 ADMIN EXTRANJERÍA' : currentRole === 'pasado_edad' ? '🛡️ SEGUIMIENTO PE' : '👤 ADMIN SENCILLO'}
              </span>
  
              {/* Quick switcher during simulation */}
              <button
                onClick={() => {
-                 const roles: AdminRole[] = ['sencillo', 'super', 'extranjeria'];
+                 const roles: AdminRole[] = ['sencillo', 'super', 'extranjeria', 'pasado_edad'];
                  const nextRole = roles[(roles.indexOf(currentRole) + 1) % roles.length];
                  setCurrentRole(nextRole);
                  setEditingCita(null); // Clear editing to prevent profile mismatch
                  if (nextRole === 'extranjeria') {
                    setActiveSubTab('extranjeria');
+                 } else if (nextRole === 'pasado_edad') {
+                   setActiveSubTab('pasado_edad' as any);
                  } else {
                    setActiveSubTab('tabla');
                  }
@@ -731,7 +739,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Usuario</label>
               <input
                 type="text"
-                placeholder="Ejemplo: AdminTE / AdminMini / Migra26"
+                placeholder="Ejemplo: AdminTE / AdminMini / adminPEdad / Migra26"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium"
@@ -820,7 +828,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               </button>
             )}
 
-            {currentRole === 'pasado_edad' && (
+            {(currentRole === 'pasado_edad' || currentRole === 'super') && (
               <button
                 onClick={() => setActiveSubTab('pasado_edad' as any)}
                 className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
@@ -862,7 +870,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               </>
             )}
             
-            {currentRole !== 'extranjeria' && (
+            {currentRole !== 'extranjeria' && currentRole !== 'pasado_edad' && (
               <div className="hidden md:block mt-auto border-t border-slate-800 pt-3">
                 <div className="bg-slate-900 border border-slate-800 p-2.5 rounded text-[10px] text-slate-400 font-mono leading-relaxed space-y-1">
                   <div role="presentation" className="text-slate-350 font-bold border-b border-slate-850 pb-1 flex items-center gap-1.5 uppercase">
@@ -1053,16 +1061,32 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                             {/* CITIZEN INFO */}
                             <td className="p-3">
                               <div className="flex flex-col">
-                                <span className="font-mono text-[11px] font-bold text-slate-200">
-                                  {cit.datosPersonales.identificacion}
-                                </span>
-                                <span className="text-[10px] text-slate-450 leading-tight">
-                                  {cit.datosPersonales.tipoIdentificacion} • {cit.datosPersonales.telefono}
-                                </span>
-                                {cit.datosPersonales.numeroSeguimiento && (
-                                  <span className="text-[10px] text-amber-400 font-mono font-bold leading-tight mt-0.5">
-                                    Seg: {cit.datosPersonales.numeroSeguimiento}
-                                  </span>
+                                {cit.servicioCategoria === 'extranjeria' ? (
+                                  <>
+                                    <span className="text-[11px] font-extrabold text-blue-300 leading-tight">
+                                      {[cit.datosPersonales.primerNombre, cit.datosPersonales.segundoNombre, cit.datosPersonales.primerApellido, cit.datosPersonales.segundoApellido].filter(Boolean).join(' ')}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-mono tracking-tight leading-tight mt-0.5">
+                                      Pasaporte: <strong className="text-amber-200">{cit.datosPersonales.pasaporte}</strong> • {cit.datosPersonales.nacionalidad}
+                                    </span>
+                                    <span className="text-[9px] text-amber-500 font-bold leading-normal mt-1 bg-amber-950/30 border border-amber-900/30 px-1.5 py-0.5 rounded w-max">
+                                      Res: {cit.datosPersonales.numeroResolucion} ({cit.datosPersonales.fechaResolucion})
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="font-mono text-[11px] font-bold text-slate-200">
+                                      {cit.datosPersonales.identificacion}
+                                    </span>
+                                    <span className="text-[10px] text-slate-450 leading-tight">
+                                      {cit.datosPersonales.tipoIdentificacion} • {cit.datosPersonales.telefono}
+                                    </span>
+                                    {cit.datosPersonales.numeroSeguimiento && (
+                                      <span className="text-[10px] text-amber-400 font-mono font-bold leading-tight mt-0.5">
+                                        Seg: {cit.datosPersonales.numeroSeguimiento}
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>

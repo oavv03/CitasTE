@@ -487,6 +487,7 @@ export default function App() {
                       onSuccess={handleStep1Success} 
                       onBack={() => setCurrentStep(1)}
                       selectedSubServicioId={selectedSubServicioId}
+                      selectedCategoria={selectedCategoria}
                     />
                   )}
 

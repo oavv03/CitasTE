@@ -2,14 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { TipoIdentificacion, DatosPersonales } from '../types';
 import { ShieldCheck, RefreshCw, AlertCircle, Sparkles, Check } from 'lucide-react';
 
+const NACIONALIDADES = [
+  "Afgana", "Albana", "Alemana", "Andorrana", "Angoleña", "Antigüeña y Barbudense", "Árabe Saudí", "Argelina", "Argentina", "Armenia", 
+  "Australiana", "Austríaca", "Azerbaiyana", "Bahameña", "Bangladesí", "Barbadense", "Bahréini", "Belga", "Beliceña", "Beninesa", 
+  "Bielorrusa", "Birmana", "Boliviana", "Bosnia", "Botsuana", "Brasileña", "Bruneana", "Búlgara", "Burkinesa", "Burundesa", 
+  "Butanesa", "Caboverdiana", "Camboyana", "Camerunesa", "Canadiense", "Catarí", "Centroafricana", "Chadiana", "Chilena", "China", 
+  "Chipriota", "Colombiana", "Comorense", "Congoleña", "Norcoreana", "Surcoreana", "Marfileña", "Costarricense", "Croata", "Cubana", 
+  "Danesa", "Dominiquesa", "Dominicana", "Ecuatoriana", "Egipcia", "Salvadoreña", "Emiratí", "Eritrea", "Eslovaca", "Eslovena", 
+  "Española", "Estadounidense", "Estonia", "Etíope", "Filipina", "Finlandesa", "Fiyiana", "Francesa", "Gabonesa", "Gambiana", 
+  "Georgiana", "Ghanesa", "Granadina", "Griega", "Guatemalteca", "Guineana", "Guyanesa", "Haitiana", "Hondureña", "Húngara", 
+  "India", "Indonesia", "Iraquí", "Iraní", "Irlandesa", "Islandesa", "Israelí", "Italiana", "Jamaicana", "Japonesa", 
+  "Jordana", "Kazaja", "Keniana", "Kirguís", "Kiribatiana", "Kuwaití", "Laosiana", "Lesotense", "Letona", "Libanesa", 
+  "Liberiana", "Libia", "Liechtensteiniana", "Lituana", "Luxemburguesa", "Macedona", "Madagascariense", "Malasia", "Malauí", "Maldiva", 
+  "Maliense", "Maltesa", "Marroquí", "Mauriciana", "Mauritana", "Mexicana", "Micronesia", "Moldava", "Monegasca", "Mongola", 
+  "Montenegrina", "Mozambiqueña", "Namibiana", "Nauruana", "Nepalesa", "Nicaragüense", "Nigeriana", "Nigerina", "Noruega", "Neozelandesa", 
+  "Omaní", "Neerlandesa", "Pakistaní", "Palaosiana", "Palestina", "Panameña", "Papú", "Paraguaya", "Peruana", "Polaca", 
+  "Portuguesa", "Británica", "Ruandesa", "Rumana", "Rusa", "Samoana", "Sancristobaleña", "Sanmarinense", "Sanvicentina", "Santalucense", 
+  "Santotomense", "Senegalesa", "Serbia", "Seychellense", "Sierraleonesa", "Singapurense", "Siria", "Somalí", "Srilankesa", "Suazi", 
+  "Sudafricana", "Sudanesa", "Sueca", "Suiza", "Surinamesa", "Tailandesa", "Tanzana", "Tayika", "Togolesa", "Tongana", 
+  "Trinitense", "Tunecina", "Turca", "Turcomana", "Tuvaluana", "Ucraniana", "Ugandesa", "Uruguaya", "Uzbeka", "Vanuatuense", 
+  "Vaticana", "Venezolana", "Vietnamita", "Yemení", "Yibutiana", "Zambiana", "Zimbabuense"
+];
+
 interface FormularioDatosProps {
   initialData?: DatosPersonales;
   onSuccess: (data: DatosPersonales) => void;
   onBack?: () => void;
   selectedSubServicioId?: string | null;
+  selectedCategoria?: string | null;
 }
 
-export default function FormularioDatos({ initialData, onSuccess, onBack, selectedSubServicioId }: FormularioDatosProps) {
+export default function FormularioDatos({ initialData, onSuccess, onBack, selectedSubServicioId, selectedCategoria }: FormularioDatosProps) {
   const [tipoIdentificacion, setTipoIdentificacion] = useState<TipoIdentificacion>(
     initialData?.tipoIdentificacion || 'Cedula'
   );
@@ -18,6 +41,16 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
   const [telefono, setTelefono] = useState(initialData?.telefono || '');
   const [correo, setCorreo] = useState(initialData?.correo || '');
   const [numeroSeguimiento, setNumeroSeguimiento] = useState(initialData?.numeroSeguimiento || '');
+
+  // Campos específicos para el trámite de extranjería
+  const [primerNombre, setPrimerNombre] = useState(initialData?.primerNombre || '');
+  const [segundoNombre, setSegundoNombre] = useState(initialData?.segundoNombre || '');
+  const [primerApellido, setPrimerApellido] = useState(initialData?.primerApellido || '');
+  const [segundoApellido, setSegundoApellido] = useState(initialData?.segundoApellido || '');
+  const [pasaporte, setPasaporte] = useState(initialData?.pasaporte || (selectedCategoria === 'extranjeria' ? initialData?.identificacion || '' : ''));
+  const [nacionalidad, setNacionalidad] = useState(initialData?.nacionalidad || '');
+  const [fechaResolucion, setFechaResolucion] = useState(initialData?.fechaResolucion || '');
+  const [numeroResolucion, setNumeroResolucion] = useState(initialData?.numeroResolucion || '');
 
   // Math Captcha state
   const [num1, setNum1] = useState(0);
@@ -68,7 +101,94 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
     if (verifyingPassport) return;
     const newErrors: { [key: string]: string } = {};
 
-    // Basic Fields validation
+    if (selectedCategoria === 'extranjeria') {
+      if (!primerNombre.trim()) {
+        newErrors.primerNombre = 'El primer nombre es obligatorio';
+      }
+      if (!primerApellido.trim()) {
+        newErrors.primerApellido = 'El primer apellido es obligatorio';
+      }
+      if (!correo.trim()) {
+        newErrors.correo = 'El correo electrónico es obligatorio';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+        newErrors.correo = 'Ingrese un formato de correo electrónico válido';
+      }
+      if (!pasaporte.trim()) {
+        newErrors.pasaporte = 'El número de pasaporte es obligatorio';
+      }
+      if (!nacionalidad.trim()) {
+        newErrors.nacionalidad = 'La nacionalidad es obligatoria';
+      }
+      if (!fechaResolucion) {
+        newErrors.fechaResolucion = 'La fecha de resolución es de carácter obligatorio';
+      }
+      if (!numeroResolucion.trim()) {
+        newErrors.numeroResolucion = 'El número de resolución es obligatorio';
+      }
+
+      // Verify Captcha math
+      const correctAns = operativo === '+' ? num1 + num2 : num1 - num2;
+      const userAns = parseInt(captchaRes, 10);
+      if (!captchaRes) {
+        newErrors.captcha = 'Debe resolver la operación matemática de control';
+      } else if (isNaN(userAns) || userAns !== correctAns) {
+        newErrors.captcha = 'Operación errónea. Inténtelo de nuevo o genere otro desafío';
+        setCaptchaCorrectState(false);
+      }
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        return;
+      }
+
+      // Passport verification against the approval database
+      setVerifyingPassport(true);
+      try {
+        const response = await fetch('/api/extranjeria/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pasaporte: pasaporte.trim().toUpperCase() })
+        });
+        const data = await response.json();
+        if (data && data.success) {
+          if (!data.found) {
+            newErrors.pasaporte = `Su pasaporte (${pasaporte.trim().toUpperCase()}) no figura aprobado por Extranjería. Verifique el número.`;
+            setErrors(newErrors);
+            setVerifyingPassport(false);
+            return;
+          } else if (data.record && !data.record.elegible) {
+            newErrors.pasaporte = `Acción Suspendida: Este número de pasaporte cuenta con restricciones de Inmigración: "${data.record.motivo}"`;
+            setErrors(newErrors);
+            setVerifyingPassport(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Passport validator network issue in Extranjeria mode:', err);
+      } finally {
+        setVerifyingPassport(false);
+      }
+
+      setErrors({});
+      onSuccess({
+        tipoIdentificacion: 'Pasaporte',
+        identificacion: pasaporte.trim().toUpperCase(),
+        fechaNacimiento: fechaResolucion,
+        telefono: 'N/A',
+        correo: correo.trim(),
+        primerNombre: primerNombre.trim(),
+        segundoNombre: segundoNombre.trim(),
+        primerApellido: primerApellido.trim(),
+        segundoApellido: segundoApellido.trim(),
+        pasaporte: pasaporte.trim().toUpperCase(),
+        nacionalidad: nacionalidad.trim(),
+        fechaResolucion,
+        numeroResolucion: numeroResolucion.trim()
+      });
+      return;
+    }
+
+    // Basic Fields validation (for normal categories)
     if (!identificacion.trim()) {
       newErrors.identificacion = 'Ingrese su número de documento o cédula';
     } else if (tipoIdentificacion === 'Cedula' && !/^\d+-(\d+)-\d+$/.test(identificacion.trim()) && identificacion.length < 5) {
@@ -199,6 +319,326 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
         return 'Válido para ciudadanos extranjeros que aún no poseen cédula PE.';
     }
   };
+
+  if (selectedCategoria === 'extranjeria') {
+    return (
+      <form onSubmit={handleSubmit} id="form-datos-personales" className="space-y-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-5 md:p-6 space-y-6 animate-fade-in shadow-sm">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-900 text-white flex items-center justify-center font-bold text-sm">
+              2
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">Formulario de Trámite de Extranjería</h3>
+              <p className="text-xs text-slate-500 font-medium">Complete los siguientes campos requeridos para la confirmación de su cita migratoria.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Primer Nombre */}
+            <div className="flex flex-col gap-1.5 animate-slide-up">
+              <label htmlFor="p_nombre" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Primer Nombre <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="p_nombre"
+                value={primerNombre}
+                onChange={(e) => setPrimerNombre(e.target.value)}
+                placeholder="Ej: John"
+                className={`h-11 w-full bg-white border ${
+                  errors.primerNombre ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition`}
+              />
+              {errors.primerNombre && (
+                <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.primerNombre}
+                </span>
+              )}
+            </div>
+
+            {/* Segundo Nombre */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="s_nombre" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Segundo Nombre
+              </label>
+              <input
+                type="text"
+                id="s_nombre"
+                value={segundoNombre}
+                onChange={(e) => setSegundoNombre(e.target.value)}
+                placeholder="Ej: Robert (Opcional)"
+                className="h-11 w-full bg-white border border-slate-300 rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-700 transition"
+              />
+            </div>
+
+            {/* Primer Apellido */}
+            <div className="flex flex-col gap-1.5 animate-slide-up">
+              <label htmlFor="p_apellido" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Primer Apellido <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="p_apellido"
+                value={primerApellido}
+                onChange={(e) => setPrimerApellido(e.target.value)}
+                placeholder="Ej: Smith"
+                className={`h-11 w-full bg-white border ${
+                  errors.primerApellido ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition`}
+              />
+              {errors.primerApellido && (
+                <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.primerApellido}
+                </span>
+              )}
+            </div>
+
+            {/* Segundo Apellido */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="s_apellido" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Segundo Apellido
+              </label>
+              <input
+                type="text"
+                id="s_apellido"
+                value={segundoApellido}
+                onChange={(e) => setSegundoApellido(e.target.value)}
+                placeholder="Ej: Doe (Opcional)"
+                className="h-11 w-full bg-white border border-slate-300 rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-700 transition"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Pasaporte */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="ext_pasaporte" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Pasaporte <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="ext_pasaporte"
+                value={pasaporte}
+                onChange={(e) => setPasaporte(e.target.value)}
+                placeholder="Ej: PA0987152"
+                className={`h-11 w-full bg-white border ${
+                  errors.pasaporte ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition font-mono uppercase`}
+              />
+              {errors.pasaporte ? (
+                <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.pasaporte}
+                </span>
+              ) : (
+                <span className="text-[11px] text-slate-400 font-medium mt-1">
+                  Este pasaporte debe coincidir con el registro aprobado en la base de Extranjería.
+                </span>
+              )}
+            </div>
+
+            {/* Nacionalidad */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="ext_nacionalidad" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Nacionalidad <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="ext_nacionalidad"
+                value={nacionalidad}
+                onChange={(e) => setNacionalidad(e.target.value)}
+                className={`h-11 w-full bg-white border ${
+                  errors.nacionalidad ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition cursor-pointer`}
+              >
+                <option value="">-- Seleccione su nacionalidad --</option>
+                {NACIONALIDADES.map((nac) => (
+                  <option key={nac} value={nac}>
+                    {nac}
+                  </option>
+                ))}
+              </select>
+              {errors.nacionalidad && (
+                <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.nacionalidad}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Correo Electrónico */}
+            <div className="flex flex-col gap-1.5 md:col-span-1 col-span-1">
+              <label htmlFor="ext_correo" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Correo Electrónico <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                id="ext_correo"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                placeholder="Ej: mi_correo@gmail.com"
+                className={`h-11 w-full bg-white border ${
+                  errors.correo ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition`}
+              />
+              {errors.correo ? (
+                <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.correo}
+                </span>
+              ) : (
+                <span className="text-[11px] text-slate-400 font-medium mt-1">
+                  Se enviará el comprobante digital a este email.
+                </span>
+              )}
+            </div>
+
+            {/* Número de Resolución */}
+            <div className="flex flex-col gap-1.5 md:col-span-1 col-span-1">
+              <label htmlFor="ext_num_resolucion" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Número de Resolución <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="ext_num_resolucion"
+                value={numeroResolucion}
+                onChange={(e) => setNumeroResolucion(e.target.value)}
+                placeholder="Ej: RESOL-2026-8492"
+                className={`h-11 w-full bg-white border ${
+                  errors.numeroResolucion ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition font-mono`}
+              />
+              {errors.numeroResolucion && (
+                <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.numeroResolucion}
+                </span>
+              )}
+            </div>
+
+            {/* Fecha de Resolución */}
+            <div className="flex flex-col gap-1.5 md:col-span-1 col-span-1">
+              <label htmlFor="ext_fecha_resolucion" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Fecha de Resolución <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                id="ext_fecha_resolucion"
+                value={fechaResolucion}
+                onChange={(e) => setFechaResolucion(e.target.value)}
+                className={`h-11 w-full bg-white border ${
+                  errors.fechaResolucion ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition cursor-pointer`}
+              />
+              {errors.fechaResolucion && (
+                <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.fechaResolucion}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Control Matemática - CAPTCHA */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 md:p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-dashed border-slate-200 pb-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-blue-700" />
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 tracking-tight">Filtro de Seguridad Antirobot</h4>
+                <p className="text-xs text-slate-500 font-medium">Resuelva este cálculo para autorizar el acceso a los servicios.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={generateCaptcha}
+              title="Generar otra operación matemática"
+              className="p-1 px-2.5 rounded hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 text-xs font-bold border border-slate-300 bg-white cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Generar otro</span>
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4 justify-between pt-1">
+            <div className="flex items-center gap-3 bg-white border border-slate-300 shadow-sm rounded px-5 py-2.5 select-none font-mono text-xl font-bold text-slate-700">
+              <span>{num1}</span>
+              <span className="text-blue-700 text-xl font-bold">{operativo}</span>
+              <span>{num2}</span>
+              <span className="text-slate-400 font-normal">=</span>
+              <span className="text-slate-300">?</span>
+            </div>
+
+            <div className="flex-1 w-full max-w-xs">
+              <div className="relative">
+                <input
+                  type="number"
+                  value={captchaRes}
+                  onChange={(e) => setCaptchaRes(e.target.value)}
+                  placeholder="Respuesta"
+                  className={`w-full h-11 bg-white border text-center font-bold text-lg rounded focus:outline-none focus:ring-2 transition ${
+                    captchaCorrectState === true
+                      ? 'border-emerald-500 text-emerald-700 focus:ring-emerald-200 bg-emerald-50/25'
+                      : captchaCorrectState === false
+                      ? 'border-red-400 text-red-700 focus:ring-red-200'
+                      : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+                  }`}
+                />
+                {captchaCorrectState === true && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 bg-emerald-100 p-0.5 rounded-full">
+                    <Check className="w-3.5 h-3.5" />
+                  </div>
+                )}
+              </div>
+              
+              {errors.captcha && (
+                <span className="flex items-center gap-1 text-[11px] text-red-500 mt-1.5 justify-center sm:justify-start font-medium leading-none animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errors.captcha}
+                </span>
+              )}
+              {captchaCorrectState === true && (
+                <span className="flex items-center gap-1 text-[11px] text-emerald-600 mt-1.5 font-bold justify-center sm:justify-start animate-pulse">
+                  <Sparkles className="w-3.5 h-3.5 animate-pulse" /> ¡Filtro de seguridad superado con éxito!
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-between pt-2">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="w-full sm:w-auto h-12 px-6 rounded border border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-xs hover:bg-slate-50 transition cursor-pointer text-center flex items-center justify-center"
+            >
+              Regresar
+            </button>
+          ) : (
+            <div className="hidden sm:block"></div>
+          )}
+
+          <button
+            type="submit"
+            disabled={verifyingPassport}
+            className="w-full sm:w-auto h-12 bg-blue-700 hover:bg-blue-800 text-white font-bold px-8 rounded shadow-lg shadow-blue-100 transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-75"
+          >
+            {verifyingPassport ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                <span>Verificando pasaporte...</span>
+              </>
+            ) : (
+              <>
+                <span>Siguiente: Oficina y Fecha</span>
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} id="form-datos-personales" className="space-y-6">

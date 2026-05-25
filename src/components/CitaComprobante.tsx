@@ -324,26 +324,55 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
             </div>
 
             {/* Applicant details */}
-            <div className="bg-slate-50 border border-slate-200 rounded p-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div className="flex items-center gap-2 text-[11px] text-slate-700">
-                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">Cédula No: <strong className="font-extrabold text-slate-800">{cita.datosPersonales.identificacion}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-700">
-                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">Teléfono: <strong className="font-bold text-slate-800">{cita.datosPersonales.telefono}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-700 col-span-1 sm:col-span-2 border-t border-slate-200 pt-2 mt-1">
-                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">Correo: <strong className="font-bold text-slate-800">{cita.datosPersonales.correo}</strong></span>
-              </div>
-              {cita.datosPersonales.numeroSeguimiento && (
-                <div className="flex items-center gap-2 text-[11px] text-blue-900 col-span-1 sm:col-span-2 border-t border-blue-200 bg-blue-50/50 p-1.5 rounded mt-1 font-mono">
-                  <span className="font-bold text-blue-750 bg-blue-100 text-[9px] px-1 rounded uppercase tracking-wider">EXPEDIENTE</span>
-                  <span className="truncate">N°: <strong className="font-black text-blue-950">{cita.datosPersonales.numeroSeguimiento}</strong></span>
+            {cita.servicioCategoria === 'extranjeria' ? (
+              <div className="bg-amber-50/20 border border-amber-200/60 rounded p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 shadow-sm">
+                <div className="flex items-center gap-2 text-[11px] text-slate-700 col-span-1 sm:col-span-2">
+                  <User className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <span className="truncate">Nombre Completo: <strong className="font-extrabold text-slate-800">{[cita.datosPersonales.primerNombre, cita.datosPersonales.segundoNombre, cita.datosPersonales.primerApellido, cita.datosPersonales.segundoApellido].filter(Boolean).join(' ')}</strong></span>
                 </div>
-              )}
-            </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                  <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-wider">PASAPORTE</span>
+                  <span className="truncate font-mono"><strong className="font-extrabold text-slate-800">{cita.datosPersonales.pasaporte}</strong></span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                  <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-wider">NACIONALIDAD</span>
+                  <span className="truncate"><strong className="font-bold text-slate-800">{cita.datosPersonales.nacionalidad}</strong></span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                  <span className="text-[9px] font-extrabold text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded uppercase tracking-wider">RESOLUCIÓN N°</span>
+                  <span className="truncate font-mono"><strong className="font-bold text-slate-800">{cita.datosPersonales.numeroResolucion}</strong></span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                  <span className="text-[9px] font-extrabold text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded uppercase tracking-wider">FECHA RESOLUCIÓN</span>
+                  <span className="truncate"><strong className="font-bold text-slate-800">{cita.datosPersonales.fechaResolucion}</strong></span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-slate-700 col-span-1 sm:col-span-2 border-t border-dashed border-slate-200 pt-2.5 mt-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">Correo: <strong className="font-bold text-slate-800">{cita.datosPersonales.correo}</strong></span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded p-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="flex items-center gap-2 text-[11px] text-slate-700">
+                  <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">Cédula No: <strong className="font-extrabold text-slate-800">{cita.datosPersonales.identificacion}</strong></span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-slate-700">
+                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">Teléfono: <strong className="font-bold text-slate-800">{cita.datosPersonales.telefono}</strong></span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-slate-700 col-span-1 sm:col-span-2 border-t border-slate-200 pt-2 mt-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">Correo: <strong className="font-bold text-slate-800">{cita.datosPersonales.correo}</strong></span>
+                </div>
+                {cita.datosPersonales.numeroSeguimiento && (
+                  <div className="flex items-center gap-2 text-[11px] text-blue-900 col-span-1 sm:col-span-2 border-t border-blue-200 bg-blue-50/50 p-1.5 rounded mt-1 font-mono">
+                    <span className="font-bold text-blue-750 bg-blue-100 text-[9px] px-1 rounded uppercase tracking-wider">EXPEDIENTE</span>
+                    <span className="truncate">N°: <strong className="font-black text-blue-950">{cita.datosPersonales.numeroSeguimiento}</strong></span>
+                  </div>
+                )}
+              </div>
+            )}
 
           </div>
 
