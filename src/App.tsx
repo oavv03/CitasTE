@@ -14,7 +14,8 @@ import {
   Languages,
   Zap,
   ArrowRight,
-  Shield
+  Shield,
+  Globe
 } from 'lucide-react';
 import { DatosPersonales, ServicioCategoriaId, Cita } from './types';
 import FormularioDatos from './components/FormularioDatos';
@@ -23,9 +24,10 @@ import AgendamientoCita from './components/AgendamientoCita';
 import CitaComprobante from './components/CitaComprobante';
 import DashboardCitas from './components/DashboardCitas';
 import AdminPanel from './components/AdminPanel';
+import ConsultaExtranjeria from './components/ConsultaExtranjeria';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'agendar' | 'mis-citas' | 'admin'>('agendar');
+  const [activeTab, setActiveTab] = useState<'agendar' | 'mis-citas' | 'admin' | 'extranjeria-consulta'>('agendar');
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Core Booking wizard state
@@ -42,15 +44,48 @@ export default function App() {
   // Full appointments history list
   const [citasList, setCitasList] = useState<Cita[]>([]);
 
-  // Load from LocalStorage on mount
+  // Load from LocalStorage on mount & Sync with server
   useEffect(() => {
     try {
       const stored = localStorage.getItem('te_panama_citas');
       if (stored) {
-        setCitasList(JSON.parse(stored));
+        const parsed: Cita[] = JSON.parse(stored);
+        setCitasList(parsed);
+
+        // Fetch newest statuses for these appointments from the backend DB
+        const ids = parsed.map(c => c.id);
+        if (ids.length > 0) {
+          fetch('/api/sync-appointments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.success && Array.isArray(data.appointments)) {
+              // Map updated statuses back to ours
+              const updatedList = parsed.map(localCita => {
+                const match = data.appointments.find((srv: any) => srv.id === localCita.id);
+                if (match) {
+                  return { ...localCita, estado: match.estado };
+                }
+                return localCita;
+              });
+              
+              // Only save if there was actually a change to prevent infinite loops
+              const isDifferent = JSON.stringify(updatedList) !== JSON.stringify(parsed);
+              if (isDifferent) {
+                console.log("[Sync] Synced appointments with server-side configurations.");
+                setCitasList(updatedList);
+                localStorage.setItem('te_panama_citas', JSON.stringify(updatedList));
+              }
+            }
+          })
+          .catch(err => console.warn('Could not sync appointments with server DB:', err));
+        }
       }
-    } catch {
-      console.warn('Could not read te_panama_citas from localStorage');
+    } catch (e) {
+      console.warn('Could not read te_panama_citas from localStorage', e);
     }
   }, []);
 
@@ -105,6 +140,17 @@ export default function App() {
       estado: 'confirmada',
     };
 
+    // Register on express server as well
+    try {
+      fetch('/api/register-appointment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevaCita)
+      }).catch(err => console.warn("Could not register booking on server:", err));
+    } catch (e) {
+      console.warn("Exception registering booking on server:", e);
+    }
+
     const updated = [nuevaCita, ...citasList];
     saveCitas(updated);
     setActiveCita(nuevaCita);
@@ -132,6 +178,17 @@ export default function App() {
     saveCitas(updated);
     if (activeCita && activeCita.id === citaId) {
       setActiveCita({ ...activeCita, estado: 'cancelada' as const });
+    }
+
+    // Cancel on express server as well
+    try {
+      fetch('/api/cancel-appointment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: citaId })
+      }).catch(err => console.warn("Could not cancel on server:", err));
+    } catch (e) {
+      console.warn("Exception canceling on server:", e);
     }
   };
 
@@ -294,17 +351,17 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('admin')}
+              onClick={() => setActiveTab('extranjeria-consulta')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black uppercase tracking-wider transition cursor-pointer ${
-                activeTab === 'admin'
-                  ? 'bg-amber-600 text-white shadow-sm'
+                activeTab === 'extranjeria-consulta'
+                  ? 'bg-white text-blue-950 shadow-sm border border-slate-350/50'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
-              id="admin-tab-button"
+              id="extranjeria-consulta-tab-button"
             >
-              <Shield className="w-3.5 h-3.5 text-blue-700" />
-              <span className="hidden sm:inline">Panel Admin</span>
-              <span className="inline sm:hidden">Admin</span>
+              <Globe className="w-3.5 h-3.5 text-blue-700" />
+              <span className="hidden sm:inline">Validar Pasaporte</span>
+              <span className="inline sm:hidden">Validar</span>
             </button>
           </nav>
         </div>
@@ -431,46 +488,26 @@ export default function App() {
                 </motion.div>
               </AnimatePresence>
 
-              {/* Panel de Atajo de Pruebas Temporal */}
-              {currentStep < 4 && (
-                <div id="demo-testing-bypass" className="mt-8 pt-6 border-t border-slate-100 bg-amber-50/40 p-4 rounded-lg border border-dashed border-amber-250 space-y-3.5 print:hidden">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                      <span className="text-[11px] font-extrabold text-amber-950 uppercase tracking-wider font-mono">Modo de Pruebas / Atajos Rápidos</span>
-                    </div>
-                    <span className="text-[10px] text-amber-800 font-extrabold bg-amber-100/80 px-2 py-0.5 rounded uppercase tracking-wide font-mono">Paso Actual: {currentStep} de 3</span>
-                  </div>
-                  
-                  <p className="text-[11px] text-amber-800 leading-relaxed max-w-2xl font-medium">
-                    Utilice estos botones temporales para cambiar de pantalla/ventana e ignorar los formularios vacíos para validar la aplicación de manera instantánea.
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      id="btn-bypass-step"
-                      onClick={handleNextStepBypass}
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] uppercase tracking-wider px-4 py-2.5 rounded shadow-sm flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-                    >
-                      <span>Siguiente Paso (Omitir Validación)</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                    
-                    <button
-                      type="button"
-                      id="btn-bypass-all"
-                      onClick={handleFastDemoBooking}
-                      className="bg-slate-900 hover:bg-slate-950 text-white font-extrabold text-[11px] uppercase tracking-wider px-4 py-2.5 rounded shadow-sm flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-                    >
-                      <Zap className="w-3 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-                      <span>Auto-Llenar Todo y Agendar Cita Directamente</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+
 
             </div>
+          ) : activeTab === 'extranjeria-consulta' ? (
+            /* CONSULTA DE EXTRANJERIA */
+            <ConsultaExtranjeria 
+              onRedirectToBook={(passportNum) => {
+                setDatosPersonales({
+                  tipoIdentificacion: 'Pasaporte',
+                  identificacion: passportNum,
+                  fechaNacimiento: '',
+                  telefono: '',
+                  correo: ''
+                });
+                setCurrentStep(1);
+                // Pre-set category optionally to Extranjería if mapped
+                setSelectedCategoria('extranjeria'); 
+                setActiveTab('agendar');
+              }}
+            />
           ) : (
             /* DASHBOARD VIEW */
             <div className="bg-white border border-slate-200 rounded shadow-sm p-4 md:p-6">
@@ -606,6 +643,21 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Floating Protected Entry for Authorized Personnel Only (Bottom-Left Shield) */}
+      <button
+        type="button"
+        id="floating-admin-shield"
+        onClick={() => setActiveTab(activeTab === 'admin' ? 'agendar' : 'admin')}
+        className={`fixed bottom-5 left-5 z-50 p-3 rounded-full shadow-lg border transition-all duration-300 active:scale-90 cursor-pointer flex items-center justify-center hover:shadow-xl group hover:rotate-12 ${
+          activeTab === 'admin'
+            ? 'bg-blue-600 border-blue-700 text-white hover:bg-blue-700'
+            : 'bg-white border-slate-200 text-blue-700 hover:bg-slate-50'
+        }`}
+        title="Acceso de Control del Tribunal Electoral"
+      >
+        <Shield className={`w-5 h-5 shrink-0 transition-transform ${activeTab === 'admin' ? 'scale-110' : 'group-hover:scale-110'}`} />
+      </button>
       
     </div>
   );

@@ -23,6 +23,113 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // States to manage 24h reminder
+  const [reminderStatus, setReminderStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [reminderMessage, setReminderMessage] = useState('');
+  const [reminderIsSimulated, setReminderIsSimulated] = useState(false);
+  const [simulatedConfirmUrl, setSimulatedConfirmUrl] = useState('');
+  const [simulatedCancelUrl, setSimulatedCancelUrl] = useState('');
+  const [simulatedHtmlPreview, setSimulatedHtmlPreview] = useState('');
+  const [showHtmlPreview, setShowHtmlPreview] = useState(false);
+
+  // States for confirmation email simulation preview
+  const [confHtmlPreview, setConfHtmlPreview] = useState('');
+  const [showConfHtmlPreview, setShowConfHtmlPreview] = useState(false);
+
+  // Poll server for status changes to support real-time interactive confirmation/cancellation email links
+  React.useEffect(() => {
+    let active = true;
+    const checkStatus = () => {
+      fetch('/api/sync-appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [cita.id] })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (active && data && data.success && Array.isArray(data.appointments) && data.appointments[0]) {
+          const srvCita = data.appointments[0];
+          if (srvCita.estado !== cita.estado) {
+            // Update local storage so that when we reload or sync, it's correct
+            try {
+              const stored = localStorage.getItem('te_panama_citas');
+              if (stored) {
+                const parsed: Cita[] = JSON.parse(stored);
+                const updatedList = parsed.map(c => c.id === cita.id ? { ...c, estado: srvCita.estado } : c);
+                localStorage.setItem('te_panama_citas', JSON.stringify(updatedList));
+                // Reload or soft update the application's inspected item state
+                window.location.reload(); // Force simple refresh to keep layout in perfect state
+              }
+            } catch (e) {
+              console.warn("Storage sync exception during poll:", e);
+            }
+          }
+        }
+      })
+      .catch(err => console.debug("Poll error:", err));
+    };
+
+    // check immediately
+    checkStatus();
+
+    // poll every 4 seconds for immediate responsiveness
+    const interval = setInterval(checkStatus, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [cita.id, cita.estado]);
+
+  const handleSendReminder = async () => {
+    setReminderStatus('sending');
+    setReminderMessage('');
+
+    try {
+      const response = await fetch('/api/send-reminder-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: cita.id,
+          email: emailInput,
+          codigoTransaccion: cita.codigoTransaccion,
+          categoriaNombre: currentCategory?.id || '',
+          subServicioNombre: currentSubService?.nombre || '',
+          fechaFormateada: formatDate(cita.fecha),
+          fecha: cita.fecha,
+          hora: cita.hora,
+          sucursalNombre: currentSucursal?.nombre || '',
+          sucursalDireccion: currentSucursal?.direccion || '',
+          identificacion: cita.datosPersonales.identificacion,
+          telefono: cita.datosPersonales.telefono,
+          requisitos: currentSubService?.requisitos || []
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setReminderStatus('success');
+        setReminderMessage(data.message);
+        setReminderIsSimulated(!!data.simulated);
+        setSimulatedConfirmUrl(data.confirmUrl || '');
+        setSimulatedCancelUrl(data.cancelUrl || '');
+        setSimulatedHtmlPreview(data.htmlPreview || '');
+      } else {
+        setReminderStatus('error');
+        setReminderMessage(data.error || 'Ocurrió un error al despachar el recordatorio.');
+        if (data.htmlPreview) {
+          setSimulatedHtmlPreview(data.htmlPreview);
+          setSimulatedConfirmUrl(data.confirmUrl || '');
+          setSimulatedCancelUrl(data.cancelUrl || '');
+        }
+      }
+    } catch (err) {
+      setReminderStatus('error');
+      setReminderMessage('No se pudo comunicar con el servidor.');
+    }
+  };
+
   // Format date display
   const formatDate = (dateStr: string) => {
     const parts = dateStr.split('-');
@@ -60,6 +167,8 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
           categoriaNombre: currentCategory?.nombre || '',
           subServicioNombre: currentSubService?.nombre || '',
           fechaFormateada: formatDate(cita.fecha),
+          fecha: cita.fecha,
+          id: cita.id,
           hora: cita.hora,
           sucursalNombre: currentSucursal?.nombre || '',
           sucursalDireccion: currentSucursal?.direccion || '',
@@ -74,9 +183,13 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
         setEmailStatus('success');
         setEmailMessage(data.message);
         setIsSimulated(!!data.simulated);
+        setConfHtmlPreview(data.htmlPreview || '');
       } else {
         setEmailStatus('error');
         setEmailMessage(data.error || 'Surgió un problema inesperado al enviar el comprobante.');
+        if (data.htmlPreview) {
+          setConfHtmlPreview(data.htmlPreview);
+        }
       }
     } catch (err) {
       setEmailStatus('error');
@@ -140,8 +253,7 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
               />
             </div>
             <div className="text-center sm:text-left">
-              <span className="text-[10px] text-blue-200 uppercase font-black tracking-widest block">República de Panamá</span>
-              <h4 className="text-xs font-extrabold text-white tracking-wider uppercase">Tribunal Electoral</h4>
+              <span className="text-xs md:text-sm text-amber-300 font-extrabold uppercase tracking-wider block">SISTEMA DE CITAS AGENDATE</span>
             </div>
           </div>
           <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1.5">
@@ -151,11 +263,19 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
             </div>
             
             <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded shadow-sm border ${
-              isCanceled 
-                ? 'bg-red-600 text-white border-red-500' 
-                : 'bg-emerald-500 text-white border-emerald-400'
+              cita.estado === 'cancelada' || cita.estado === 'no_asistire'
+                ? 'bg-red-650 text-white border-red-550' 
+                : cita.estado === 'asistire'
+                  ? 'bg-blue-650 text-white border-blue-550'
+                  : 'bg-emerald-500 text-white border-emerald-400'
             }`}>
-              {isCanceled ? 'Cancelada' : 'Confirmada'}
+              {cita.estado === 'cancelada' 
+                ? 'Cancelada' 
+                : cita.estado === 'asistire' 
+                  ? 'Asistencia Confirmada' 
+                  : cita.estado === 'no_asistire' 
+                    ? 'No Asistirá / Cancelada' 
+                    : 'Confirmada'}
             </span>
           </div>
         </div>
@@ -372,22 +492,244 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
               {emailMessage}
             </p>
             {isSimulated && (
-              <p className="font-bold text-[10px] text-amber-700 leading-normal pl-5 uppercase">
-                (Nota: El servidor está operando en Modo Demostración sin claves. Para efectuar entregas reales a cualquier bandeja, configure la variable RESEND_API_KEY en los secretos).
-              </p>
+              <>
+                <p className="font-bold text-[10px] text-amber-700 leading-normal pl-5 uppercase">
+                  (Nota: El servidor está operando en Modo Demostración sin claves. Para efectuar entregas reales a cualquier bandeja, configure la variable RESEND_API_KEY en los secretos).
+                </p>
+                {confHtmlPreview && (
+                  <div className="mt-3.5 pt-3.5 border-t border-emerald-200/50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded tracking-wider">
+                        Buzón de Simulación Activo
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowConfHtmlPreview(!showConfHtmlPreview)}
+                        className="text-[11px] font-bold text-emerald-800 hover:text-emerald-950 underline decoration-dotted underline-offset-4 cursor-pointer"
+                      >
+                        {showConfHtmlPreview ? 'Ocultar correo' : 'Ver correo simulado (HTML)'}
+                      </button>
+                    </div>
+                    {showConfHtmlPreview && (
+                      <div className="bg-white rounded border border-emerald-200 overflow-hidden shadow-sm">
+                        <div className="bg-slate-100 p-2.5 text-[10px] border-b border-slate-200 text-slate-500 font-mono flex items-center justify-between">
+                          <span>De: Tribunal Electoral (simulado)</span>
+                          <span>Para: {emailInput}</span>
+                        </div>
+                        <div 
+                          className="p-4 overflow-auto max-h-96 text-left border-t border-slate-100" 
+                          dangerouslySetInnerHTML={{ __html: confHtmlPreview }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
 
         {emailStatus === 'error' && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded text-xs space-y-1">
-            <p className="font-extrabold flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              <span>No se pudo procesar el correo</span>
-            </p>
-            <p className="font-medium text-[11.5px] leading-normal text-red-700 pl-5">
-              {emailMessage}
-            </p>
+          <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded text-xs space-y-2">
+            <div>
+              <p className="font-extrabold flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <span>No se pudo procesar el correo</span>
+              </p>
+              <p className="font-medium text-[11.5px] leading-normal text-red-700 pl-5">
+                {emailMessage}
+              </p>
+            </div>
+            
+            {confHtmlPreview && (
+              <div className="mt-3 pt-3 border-t border-red-200/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded tracking-wider">
+                    Buzón de Simulación Alternativo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfHtmlPreview(!showConfHtmlPreview)}
+                    className="text-[11px] font-bold text-red-800 hover:text-red-950 underline decoration-dotted underline-offset-4 cursor-pointer"
+                  >
+                    {showConfHtmlPreview ? 'Ocultar correo' : 'Ver correo simulado (HTML)'}
+                  </button>
+                </div>
+                {showConfHtmlPreview && (
+                  <div className="bg-white rounded border border-red-200 overflow-hidden shadow-sm">
+                    <div className="bg-slate-105 p-2.5 text-[10px] border-b border-slate-200 text-slate-500 font-mono flex items-center justify-between">
+                      <span>De: Tribunal Electoral (simulado en error)</span>
+                      <span>Para: {emailInput}</span>
+                    </div>
+                    <div 
+                      className="p-4 overflow-auto max-h-96 text-left border-t border-slate-100" 
+                      dangerouslySetInnerHTML={{ __html: confHtmlPreview }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 24-Hour Reminder Simulation & Interactive Flow Control Card */}
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50/30 border border-amber-200 rounded p-5 max-w-2xl mx-auto shadow-sm space-y-4">
+        <h5 className="text-xs font-black text-amber-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-amber-100 pb-2.5">
+          <FileClock className="w-4 h-4 text-amber-700 font-extrabold" />
+          <span>Recordatorio de 24h & Confirmación Activa</span>
+        </h5>
+
+        <p className="text-[11px] text-slate-600 leading-normal font-medium">
+          <strong>Demostración de flujo interactivo:</strong> El Tribunal Electoral exige que los ciudadanos confirmen su asistencia 24h antes para optimizar turnos en ventanilla. Pulse el botón a continuación para despachar la notificación (real o simulada) que posee enlaces de acción viva:
+        </p>
+
+        <div className="bg-white/80 rounded border border-amber-100 p-3.5 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-700">Estado de Asistencia (Servidor):</span>
+            
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${
+                cita.estado === 'asistire'
+                  ? 'bg-blue-600 animate-pulse'
+                  : cita.estado === 'cancelada' || cita.estado === 'no_asistire'
+                    ? 'bg-red-500'
+                    : 'bg-amber-450 animate-ping'
+              }`} />
+              
+              <span className={`font-black uppercase tracking-wider text-[10px] ${
+                cita.estado === 'asistire'
+                  ? 'text-blue-700'
+                  : cita.estado === 'cancelada' || cita.estado === 'no_asistire'
+                    ? 'text-red-700'
+                    : 'text-amber-800'
+              }`}>
+                {cita.estado === 'asistire'
+                  ? '✓ Asistencia Confirmada'
+                  : cita.estado === 'cancelada' || cita.estado === 'no_asistire'
+                    ? '✗ Cita Cancelada'
+                    : '⏳ Pendiente (Recordatorio Recibido / Reserva Activa)'}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row gap-2.5 items-center justify-between">
+            <button
+              type="button"
+              onClick={handleSendReminder}
+              disabled={reminderStatus === 'sending'}
+              className={`w-full sm:w-auto h-10 px-5 rounded text-[11px] uppercase font-black tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
+                reminderStatus === 'sending'
+                  ? 'bg-slate-200 text-slate-450 cursor-not-allowed'
+                  : 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm'
+              }`}
+            >
+              {reminderStatus === 'sending' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Despachando Recordatorio 24h...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Enviar Recordatorio de 24h</span>
+                </>
+              )}
+            </button>
+
+            <span className="text-[10px] font-bold text-slate-400">
+              Auto-sincronizado en tiempo real
+            </span>
+          </div>
+        </div>
+
+        {/* Status Responses */}
+        {reminderStatus === 'success' && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs space-y-2">
+            <div>
+              <p className="font-extrabold flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <span>¡Recordatorio Obligatorio de 24h Enviado!</span>
+              </p>
+              <p className="font-medium text-[11px] leading-normal text-emerald-700 pl-5">
+                {reminderMessage} Abre el correo y haz clic en <strong>"Sí, asistiré"</strong> o <strong>"No, cancelar"</strong>. Esta pantalla se actualizará instantáneamente sin actualizar la página.
+              </p>
+            </div>
+            {reminderIsSimulated && (
+              <p className="font-bold text-[10px] text-amber-700 leading-normal pl-5 uppercase">
+                (Nota: Se simuló la entrega de mail de manera local en segundo plano).
+              </p>
+            )}
+            {simulatedHtmlPreview && (
+              <div className="mt-3 pt-3 border-t border-emerald-200/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded tracking-wider">
+                    Buzón de Simulación Activo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowHtmlPreview(!showHtmlPreview)}
+                    className="text-[11px] font-bold text-amber-805 hover:text-amber-955 underline decoration-dotted underline-offset-4 cursor-pointer"
+                  >
+                    {showHtmlPreview ? 'Ocultar correo' : 'Ver correo simulado (HTML)'}
+                  </button>
+                </div>
+                {showHtmlPreview && (
+                  <div className="bg-white rounded border border-emerald-200 overflow-hidden shadow-sm">
+                    <div className="bg-slate-100 p-2.5 text-[10px] border-b border-slate-200 text-slate-500 font-mono flex items-center justify-between">
+                      <span>De: Tribunal Electoral (simulado)</span>
+                      <span>Para: {emailInput}</span>
+                    </div>
+                    <div 
+                      className="p-4 overflow-auto max-h-96 text-left border-t border-slate-100" 
+                      dangerouslySetInnerHTML={{ __html: simulatedHtmlPreview }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {reminderStatus === 'error' && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded text-xs space-y-2">
+            <div>
+              <p className="font-extrabold flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <span>Error de despacho</span>
+              </p>
+              <p className="font-medium text-[11.5px] leading-normal text-red-700 pl-5">
+                {reminderMessage}
+              </p>
+            </div>
+            {simulatedHtmlPreview && (
+              <div className="mt-3 pt-3 border-t border-red-200/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded tracking-wider">
+                    Buzón de Simulación Alternativo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowHtmlPreview(!showHtmlPreview)}
+                    className="text-[11px] font-bold text-red-800 hover:text-red-950 underline decoration-dotted underline-offset-4 cursor-pointer"
+                  >
+                    {showHtmlPreview ? 'Ocultar correo' : 'Ver correo simulado (HTML)'}
+                  </button>
+                </div>
+                {showHtmlPreview && (
+                  <div className="bg-white rounded border border-red-200 overflow-hidden shadow-sm">
+                    <div className="bg-slate-105 p-2.5 text-[10px] border-b border-slate-200 text-slate-500 font-mono flex items-center justify-between">
+                      <span>De: Tribunal Electoral (simulado en error)</span>
+                      <span>Para: {emailInput}</span>
+                    </div>
+                    <div 
+                      className="p-4 overflow-auto max-h-96 text-left border-t border-slate-100" 
+                      dangerouslySetInnerHTML={{ __html: simulatedHtmlPreview }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

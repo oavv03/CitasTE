@@ -44,5 +44,16 @@ export interface Cita {
   hora: string;  // HH:MM
   codigoTransaccion: string;
   fechaCreacion: string;
-  estado: 'confirmada' | 'cancelada';
+  estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire';
 }
+
+export interface ExtranjeriaRecord {
+  pasaporte: string;
+  nombre: string;
+  nacionalidad?: string;
+  elegible: boolean;
+  motivo: string;
+}
+
+export type AdminRole = 'sencillo' | 'super' | 'extranjeria';
+

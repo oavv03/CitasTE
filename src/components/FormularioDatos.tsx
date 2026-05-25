@@ -22,6 +22,7 @@ export default function FormularioDatos({ initialData, onSuccess }: FormularioDa
   const [operativo, setOperativo] = useState<'+' | '-'>('+');
   const [captchaRes, setCaptchaRes] = useState('');
   const [captchaCorrectState, setCaptchaCorrectState] = useState<boolean | null>(null);
+  const [verifyingPassport, setVerifyingPassport] = useState(false);
 
   // Error messages
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -59,8 +60,9 @@ export default function FormularioDatos({ initialData, onSuccess }: FormularioDa
     }
   }, [captchaRes, num1, num2, operativo]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (verifyingPassport) return;
     const newErrors: { [key: string]: string } = {};
 
     // Basic Fields validation
@@ -115,6 +117,37 @@ export default function FormularioDatos({ initialData, onSuccess }: FormularioDa
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
+    }
+
+    // Passport live eligibility check
+    if (tipoIdentificacion === 'Pasaporte') {
+      setVerifyingPassport(true);
+      try {
+        const response = await fetch('/api/extranjeria/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pasaporte: identificacion.trim().toUpperCase() })
+        });
+        const data = await response.json();
+        if (data && data.success) {
+          if (!data.found) {
+            newErrors.identificacion = `Su pasaporte (${identificacion.trim().toUpperCase()}) no figura aprobado por Extranjería. Verifique el número o consulte la pestaña de validación.`;
+            setErrors(newErrors);
+            setVerifyingPassport(false);
+            return;
+          } else if (data.record && !data.record.elegible) {
+            newErrors.identificacion = `Acción Suspendida: Este número de pasaporte cuenta con restricciones de Inmigración: "${data.record.motivo}"`;
+            setErrors(newErrors);
+            setVerifyingPassport(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Passport validator network issue:', err);
+        // Fail-safe: allow proceeding if server fails to connect but notify console log
+      } finally {
+        setVerifyingPassport(false);
+      }
     }
 
     setErrors({});
@@ -363,12 +396,22 @@ export default function FormularioDatos({ initialData, onSuccess }: FormularioDa
       <div className="flex justify-end pt-2">
         <button
           type="submit"
-          className="w-full sm:w-auto h-12 bg-blue-700 hover:bg-blue-800 text-white font-bold px-8 rounded shadow-lg shadow-blue-100 transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+          disabled={verifyingPassport}
+          className="w-full sm:w-auto h-12 bg-blue-700 hover:bg-blue-800 text-white font-bold px-8 rounded shadow-lg shadow-blue-100 transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-75"
         >
-          <span>Siguiente: Elegir Servicio</span>
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
+          {verifyingPassport ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+              <span>Verificando pasaporte...</span>
+            </>
+          ) : (
+            <>
+              <span>Siguiente: Elegir Servicio</span>
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </>
+          )}
         </button>
       </div>
     </form>

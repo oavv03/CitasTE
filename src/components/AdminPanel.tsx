@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Shield, 
   ShieldAlert, 
@@ -26,16 +26,15 @@ import {
   Info,
   Plus
 } from 'lucide-react';
-import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio } from '../types';
+import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio, ExtranjeriaRecord, AdminRole } from '../types';
 import { SUCURSALES_TE, SERVICIOS_TRIBUNAL, saveTramiteMutation, saveSucursalMutation } from '../data';
+import ExtranjeriaController from './ExtranjeriaController';
 
 interface AdminPanelProps {
   citas: Cita[];
   onUpdateCitas: (updatedList: Cita[]) => void;
   onClose: () => void;
 }
-
-type AdminRole = 'sencillo' | 'super';
 
 export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanelProps) {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -44,7 +43,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const [loginError, setLoginError] = useState('');
   
   const [currentRole, setCurrentRole] = useState<AdminRole>('sencillo');
-  const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites'>('tabla');
+  const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites' | 'extranjeria' | 'supabase'>('tabla');
 
   // Search and Filtering states
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,7 +57,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   // Custom states for editing
   const [editFecha, setEditFecha] = useState('');
   const [editHora, setEditHora] = useState('');
-  const [editEstado, setEditEstado] = useState<'confirmada' | 'cancelada'>('confirmada');
+  const [editEstado, setEditEstado] = useState<'confirmada' | 'cancelada' | 'asistire' | 'no_asistire'>('confirmada');
   const [editTipoIdentificacion, setEditTipoIdentificacion] = useState<TipoIdentificacion>('Cedula');
   const [editIdentificacion, setEditIdentificacion] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
@@ -76,6 +75,165 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   // Reactive list states for offices and procedures (available to both Admin Sencillo and Super Admin)
   const [mutableSucursales, setMutableSucursales] = useState<Sucursal[]>([...SUCURSALES_TE]);
   const [mutableServicios, setMutableServicios] = useState<CategoriaServicio[]>([...SERVICIOS_TRIBUNAL]);
+
+  // Supabase live integration states
+  const [dbSupabaseUrl, setDbSupabaseUrl] = useState('');
+  const [dbSupabaseAnonKey, setDbSupabaseAnonKey] = useState('');
+  const [dbTableName, setDbTableName] = useState('citas');
+  const [dbAutoSync, setDbAutoSync] = useState(true);
+  const [dbSyncToVercel, setDbSyncToVercel] = useState(true);
+  const [dbVercelUrl, setDbVercelUrl] = useState('https://sistema-de-ticket.vercel.app/api/tickets');
+  const [dbTestingConn, setDbTestingConn] = useState(false);
+  const [dbTestResult, setDbTestResult] = useState<{ success: boolean; connected: boolean; tableExists?: boolean; message?: string; error?: string } | null>(null);
+  const [dbSyncingAll, setDbSyncingAll] = useState(false);
+  const [dbSyncAllResult, setDbSyncAllResult] = useState<{ success: boolean; total: number; synced: number; failed: number; errors: string[] } | null>(null);
+  const [dbIsSavingConfig, setDbIsSavingConfig] = useState(false);
+  const [dbIsConfigLoaded, setDbIsConfigLoaded] = useState(false);
+  const [dbSaveStatus, setDbSaveStatus] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Load configuration from server
+  useEffect(() => {
+    if (activeSubTab === 'supabase' && !dbIsConfigLoaded) {
+      fetch('/api/supabase/config')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.config) {
+            setDbSupabaseUrl(data.config.supabaseUrl || '');
+            setDbSupabaseAnonKey(data.config.supabaseAnonKey || '');
+            setDbTableName(data.config.tableName || 'citas');
+            setDbAutoSync(data.config.autoSync ?? true);
+            setDbSyncToVercel(data.config.syncToVercel ?? true);
+            setDbVercelUrl(data.config.vercelUrl || 'https://sistema-de-ticket.vercel.app/api/tickets');
+          }
+          setDbIsConfigLoaded(true);
+        })
+        .catch(err => console.error("Error loading Supabase configuration:", err));
+    }
+  }, [activeSubTab, dbIsConfigLoaded]);
+
+  const handleSaveDbConfig = async () => {
+    setDbIsSavingConfig(true);
+    setDbSaveStatus(null);
+    setDbTestResult(null);
+    try {
+      const resp = await fetch('/api/supabase/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supabaseUrl: dbSupabaseUrl,
+          supabaseAnonKey: dbSupabaseAnonKey,
+          tableName: dbTableName,
+          autoSync: dbAutoSync,
+          syncToVercel: dbSyncToVercel,
+          vercelUrl: dbVercelUrl
+        })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setDbSaveStatus({
+          success: true,
+          message: '¡Configuración de sincronización guardada con éxito en el servidor!'
+        });
+        // Reload configuration to see masked key representation
+        const getResp = await fetch('/api/supabase/config');
+        const getData = await getResp.json();
+        if (getData.success && getData.config) {
+          setDbSupabaseUrl(getData.config.supabaseUrl || '');
+          setDbSupabaseAnonKey(getData.config.supabaseAnonKey || '');
+        }
+      } else {
+        setDbSaveStatus({
+          success: false,
+          message: 'Error al guardar: ' + (data.error || 'error desconocido')
+        });
+      }
+    } catch (e: any) {
+      setDbSaveStatus({
+        success: false,
+        message: 'Error en el servidor: ' + e.message
+      });
+    } finally {
+      setDbIsSavingConfig(false);
+      setTimeout(() => setDbSaveStatus(null), 8500);
+    }
+  };
+
+  const handleTestDbConnection = async () => {
+    setDbTestingConn(true);
+    setDbTestResult(null);
+    try {
+      const resp = await fetch('/api/supabase/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supabaseUrl: dbSupabaseUrl,
+          supabaseAnonKey: dbSupabaseAnonKey,
+          tableName: dbTableName
+        })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setDbTestResult({
+          success: true,
+          connected: data.connected,
+          tableExists: data.tableExists,
+          message: data.message
+        });
+      } else {
+        setDbTestResult({
+          success: false,
+          connected: false,
+          error: data.error || 'No se pudo establecer conexión al servidor especificado.'
+        });
+      }
+    } catch (e: any) {
+      setDbTestResult({
+        success: false,
+        connected: false,
+        error: e.message || 'Error de red.'
+      });
+    } finally {
+      setDbTestingConn(false);
+    }
+  };
+
+  const handleSyncAllDb = async () => {
+    setDbSyncingAll(true);
+    setDbSyncAllResult(null);
+    try {
+      const resp = await fetch('/api/supabase/sync-all', {
+        method: 'POST'
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setDbSyncAllResult({
+          success: true,
+          total: data.total,
+          synced: data.synced,
+          failed: data.failed,
+          errors: data.errors || []
+        });
+      } else {
+        setDbSyncAllResult({
+          success: false,
+          total: 0,
+          synced: 0,
+          failed: 0,
+          errors: [data.error || 'Error desconocido']
+        });
+      }
+    } catch (e: any) {
+      setDbSyncAllResult({
+        success: false,
+        total: 0,
+        synced: 0,
+        failed: 0,
+        errors: [e.message || 'Error de comunicación con el servidor.']
+      });
+    } finally {
+      setDbSyncingAll(false);
+    }
+  };
 
   // Editing states for branches/offices
   const [editingSucursal, setEditingSucursal] = useState<Sucursal | null>(null);
@@ -106,20 +264,33 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     setCurrentRole(role);
     setIsAdminLoggedIn(true);
     setLoginError('');
+    if (role === 'extranjeria') {
+      setActiveSubTab('extranjeria');
+    } else {
+      setActiveSubTab('tabla');
+    }
   };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim().toLowerCase() === 'admin' && password === '1234') {
+    const lcUser = username.trim().toLowerCase();
+    if (lcUser === 'adminmini' && password === 'admin1234') {
       setCurrentRole('sencillo');
       setIsAdminLoggedIn(true);
+      setActiveSubTab('tabla');
       setLoginError('');
-    } else if (username.trim().toLowerCase() === 'super' && password === 'admin123') {
+    } else if (lcUser === 'adminte' && password === 'Value1234') { 
       setCurrentRole('super');
       setIsAdminLoggedIn(true);
+      setActiveSubTab('tabla');
+      setLoginError('');
+    } else if (lcUser === 'migra26' && password === '12345678') {
+      setCurrentRole('extranjeria');
+      setIsAdminLoggedIn(true);
+      setActiveSubTab('extranjeria');
       setLoginError('');
     } else {
-      setLoginError('Credenciales incorrectas. Para pruebas rápidas use los botones de acceso directo.');
+      setLoginError('Credenciales incorrectas. Para pruebas rápidas use los botones de acceso directo o ingrese las credenciales asignadas.');
     }
   };
 
@@ -143,8 +314,8 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   // Dynamic calculations for Stats dashboard
   const stats = useMemo(() => {
     const total = citas.length;
-    const confirmadas = citas.filter(c => c.estado === 'confirmada').length;
-    const canceladas = citas.filter(c => c.estado === 'cancelada').length;
+    const confirmadas = citas.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
+    const canceladas = citas.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
 
     // By Category
     const porCategoria: Record<string, number> = {};
@@ -546,26 +717,35 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
         {isAdminLoggedIn && (
           <div className="flex flex-wrap items-center gap-2">
-            {/* Role indicator label */}
-            <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border shadow-sm ${
-              currentRole === 'super' 
-                ? 'bg-red-950 text-red-400 border-red-800' 
-                : 'bg-blue-950 text-blue-400 border-blue-800'
-            }`}>
-              Perfil: {currentRole === 'super' ? '⚡ SUPER ADMIN' : '👤 ADMIN SENCILLO'}
-            </span>
-
-            {/* Quick switcher during simulation */}
-            <button
-              onClick={() => {
-                setCurrentRole(currentRole === 'super' ? 'sencillo' : 'super');
-                setEditingCita(null); // Clear editing to prevent profile mismatch
-              }}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-bold px-2 py-1 rounded tracking-wide transition"
-              title="Alternar perfiles para validar restricciones fácilmente"
-            >
-              Cambiar a {currentRole === 'super' ? 'Admin Sencillo' : 'Super Admin'}
-            </button>
+             {/* Role indicator label */}
+             <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border shadow-sm ${
+               currentRole === 'super' 
+                 ? 'bg-red-950 text-red-400 border-red-800' 
+                 : currentRole === 'extranjeria'
+                   ? 'bg-amber-950 text-amber-400 border-amber-800'
+                   : 'bg-blue-950 text-blue-400 border-blue-800'
+             }`}>
+               Perfil: {currentRole === 'super' ? '⚡ SUPER ADMIN' : currentRole === 'extranjeria' ? '🛂 ADMIN EXTRANJERÍA' : '👤 ADMIN SENCILLO'}
+             </span>
+ 
+             {/* Quick switcher during simulation */}
+             <button
+               onClick={() => {
+                 const roles: AdminRole[] = ['sencillo', 'super', 'extranjeria'];
+                 const nextRole = roles[(roles.indexOf(currentRole) + 1) % roles.length];
+                 setCurrentRole(nextRole);
+                 setEditingCita(null); // Clear editing to prevent profile mismatch
+                 if (nextRole === 'extranjeria') {
+                   setActiveSubTab('extranjeria');
+                 } else {
+                   setActiveSubTab('tabla');
+                 }
+               }}
+               className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-bold px-2 py-1 rounded tracking-wide transition"
+               title="Alternar perfiles para validar restricciones fácilmente"
+             >
+               Cambiar Perfil (Switch)
+             </button>
 
             <button
               type="button"
@@ -608,10 +788,10 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Usuario</label>
               <input
                 type="text"
-                placeholder="Ejemplo: admin / super"
+                placeholder="Ejemplo: AdminTE / AdminMini / Migra26"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium"
               />
             </div>
 
@@ -619,7 +799,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Contraseña</label>
               <input
                 type="password"
-                placeholder="••••"
+                placeholder="Contraseña institucional segura"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600"
@@ -628,37 +808,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider py-2 rounded transition shadow-md"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider py-2 rounded transition shadow-md cursor-pointer"
             >
               Iniciar sesión institucional
             </button>
           </form>
-
-          {/* QUICK DEMO SELECTORS */}
-          <div className="w-full space-y-3 pt-4 border-t border-slate-800">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Botones de Acceso Directo de Prueba</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('sencillo')}
-                className="p-3 bg-slate-950 hover:bg-slate-900 border border-blue-900/60 rounded flex flex-col items-center gap-1.5 transition text-center group cursor-pointer"
-              >
-                <Users className="w-5 h-5 text-blue-400 group-hover:scale-110 transition" />
-                <span className="text-[11px] font-extrabold text-white">ADMIN SENCILLO</span>
-                <span className="text-[9px] text-slate-400 leading-tight">Visualiza estadísticas, busca, filtra y reprograma citas sin permisos de borrado.</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('super')}
-                className="p-3 bg-slate-950 hover:bg-slate-900 border border-red-950 rounded flex flex-col items-center gap-1.5 transition text-center group cursor-pointer"
-              >
-                <ShieldAlert className="w-5 h-5 text-red-400 group-hover:scale-110 transition" />
-                <span className="text-[11px] font-extrabold text-white">SUPER ADMIN</span>
-                <span className="text-[9px] text-slate-400 leading-tight">Acceso global: edita datos presenciales de ciudadanos, elimina citas y ejecuta acciones masivas.</span>
-              </button>
-            </div>
-          </div>
         </div>
       ) : (
         /* MAIN ADMIN INTERFACE */
@@ -666,77 +820,117 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
           
           {/* SIDEBAR TABS */}
           <div className="w-full md:w-52 bg-slate-950 border-r border-slate-800 p-3 flex flex-row md:flex-col gap-1.5 overflow-x-auto md:overflow-x-visible">
-            <button
-              onClick={() => setActiveSubTab('tabla')}
-              className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                activeSubTab === 'tabla'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-white border border-transparent'
-              }`}
-            >
-              <ClipboardList className="w-4 h-4 shrink-0" />
-              <span>Gestión de Citas</span>
-            </button>
+            {currentRole !== 'extranjeria' && (
+              <>
+                <button
+                  onClick={() => setActiveSubTab('tabla')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'tabla'
+                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <ClipboardList className="w-4 h-4 shrink-0" />
+                  <span>Gestión de Citas</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveSubTab('horarios')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'horarios'
+                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Clock className="w-4 h-4 shrink-0" />
+                  <span>Horarios Regionales</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveSubTab('tramites')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'tramites'
+                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4 shrink-0" />
+                  <span>Gestión de Trámites</span>
+                </button>
+              </>
+            )}
 
             <button
-              onClick={() => setActiveSubTab('horarios')}
+              onClick={() => setActiveSubTab('extranjeria')}
               className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                activeSubTab === 'horarios'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                activeSubTab === 'extranjeria'
+                  ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 shadow-inner'
                   : 'text-slate-400 hover:text-white border border-transparent'
               }`}
             >
-              <Clock className="w-4 h-4 shrink-0" />
-              <span>Horarios Regionales</span>
+              <FileSpreadsheet className="w-4 h-4 shrink-0 text-amber-500" />
+              <span className="flex items-center gap-1">
+                <span>Carga Extranjería</span>
+                <span className="bg-amber-500/20 text-amber-300 px-1 rounded text-[9px] font-black border border-amber-500/30">CSV</span>
+              </span>
             </button>
 
-            <button
-              onClick={() => setActiveSubTab('tramites')}
-              className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                activeSubTab === 'tramites'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-white border border-transparent'
-              }`}
-            >
-              <Briefcase className="w-4 h-4 shrink-0" />
-              <span>Gestión de Trámites</span>
-            </button>
+            {currentRole !== 'extranjeria' && (
+              <>
+                <button
+                  onClick={() => setActiveSubTab('stats')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'stats'
+                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  <span>Estadísticas</span>
+                </button>
 
-            <button
-              onClick={() => setActiveSubTab('stats')}
-              className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                activeSubTab === 'stats'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-white border border-transparent'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 shrink-0" />
-              <span>Estadísticas</span>
-            </button>
+                <button
+                  onClick={() => setActiveSubTab('config')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'config'
+                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Settings className="w-4 h-4 shrink-0" />
+                  <span>Configuración</span>
+                </button>
 
-            <button
-              onClick={() => setActiveSubTab('config')}
-              className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                activeSubTab === 'config'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-white border border-transparent'
-              }`}
-            >
-              <Settings className="w-4 h-4 shrink-0" />
-              <span>Configuración</span>
-            </button>
+                <button
+                  onClick={() => setActiveSubTab('supabase')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'supabase'
+                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Key className="w-4 h-4 shrink-0 text-blue-500" />
+                  <span className="flex items-center gap-1.5">
+                    <span>Integración Turno</span>
+                    <span className="bg-blue-500/15 text-blue-400 px-1 py-0.5 rounded text-[8px] font-black border border-blue-500/25">SUPABASE</span>
+                  </span>
+                </button>
+              </>
+            )}
             
-            <div className="hidden md:block mt-auto border-t border-slate-800 pt-3">
-              <div className="bg-slate-900 border border-slate-800 p-2.5 rounded text-[10px] text-slate-400 font-mono leading-relaxed space-y-1">
-                <div role="presentation" className="text-slate-350 font-bold border-b border-slate-850 pb-1 flex items-center gap-1.5 uppercase">
-                  <Sliders className="w-3 h-3 text-blue-500" />
-                  <span>Configuración TE</span>
+            {currentRole !== 'extranjeria' && (
+              <div className="hidden md:block mt-auto border-t border-slate-800 pt-3">
+                <div className="bg-slate-900 border border-slate-800 p-2.5 rounded text-[10px] text-slate-400 font-mono leading-relaxed space-y-1">
+                  <div role="presentation" className="text-slate-350 font-bold border-b border-slate-850 pb-1 flex items-center gap-1.5 uppercase">
+                    <Sliders className="w-3 h-3 text-blue-500" />
+                    <span>Configuración TE</span>
+                  </div>
+                  <div>Línea de Servicio: 311</div>
+                  <div>Cupo Hora: {maxSlotsPerHour}</div>
+                  <div>Regulación: PE 2026</div>
                 </div>
-                <div>Línea de Servicio: 311</div>
-                <div>Cupo Hora: {maxSlotsPerHour}</div>
-                <div>Regulación: PE 2026</div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* MAIN PAGE AREA */}
@@ -962,9 +1156,19 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                               <span className={`text-[10px] font-black uppercase inline-block px-2 py-0.5 rounded tracking-wider shadow-sm border ${
                                 cit.estado === 'confirmada'
                                   ? 'bg-emerald-950/70 text-emerald-400 border-emerald-900/60'
-                                  : 'bg-amber-950/70 text-amber-400 border-amber-900/60'
+                                  : cit.estado === 'asistire'
+                                    ? 'bg-blue-950/80 text-blue-400 border-blue-900/60'
+                                    : cit.estado === 'no_asistire'
+                                      ? 'bg-orange-950/70 text-orange-400 border-orange-900/60'
+                                      : 'bg-red-950/70 text-red-400 border-red-900/60'
                               }`}>
-                                {cit.estado === 'confirmada' ? 'Confirmada' : 'Cancelada'}
+                                {cit.estado === 'confirmada' 
+                                  ? 'Reservada' 
+                                  : cit.estado === 'asistire' 
+                                    ? '✓ Asistirá' 
+                                    : cit.estado === 'no_asistire' 
+                                      ? '✗ No Asistirá' 
+                                      : 'Cancelada'}
                               </span>
                             </td>
 
@@ -1744,6 +1948,306 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               </div>
             )}
 
+            {/* TAB CONTENT: EXTRANJERIA (Carga CSV y Control Estatus Migratorio) */}
+            {activeSubTab === 'extranjeria' && (
+              <div className="space-y-6 animate-fade-in font-sans">
+                <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                      <FileSpreadsheet className="w-5 h-5 text-amber-500" />
+                      <span>Base de Elegibilidad Extranjería (Pasaportes)</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      Gestione la lista consolidada de pasaportes extranjeros elegibles para realizar trámites. Suba un archivo CSV o modifique registros de forma manual.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      currentRole === 'sencillo' 
+                        ? 'bg-red-950/80 text-red-400 border-red-900/50' 
+                        : 'bg-emerald-950/80 text-emerald-400 border-emerald-900/50'
+                    }`}>
+                      {currentRole === 'sencillo' ? '🔒 Solo Lectura' : '✍ Permiso de Carga Activo'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* API COMMUNICATOR HOOK-UP COMPONENT */}
+                <ExtranjeriaController currentRole={currentRole} />
+
+              </div>
+            )}
+
+            {/* TAB CONTENT: SUPABASE (Sincronización en tiempo real y flujo de prioridad) */}
+            {activeSubTab === 'supabase' && (
+              <div className="space-y-6 animate-fade-in font-sans">
+                {/* Header card with status */}
+                <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-blue-500 animate-spin-slow" />
+                      <span>Sincronización Centralizada Supabase (Turneros)</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      Sincronice citas agendadas con la base de datos central en tiempo real y asigne máxima prioridad en el repartidor de turnos de la sucursal del Tribunal Electoral.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border bg-blue-950/80 text-blue-400 border-blue-900/50">
+                      ⚡ Canal Activo
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Form Settings */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-slate-900 rounded-lg p-5 border border-slate-800 space-y-4 shadow-xl">
+                      <h4 className="text-[11px] font-black uppercase text-slate-200 tracking-wider border-b border-slate-800 pb-2">
+                        🔧 Configuración de Conexión
+                      </h4>
+
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Supabase URL Project</label>
+                          <input
+                            type="text"
+                            placeholder="https://your-project.supabase.co"
+                            value={dbSupabaseUrl}
+                            onChange={(e) => setDbSupabaseUrl(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-755 text-white p-2.5 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Supabase API Key (Anon Key)</label>
+                          <input
+                            type="password"
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                            value={dbSupabaseAnonKey}
+                            onChange={(e) => setDbSupabaseAnonKey(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-755 text-white p-2.5 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider font-mono">Nombre de la Tabla</label>
+                            <input
+                              type="text"
+                              value={dbTableName}
+                              onChange={(e) => setDbTableName(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-755 text-white p-2.5 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-3 pt-4 flex flex-col justify-center">
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-[10px] font-bold text-slate-300">
+                              <input
+                                type="checkbox"
+                                checked={dbAutoSync}
+                                onChange={(e) => setDbAutoSync(e.target.checked)}
+                                className="w-3.5 h-3.5 rounded bg-slate-950 border-slate-705 text-blue-600 accent-blue-600 focus:outline-none"
+                              />
+                              <span>Autoguardar citas en Supabase</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-slate-800/80 pt-4 space-y-3">
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 cursor-pointer select-none text-[10px] font-bold text-slate-300">
+                            <input
+                                type="checkbox"
+                                checked={dbSyncToVercel}
+                                onChange={(e) => setDbSyncToVercel(e.target.checked)}
+                                className="w-3.5 h-3.5 rounded bg-slate-950 border-slate-705 text-blue-600 accent-blue-600 focus:outline-none"
+                            />
+                            <span>Sincronizar Cola con Vercel (sistema-de-ticket.vercel.app)</span>
+                          </label>
+                        </div>
+
+                        {dbSyncToVercel && (
+                          <div className="space-y-1 pt-1 animate-slide-down">
+                            <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">URL de Integración (Webhook/API Vercel)</label>
+                            <input
+                              type="text"
+                              value={dbVercelUrl}
+                              onChange={(e) => setDbVercelUrl(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-755 text-white p-2.5 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Display Save Status feedback */}
+                      {dbSaveStatus && (
+                        <div className={`p-3 rounded border text-[10px] flex items-center gap-2 font-medium ${
+                          dbSaveStatus.success 
+                            ? 'bg-emerald-950/80 text-emerald-400 border-emerald-900/60' 
+                            : 'bg-red-950/80 text-red-400 border-red-900/60'
+                        }`}>
+                          {dbSaveStatus.success ? <CheckCircle className="w-4 h-4 shrink-0 text-emerald-500" /> : <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />}
+                          <span>{dbSaveStatus.message}</span>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-850 pt-4">
+                        <button
+                          type="button"
+                          onClick={handleTestDbConnection}
+                          disabled={dbTestingConn}
+                          className="bg-slate-800 hover:bg-slate-750 disabled:opacity-50 text-slate-300 font-black text-[10px] uppercase tracking-wider px-4 py-2.5 rounded transition shadow-sm cursor-pointer flex items-center gap-2"
+                        >
+                          {dbTestingConn ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sliders className="w-3.5 h-3.5" />}
+                          <span>{dbTestingConn ? 'Probando...' : 'Probar Conexión'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleSaveDbConfig}
+                          disabled={dbIsSavingConfig}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-wider px-5 py-2.5 rounded transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                          {dbIsSavingConfig ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                          <span>{dbIsSavingConfig ? 'Guardando...' : 'Guardar Parámetros'}</span>
+                        </button>
+                      </div>
+
+                      {/* Test connection result details */}
+                      {dbTestResult && (
+                        <div className={`p-4 rounded border text-xs leading-relaxed space-y-2 animate-fade-in ${
+                          dbTestResult.success 
+                            ? 'bg-emerald-950/70 text-emerald-300 border-emerald-850' 
+                            : 'bg-red-950/70 text-red-350 border-red-850'
+                        }`}>
+                          <div className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
+                            {dbTestResult.success ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
+                            <span>{dbTestResult.success ? 'Conexión Exitosa' : 'Establecimiento Fallido'}</span>
+                          </div>
+                          <p>{dbTestResult.message || dbTestResult.error}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BULK OPERATION SYSTEM */}
+                    <div className="bg-slate-900 rounded-lg p-5 border border-slate-800 space-y-4 shadow-xl">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                        <h4 className="text-[11px] font-black uppercase text-slate-200 tracking-wider">
+                          🔄 Sincronización Masiva Retrospectiva
+                        </h4>
+                        <span className="text-[10px] font-mono text-slate-400">Total en Servidor local: {citas.length}</span>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans mt-1">
+                        Si acaba de configurar su base de datos Supabase o desea re-transmitir todas las citas registradas históricamente en una sola operación, presione el botón a continuación. Esto procesará todos los turnos asignándoles la prioridad designada.
+                      </p>
+
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleSyncAllDb}
+                          disabled={dbSyncingAll}
+                          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-[10px] uppercase tracking-wider px-5 py-2.5 rounded transition shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                          {dbSyncingAll ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                          <span>{dbSyncingAll ? 'Sincronizando Todo...' : 'Sincronizar Todas las Citas'}</span>
+                        </button>
+                      </div>
+
+                      {dbSyncAllResult && (
+                        <div className={`p-4 rounded-lg border text-xs leading-relaxed space-y-2 animate-fade-in ${
+                          dbSyncAllResult.success 
+                            ? 'bg-blue-950/80 text-blue-300 border-blue-900/60' 
+                            : 'bg-red-950/80 text-red-300 border-red-900/60'
+                        }`}>
+                          <h5 className="font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 text-blue-400">
+                            <Info className="w-4 h-4" />
+                            <span>Resultado de Sincronización Masiva</span>
+                          </h5>
+                          <div className="grid grid-cols-3 gap-2 text-center py-1">
+                            <div className="bg-slate-950/40 p-2 rounded">
+                              <div className="text-xs text-slate-400">Total</div>
+                              <div className="text-sm font-black text-white">{dbSyncAllResult.total}</div>
+                            </div>
+                            <div className="bg-slate-950/40 p-2 rounded">
+                              <div className="text-xs text-slate-400 text-emerald-400 font-bold">Éxito</div>
+                              <div className="text-sm font-black text-emerald-400">{dbSyncAllResult.synced}</div>
+                            </div>
+                            <div className="bg-slate-950/40 p-2 rounded">
+                              <div className="text-xs text-slate-400 text-rose-400 font-bold">Fallidos</div>
+                              <div className="text-sm font-black text-rose-400">{dbSyncAllResult.failed}</div>
+                            </div>
+                          </div>
+                          {dbSyncAllResult.errors.length > 0 && (
+                            <div className="border-t border-slate-800 pt-2 text-[10px] text-red-350 font-mono space-y-1">
+                              <div className="font-bold">Resumen de errores detectados:</div>
+                              {dbSyncAllResult.errors.map((err, i) => (
+                                <div key={i}>• {err}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: SQL snippet and sync diagnostics */}
+                  <div className="space-y-6">
+                    <div className="bg-slate-900 rounded-lg p-5 border border-slate-800 space-y-4 shadow-xl">
+                      <h4 className="text-[11px] font-black uppercase text-slate-200 tracking-wider border-b border-slate-800 pb-2 flex items-center gap-2">
+                        <Building className="w-4 h-4 text-blue-500" />
+                        <span>Instrucciones SQL Supabase</span>
+                      </h4>
+                      <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
+                        Abra la pestaña <span className="text-slate-250 font-bold">SQL Editor</span> en su panel de administración de Supabase y ejecute el siguiente script para crear la tabla con el esquema de columnas exacto requerido por el sistema:
+                      </p>
+
+                      <pre className="bg-slate-950 text-slate-350 p-3 rounded border border-slate-850 text-[10px] font-mono overflow-x-auto leading-relaxed max-h-56 select-all cursor-pointer">
+{`CREATE TABLE IF NOT EXISTS citas (
+  id TEXT PRIMARY KEY,
+  codigo_cita TEXT UNIQUE,
+  nombre_ciudadano TEXT,
+  identificacion TEXT,
+  correo TEXT,
+  telefono TEXT,
+  tipo_tramite TEXT,
+  servicio_detalle TEXT,
+  sucursal TEXT,
+  fecha DATE,
+  hora TIME,
+  estado TEXT,
+  prioridad TEXT DEFAULT 'alta',
+  fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);`}
+                      </pre>
+                      <div className="text-[9px] text-slate-500 font-medium font-sans flex items-center gap-1">
+                        <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span>Haga click para copiar todo el script.</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 rounded-lg p-5 border border-slate-800 space-y-4 shadow-xl font-sans text-slate-300">
+                      <h4 className="text-[11px] font-black uppercase text-slate-200 tracking-wider border-b border-slate-800 pb-2 flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-blue-500" />
+                        <span>Regla de Priorización</span>
+                      </h4>
+                      <p className="text-[11px] leading-relaxed text-slate-400">
+                        Las citas que entran por este portal se registran con prioridad <strong className="text-white">alta</strong> ({`"alta"`}) en los sistemas de turnos, asegurando tiempos de espera preferenciales frente a tickets generados de forma presencial o sin agendar.
+                      </p>
+                      
+                      <div className="border border-blue-500/20 bg-blue-600/5 p-3 rounded text-[10px] leading-relaxed text-blue-300">
+                        <div className="font-bold uppercase tracking-wider mb-1">Configuración del Repositorio de Turno:</div>
+                        El panel local de la sucursal o el turnero presencial de la sucursal <span className="font-mono text-white">Tribunal Electoral</span> lee el repositorio compartido en Supabase y antepone en cola priorizada de llamada a cualquier ciudadano que posea código registrado desde este portal.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
 
         </div>
@@ -1889,11 +2393,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                 </div>
                 <select
                   value={editEstado}
-                  onChange={(e) => setEditEstado(e.target.value as 'confirmada' | 'cancelada')}
+                  onChange={(e) => setEditEstado(e.target.value as 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire')}
                   className="bg-slate-900 border border-slate-700 text-white p-1 text-xs px-2 rounded cursor-pointer focus:outline-none"
                 >
-                  <option value="confirmada">Confirmada</option>
-                  <option value="cancelada">Cancelada</option>
+                  <option value="confirmada">Confirmada (Reservada)</option>
+                  <option value="asistire">✓ Asistencia Confirmada</option>
+                  <option value="no_asistire">✗ No Asistirá</option>
+                  <option value="cancelada">Cancelada / Liberada</option>
                 </select>
               </div>
 

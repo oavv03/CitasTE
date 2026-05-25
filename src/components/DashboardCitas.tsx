@@ -19,7 +19,7 @@ export default function DashboardCitas({
   onNavigateToBooking,
 }: DashboardCitasProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'todos' | 'confirmada' | 'cancelada'>('todos');
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'confirmada' | 'asistire' | 'cancelada'>('todos');
   const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
@@ -29,7 +29,10 @@ export default function DashboardCitas({
       cita.datosPersonales.identificacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cita.datosPersonales.correo.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'todos' || cita.estado === statusFilter;
+    const matchesStatus = statusFilter === 'todos' || 
+      (statusFilter === 'confirmada' && cita.estado === 'confirmada') ||
+      (statusFilter === 'asistire' && cita.estado === 'asistire') ||
+      (statusFilter === 'cancelada' && (cita.estado === 'cancelada' || cita.estado === 'no_asistire'));
 
     return matchesSearch && matchesStatus;
   });
@@ -110,11 +113,11 @@ export default function DashboardCitas({
               />
             </div>
             
-            <div className="flex bg-slate-100 p-1 rounded border border-slate-200 self-start sm:self-auto">
+            <div className="flex flex-wrap bg-slate-100 p-1 rounded border border-slate-200 self-start sm:self-auto gap-0.5">
               <button
                 type="button"
                 onClick={() => setStatusFilter('todos')}
-                className={`px-3 py-1 text-xs font-black uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
+                className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
                   statusFilter === 'todos' ? 'bg-white shadow-sm text-blue-900 border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -123,17 +126,26 @@ export default function DashboardCitas({
               <button
                 type="button"
                 onClick={() => setStatusFilter('confirmada')}
-                className={`px-3 py-1 text-xs font-black uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
+                className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
                   statusFilter === 'confirmada' ? 'bg-white shadow-sm text-emerald-800 border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Confirmadas
+                Reservadas
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('asistire')}
+                className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
+                  statusFilter === 'asistire' ? 'bg-white shadow-sm text-blue-800 border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Asistiré (Confirmado)
               </button>
               <button
                 type="button"
                 onClick={() => setStatusFilter('cancelada')}
-                className={`px-3 py-1 text-xs font-black uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
-                  statusFilter === 'cancelada' ? 'bg-white shadow-sm text-red-800 border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
+                className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
+                  statusFilter === 'cancelada' ? 'bg-white shadow-sm text-red-805 border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 Canceladas
@@ -169,13 +181,21 @@ export default function DashboardCitas({
                         </span>
                         
                         <span
-                          className={`text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded ${
-                            isCanceled
-                              ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                          className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded select-none border ${
+                            cita.estado === 'cancelada' || cita.estado === 'no_asistire'
+                              ? 'bg-red-50 text-red-755 border-red-200'
+                              : cita.estado === 'asistire'
+                                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                           }`}
                         >
-                          {cita.estado}
+                          {cita.estado === 'cancelada' 
+                            ? 'Cancelada' 
+                            : cita.estado === 'asistire' 
+                              ? 'Asistiré (Confirmada)' 
+                              : cita.estado === 'no_asistire' 
+                                ? 'No Asistirá' 
+                                : 'Confirmada'}
                         </span>
                       </div>
 
