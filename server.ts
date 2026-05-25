@@ -10,6 +10,43 @@ dns.setDefaultResultOrder("ipv4first");
 
 const DB_PATH = path.join(process.cwd(), "appointments-db.json");
 const EXTRANJERIA_DB_PATH = path.join(process.cwd(), "extranjeria-db.json");
+const EXTRANJERIA_CONFIG_PATH = path.join(process.cwd(), "extranjeria-config.json");
+
+interface ExtranjeriaConfig {
+  capacidad: number;
+  intervalo: number;
+  horaInicio: string;
+  horaFin: string;
+}
+
+const DEFAULT_EXTRANJERIA_CONFIG: ExtranjeriaConfig = {
+  capacidad: 2,
+  intervalo: 15,
+  horaInicio: "07:00 AM",
+  horaFin: "02:00 AM"
+};
+
+function getExtranjeriaConfig(): ExtranjeriaConfig {
+  try {
+    if (!fs.existsSync(EXTRANJERIA_CONFIG_PATH)) {
+      fs.writeFileSync(EXTRANJERIA_CONFIG_PATH, JSON.stringify(DEFAULT_EXTRANJERIA_CONFIG, null, 2), "utf8");
+      return DEFAULT_EXTRANJERIA_CONFIG;
+    }
+    const data = fs.readFileSync(EXTRANJERIA_CONFIG_PATH, "utf8");
+    return JSON.parse(data);
+  } catch (error) {
+    console.error("Error reading extranjeria config DB:", error);
+  }
+  return DEFAULT_EXTRANJERIA_CONFIG;
+}
+
+function saveExtranjeriaConfig(config: ExtranjeriaConfig): void {
+  try {
+    fs.writeFileSync(EXTRANJERIA_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  } catch (error) {
+    console.error("Error writing extranjeria config DB:", error);
+  }
+}
 
 interface ExtranjeriaRecord {
   pasaporte: string;
@@ -849,6 +886,36 @@ async function startServer() {
     }
   });
 
+  // Endpoints to get and set Extranjería capacity scheduler configurations
+  app.get("/api/extranjeria/config", (req, res) => {
+    try {
+      const config = getExtranjeriaConfig();
+      return res.json({ success: true, config });
+    } catch (e: any) {
+      console.error("Error fetching extranjería settings:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/extranjeria/config", (req, res) => {
+    try {
+      const { capacidad, intervalo, horaInicio, horaFin } = req.body;
+      
+      const updatedConfig: ExtranjeriaConfig = {
+        capacidad: parseInt(capacidad, 10) || DEFAULT_EXTRANJERIA_CONFIG.capacidad,
+        intervalo: parseInt(intervalo, 10) || DEFAULT_EXTRANJERIA_CONFIG.intervalo,
+        horaInicio: String(horaInicio || DEFAULT_EXTRANJERIA_CONFIG.horaInicio),
+        horaFin: String(horaFin || DEFAULT_EXTRANJERIA_CONFIG.horaFin)
+      };
+
+      saveExtranjeriaConfig(updatedConfig);
+      return res.json({ success: true, config: updatedConfig });
+    } catch (e: any) {
+      console.error("Error saving extranjería config:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // API to register appointment directly
   app.post("/api/register-appointment", (req, res) => {
     try {
@@ -875,6 +942,30 @@ async function startServer() {
       }
 
       const appointments = getAppointments();
+
+      // Enforce capacity check for Extranjeria appointments
+      const isExtranjeria = servicioCategoria === 'extranjeria' || 
+        (subServicioId && (subServicioId.includes('extranjero') || subServicioId.startsWith('ext_')));
+      
+      if (isExtranjeria) {
+        const config = getExtranjeriaConfig();
+        const activeCitas = appointments.filter(a => 
+          a.fecha === fecha && 
+          a.hora === hora && 
+          (a.categoriaNombre === 'extranjeria' || (a.subServicioNombre && (a.subServicioNombre.includes('extranjero') || a.subServicioNombre.toLowerCase().includes('extranjeria')))) &&
+          a.estado !== 'cancelada'
+        );
+        
+        // Only reject if booking a fresh slot (not modifying/re-saving existing on same slot)
+        const isNewBooking = appointments.findIndex(a => a.id === id) < 0;
+        if (isNewBooking && activeCitas.length >= config.capacidad) {
+          return res.status(400).json({ 
+            success: false, 
+            error: `Cupos agotados. El límite de atención para las ${hora} el día ${fecha} es de ${config.capacidad} usuarios.` 
+          });
+        }
+      }
+
       const existingIdx = appointments.findIndex(a => a.id === id || a.codigoTransaccion === codigoTransaccion);
 
       const serverCita: ServerCita = {

@@ -8,7 +8,7 @@ export interface DatosPersonales {
   correo: string;
 }
 
-export type ServicioCategoriaId = 'extranjeria' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil';
+export type ServicioCategoriaId = 'extranjeria' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil' | 'panamenos_extranjero';
 
 export interface SubServicio {
   id: string;

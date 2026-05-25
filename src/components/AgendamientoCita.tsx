@@ -13,6 +13,51 @@ interface AgendamientoCitaProps {
   selectedSubServicioId?: string | null;
 }
 
+function timeToMinutes(timeStr: string): number {
+  const match = timeStr.trim().match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  
+  if (ampm === 'PM' && hours !== 12) {
+    hours += 12;
+  } else if (ampm === 'AM' && hours === 12) {
+    hours = 0;
+  }
+  return hours * 60 + minutes;
+}
+
+function formatMinutes(totalMinutes: number): string {
+  const norm = totalMinutes % 1440;
+  let hours24 = Math.floor(norm / 60);
+  const minutes = norm % 65; // supports modulo correctly for minutes
+  const trueMin = norm % 60;
+  
+  const ampm = hours24 >= 12 ? 'PM' : 'AM';
+  let hours12 = hours24 % 12;
+  if (hours12 === 0) hours12 = 12;
+  
+  const hh = String(hours12).padStart(2, '0');
+  const mm = String(trueMin).padStart(2, '0');
+  return `${hh}:${mm} ${ampm}`;
+}
+
+function generateExtranjeriaSlots(inicio: string, fin: string, intervaloMinutos: number): string[] {
+  const startMin = timeToMinutes(inicio);
+  let endMin = timeToMinutes(fin);
+  
+  if (endMin <= startMin) {
+    endMin += 1440; // wrap around midnight
+  }
+  
+  const slots: string[] = [];
+  for (let min = startMin; min <= endMin; min += intervaloMinutos) {
+    slots.push(formatMinutes(min));
+  }
+  return slots;
+}
+
 export default function AgendamientoCita({
   selectedSucursalId,
   selectedFecha,
@@ -26,6 +71,64 @@ export default function AgendamientoCita({
     return selectedCategoria === 'extranjeria' || 
       (selectedSubServicioId && (selectedSubServicioId.includes('extranjero') || selectedSubServicioId.startsWith('ext_')));
   }, [selectedCategoria, selectedSubServicioId]);
+
+  // Load custom settings from localStorage or fallback to standard properties
+  const [extranjeriaConfig, setExtranjeriaConfig] = useState(() => {
+    const start = localStorage.getItem('extranjeria_hora_inicio') || '07:00 AM';
+    const end = localStorage.getItem('extranjeria_hora_fin') || '02:00 AM';
+    const interval = parseInt(localStorage.getItem('extranjeria_intervalo_minutos') || '15', 10);
+    const capacity = parseInt(localStorage.getItem('extranjeria_capacidad_usuarios') || '2', 10);
+    return { start, end, interval, capacity };
+  });
+
+  // Query server to keep setup perfectly in-sync
+  React.useEffect(() => {
+    if (isExtranjeria) {
+      fetch('/api/extranjeria/config')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success && data.config) {
+            const { capacidad, intervalo, horaInicio, horaFin } = data.config;
+            setExtranjeriaConfig({
+              start: horaInicio,
+              end: horaFin,
+              interval: intervalo,
+              capacity: capacidad
+            });
+            // Also keep localstorage synced
+            localStorage.setItem('extranjeria_capacidad_usuarios', String(capacidad));
+            localStorage.setItem('extranjeria_intervalo_minutos', String(intervalo));
+            localStorage.setItem('extranjeria_hora_inicio', horaInicio);
+            localStorage.setItem('extranjeria_hora_fin', horaFin);
+          }
+        })
+        .catch(err => console.warn("Failed to retrieve extranjeria remote configs:", err));
+    }
+  }, [isExtranjeria]);
+
+  const availableSlots = useMemo(() => {
+    if (isExtranjeria) {
+      return generateExtranjeriaSlots(
+        extranjeriaConfig.start,
+        extranjeriaConfig.end,
+        extranjeriaConfig.interval
+      );
+    }
+    return HORAS_DISPONIBLES;
+  }, [isExtranjeria, extranjeriaConfig]);
+
+  // Load active bookings in order to enforce dynamic capacity constraints
+  const activeBookings = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('te_panama_citas');
+      if (stored) {
+        return JSON.parse(stored) as any[];
+      }
+    } catch (e) {
+      console.error("Could not load te_panama_citas in AgendamientoCita", e);
+    }
+    return [];
+  }, []);
 
   const [selectedProvincia, setSelectedProvincia] = useState<string>(isExtranjeria ? 'Panamá' : 'Todos');
   const [sucursalId, setSucursalId] = useState<string>(isExtranjeria ? 'anc_main' : (selectedSucursalId || ''));
@@ -290,29 +393,62 @@ export default function AgendamientoCita({
 
               {/* TIME PICKING */}
               {fecha ? (
-                <div className="space-y-2 border-t border-slate-100 pt-4">
+                <div className="space-y-4 border-t border-slate-100 pt-4">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-slate-500" />
                     <span>3. Seleccione el Intervalo de Hora</span>
                     <span className="text-red-500">*</span>
                   </label>
-                  <p className="text-xs text-slate-500 font-medium">Espacios de atención de 30 minutos disponibles:</p>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {isExtranjeria 
+                      ? `Espacios de atención de ${extranjeriaConfig.interval} minutos disponibles (Capacidad: ${extranjeriaConfig.capacity} usuarios por intervalo):`
+                      : 'Espacios de atención de 30 minutos disponibles:'
+                    }
+                  </p>
 
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {HORAS_DISPONIBLES.map((slot) => {
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {availableSlots.map((slot) => {
                       const isSelected = hora === slot;
+                      
+                      // Count current bookings in this slot to apply slot limitations
+                      const bookedCount = activeBookings.filter(c => 
+                        c.fecha === fecha && 
+                        c.hora === slot && 
+                        (c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranjero') || c.subServicioId?.startsWith('ext_')) &&
+                        c.estado !== 'cancelada'
+                      ).length;
+                      
+                      const isFull = isExtranjeria && bookedCount >= extranjeriaConfig.capacity;
+                      
                       return (
                         <button
                           key={slot}
                           type="button"
+                          disabled={isFull && !isSelected}
                           onClick={() => setHora(slot)}
-                          className={`p-2 rounded border text-center text-xs font-bold transition ${
+                          className={`p-2.5 rounded border text-center text-xs font-bold transition flex flex-col items-center justify-center gap-1 ${
                             isSelected
                               ? 'border-blue-700 bg-blue-700 text-white shadow-sm shadow-blue-100'
-                              : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                              : isFull
+                                ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                           }`}
                         >
-                          {slot}
+                          <span className="tracking-tight text-[11px] font-bold">{slot}</span>
+                          {isExtranjeria && (
+                            <span className={`text-[9px] tracking-tight block ${
+                              isSelected 
+                                ? 'text-blue-200 font-medium' 
+                                : isFull 
+                                  ? 'text-red-500 font-bold' 
+                                  : 'text-slate-400 font-normal'
+                            }`}>
+                              {isFull 
+                                ? '⛔ Lleno' 
+                                : `${bookedCount}/${extranjeriaConfig.capacity} ocupados`
+                              }
+                            </span>
+                          )}
                         </button>
                       );
                     })}

@@ -14,9 +14,19 @@ import {
   Clipboard, 
   Check, 
   FileText,
-  Edit
+  Edit,
+  Clock
 } from 'lucide-react';
 import { ExtranjeriaRecord, AdminRole } from '../types';
+
+const SELECT_TIMES_OPTIONS = [
+  '12:00 AM', '12:30 AM', '01:00 AM', '01:30 AM', '02:00 AM', '02:30 AM', '03:00 AM', '03:30 AM',
+  '04:00 AM', '04:30 AM', '05:00 AM', '05:30 AM', '06:00 AM', '06:30 AM', '07:00 AM', '07:30 AM',
+  '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+  '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
+  '08:00 PM', '08:30 PM', '09:00 PM', '09:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'
+];
 
 interface ExtranjeriaControllerProps {
   currentRole: AdminRole;
@@ -45,6 +55,57 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
   const [formMotivo, setFormMotivo] = useState('');
   const [editingRecordIdx, setEditingRecordIdx] = useState<number | null>(null);
 
+  // Configuration states for dynamic schedule parameters of extranjeria
+  const [capacidad, setCapacidad] = useState<number>(() => {
+    return parseInt(localStorage.getItem('extranjeria_capacidad_usuarios') || '2', 10);
+  });
+  const [intervalo, setIntervalo] = useState<number>(() => {
+    return parseInt(localStorage.getItem('extranjeria_intervalo_minutos') || '15', 10);
+  });
+  const [horaInicio, setHoraInicio] = useState<string>(() => {
+    return localStorage.getItem('extranjeria_hora_inicio') || '07:00 AM';
+  });
+  const [horaFin, setHoraFin] = useState<string>(() => {
+    return localStorage.getItem('extranjeria_hora_fin') || '02:00 AM';
+  });
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentRole === 'sencillo') {
+      showStatus('Operación denegada. Solo personal de Inmigración/Admin puede configurar la capacidad.', 'error');
+      return;
+    }
+    
+    // Save locally
+    localStorage.setItem('extranjeria_capacidad_usuarios', String(capacidad));
+    localStorage.setItem('extranjeria_intervalo_minutos', String(intervalo));
+    localStorage.setItem('extranjeria_hora_inicio', horaInicio);
+    localStorage.setItem('extranjeria_hora_fin', horaFin);
+    
+    // Save to server
+    try {
+      const res = await fetch('/api/extranjeria/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          capacidad,
+          intervalo,
+          horaInicio,
+          horaFin
+        })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        showStatus('¡Éxito! Configuración de citas para Extranjería actualizada y sincronizada en el servidor.', 'success');
+      } else {
+        showStatus('Configuración guardada localmente, pero falló la sincronización con el servidor.', 'info');
+      }
+    } catch (err) {
+      console.error(err);
+      showStatus('Configuración guardada localmente, pero falló la sincronización con el servidor.', 'info');
+    }
+  };
+
   // Fetch listed passports
   const fetchRecords = async () => {
     setLoading(true);
@@ -66,6 +127,26 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
 
   useEffect(() => {
     fetchRecords();
+
+    // Load config from server
+    fetch('/api/extranjeria/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.config) {
+          const { capacidad: cap, intervalo: inter, horaInicio: hIni, horaFin: hFin } = data.config;
+          setCapacidad(cap);
+          setIntervalo(inter);
+          setHoraInicio(hIni);
+          setHoraFin(hFin);
+          
+          // Sync with localstorage too
+          localStorage.setItem('extranjeria_capacidad_usuarios', String(cap));
+          localStorage.setItem('extranjeria_intervalo_minutos', String(inter));
+          localStorage.setItem('extranjeria_hora_inicio', hIni);
+          localStorage.setItem('extranjeria_hora_fin', hFin);
+        }
+      })
+      .catch(err => console.warn("Failed to load extranjeria config from server:", err));
   }, []);
 
   const showStatus = (text: string, type: 'success' | 'error' | 'info') => {
@@ -452,6 +533,90 @@ PA-USA-112233,Sarah Michelle Connor,Estados Unidos,si,Residente calificada por C
                 </div>
               </div>
             )}
+          </div>
+
+          {/* SCHEDULING CAPACITY CONTROL (Extranjería Special) */}
+          <div className="bg-slate-950 rounded-lg border border-slate-805 p-5 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span>Control Operativo de Citas de Extranjería</span>
+            </h4>
+            <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+              Configure los límites de usuarios simultáneos, intervalos de consultas, y el horario de inicio/fin aplicable para toda reserva migratoria.
+            </p>
+
+            <form onSubmit={handleSaveConfig} className="space-y-3 pt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Cupos por Slot</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={capacidad}
+                    onChange={(e) => setCapacidad(parseInt(e.target.value, 10) || 1)}
+                    disabled={currentRole === 'sencillo'}
+                    className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Intervalo (Minutos)</label>
+                  <select
+                    value={intervalo}
+                    onChange={(e) => setIntervalo(parseInt(e.target.value, 10))}
+                    disabled={currentRole === 'sencillo'}
+                    className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-mono"
+                  >
+                    <option value="10">10 minutos</option>
+                    <option value="15">15 minutos</option>
+                    <option value="20">20 minutos</option>
+                    <option value="30">30 minutos</option>
+                    <option value="45">45 minutos</option>
+                    <option value="60">60 minutos</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Hora Inicio</label>
+                  <select
+                    value={horaInicio}
+                    onChange={(e) => setHoraInicio(e.target.value)}
+                    disabled={currentRole === 'sencillo'}
+                    className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs cursor-pointer focus:outline-none"
+                  >
+                    {SELECT_TIMES_OPTIONS.map(time => (
+                      <option key={`start-${time}`} value={time}>{time}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Hora Fin (Cierre)</label>
+                  <select
+                    value={horaFin}
+                    onChange={(e) => setHoraFin(e.target.value)}
+                    disabled={currentRole === 'sencillo'}
+                    className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs cursor-pointer focus:outline-none"
+                  >
+                    {SELECT_TIMES_OPTIONS.map(time => (
+                      <option key={`end-${time}`} value={time}>{time}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={currentRole === 'sencillo'}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2 rounded transition shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5 text-white" />
+                <span>Guardar Parámetros de Citas</span>
+              </button>
+            </form>
           </div>
 
           {/* MANUAL REGISTRATION FORM */}

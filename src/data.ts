@@ -194,6 +194,44 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         ]
       }
     ]
+  },
+  {
+    id: 'panamenos_extranjero',
+    nombre: 'Trámite de Panameños en el Extranjero',
+    descripcion: 'Inscripción de hechos vitales y trámites consulares de identidad para ciudadanos residentes en el exterior.',
+    icono: 'Plane',
+    subServicios: [
+      {
+        id: 'pe_nacimiento',
+        nombre: 'Inscripción de Nacimiento en el Extranjero',
+        descripcion: 'Registro de nacimiento para hijos de padre y/o madre panameños nacidos fuera del territorio nacional.',
+        requisitos: [
+          'Certificado de nacimiento original otorgado por el país extranjero, debidamente apostillado o legalizado.',
+          'Cédula de identidad de origen o pasaportes vigentes del padre o la madre panameña.',
+          'Copia simple del documento de identidad del menor.'
+        ]
+      },
+      {
+        id: 'pe_cedulacion',
+        nombre: 'Cédula de Identidad en Oficinas Consulares',
+        descripcion: 'Gestión y renovación de cédula de identidad a través de delegaciones diplomáticas y consulados de enlace.',
+        requisitos: [
+          'Presencia física obligatoria en el consulado panameño correspondiente.',
+          'Suministrar número de cédula anterior o pasaporte panameño vigente.',
+          'Formulario de validación biométrica consular firmado.'
+        ]
+      },
+      {
+        id: 'pe_matrimonio',
+        nombre: 'Inscripción de Matrimonio celebrado en el Extranjero',
+        descripcion: 'Registro oficial de matrimonios de ciudadanos panameños celebrados en el exterior.',
+        requisitos: [
+          'Certificado de matrimonio original extranjero apostillado o legalizado.',
+          'Cédula de identidad vigente del cónyuge panameño.',
+          'Traducción autorizada al español si el documento original fue emitido en otro idioma.'
+        ]
+      }
+    ]
   }
 ];
 

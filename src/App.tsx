@@ -24,10 +24,9 @@ import AgendamientoCita from './components/AgendamientoCita';
 import CitaComprobante from './components/CitaComprobante';
 import DashboardCitas from './components/DashboardCitas';
 import AdminPanel from './components/AdminPanel';
-import ConsultaExtranjeria from './components/ConsultaExtranjeria';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'agendar' | 'mis-citas' | 'admin' | 'extranjeria-consulta'>('agendar');
+  const [activeTab, setActiveTab] = useState<'agendar' | 'mis-citas' | 'admin'>('agendar');
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Core Booking wizard state
@@ -349,20 +348,6 @@ export default function App() {
                 </span>
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('extranjeria-consulta')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black uppercase tracking-wider transition cursor-pointer ${
-                activeTab === 'extranjeria-consulta'
-                  ? 'bg-white text-blue-950 shadow-sm border border-slate-350/50'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-              id="extranjeria-consulta-tab-button"
-            >
-              <Globe className="w-3.5 h-3.5 text-blue-700" />
-              <span className="hidden sm:inline">Validar Pasaporte</span>
-              <span className="inline sm:hidden">Validar</span>
-            </button>
           </nav>
         </div>
       </header>
@@ -410,28 +395,43 @@ export default function App() {
                     </div>
  
                     {/* Step 1 badge */}
-                    <div className="flex flex-col items-center gap-1.5 relative z-10">
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 ${getStepIndicatorStyle(1)}`}>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
+                      title="Ir al Paso 1: Datos Personales"
+                    >
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(1)}`}>
                         {currentStep > 1 ? '✓' : '1'}
                       </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Datos</span>
-                    </div>
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Datos</span>
+                    </button>
 
                     {/* Step 2 badge */}
-                    <div className="flex flex-col items-center gap-1.5 relative z-10">
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 ${getStepIndicatorStyle(2)}`}>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
+                      title="Ir al Paso 2: Selección de Trámite"
+                    >
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(2)}`}>
                         {currentStep > 2 ? '✓' : '2'}
                       </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Trámite</span>
-                    </div>
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Trámite</span>
+                    </button>
 
                     {/* Step 3 badge */}
-                    <div className="flex flex-col items-center gap-1.5 relative z-10">
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 ${getStepIndicatorStyle(3)}`}>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
+                      title="Ir al Paso 3: Agendamiento de Cita"
+                    >
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(3)}`}>
                         3
                       </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Fecha</span>
-                    </div>
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Fecha</span>
+                    </button>
 
                   </div>
                 </div>
@@ -491,23 +491,6 @@ export default function App() {
 
 
             </div>
-          ) : activeTab === 'extranjeria-consulta' ? (
-            /* CONSULTA DE EXTRANJERIA */
-            <ConsultaExtranjeria 
-              onRedirectToBook={(passportNum) => {
-                setDatosPersonales({
-                  tipoIdentificacion: 'Pasaporte',
-                  identificacion: passportNum,
-                  fechaNacimiento: '',
-                  telefono: '',
-                  correo: ''
-                });
-                setCurrentStep(1);
-                // Pre-set category optionally to Extranjería if mapped
-                setSelectedCategoria('extranjeria'); 
-                setActiveTab('agendar');
-              }}
-            />
           ) : (
             /* DASHBOARD VIEW */
             <div className="bg-white border border-slate-200 rounded shadow-sm p-4 md:p-6">
@@ -644,19 +627,26 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Floating Protected Entry for Authorized Personnel Only (Bottom-Left Shield) */}
+      {/* Botón flotante de Panel Admin (Esquina inferior izquierda, solo escudo) */}
       <button
         type="button"
-        id="floating-admin-shield"
-        onClick={() => setActiveTab(activeTab === 'admin' ? 'agendar' : 'admin')}
-        className={`fixed bottom-5 left-5 z-50 p-3 rounded-full shadow-lg border transition-all duration-300 active:scale-90 cursor-pointer flex items-center justify-center hover:shadow-xl group hover:rotate-12 ${
+        id="admin-tab-button"
+        onClick={() => {
+          if (activeTab === 'admin') {
+            setActiveTab('agendar');
+          } else {
+            setActiveTab('admin');
+          }
+        }}
+        className={`fixed bottom-5 left-5 z-50 p-3 rounded-full shadow-lg border transition-all duration-200 transform hover:scale-110 active:scale-95 cursor-pointer print:hidden flex items-center justify-center ${
           activeTab === 'admin'
-            ? 'bg-blue-600 border-blue-700 text-white hover:bg-blue-700'
-            : 'bg-white border-slate-200 text-blue-700 hover:bg-slate-50'
+            ? 'bg-amber-600 border-amber-500 text-white shadow-amber-900/20'
+            : 'bg-white border-slate-200 text-blue-700 hover:text-blue-800 hover:bg-slate-50 shadow-slate-900/10'
         }`}
-        title="Acceso de Control del Tribunal Electoral"
+        title="Panel de Administración"
+        aria-label="Panel de Administración"
       >
-        <Shield className={`w-5 h-5 shrink-0 transition-transform ${activeTab === 'admin' ? 'scale-110' : 'group-hover:scale-110'}`} />
+        <Shield className="w-5 h-5 shrink-0" />
       </button>
       
     </div>

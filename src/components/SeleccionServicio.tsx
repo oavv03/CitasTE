@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ServicioCategoriaId, CategoriaServicio } from '../types';
 import { SERVICIOS_TRIBUNAL } from '../data';
-import { IdCard, FileText, Globe, Vote, ClipboardCheck, Info, ArrowLeft, ArrowRight, CornerDownRight } from 'lucide-react';
+import { IdCard, FileText, Globe, Vote, ClipboardCheck, Info, ArrowLeft, ArrowRight, CornerDownRight, Plane } from 'lucide-react';
 
 interface SeleccionServicioProps {
   selectedCategoria: ServicioCategoriaId | null;
@@ -21,6 +21,8 @@ const renderIcon = (iconName: string, className: string) => {
       return <Globe className={className} />;
     case 'Vote':
       return <Vote className={className} />;
+    case 'Plane':
+      return <Plane className={className} />;
     default:
       return <ClipboardCheck className={className} />;
   }

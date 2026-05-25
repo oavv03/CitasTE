@@ -1575,6 +1575,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                               <option value="registro_civil">Registro Civil</option>
                               <option value="extranjeria">Trámites de Extranjería</option>
                               <option value="organizacion_electoral">Organización Electoral</option>
+                              <option value="panamenos_extranjero">Trámite de Panameños en el Extranjero</option>
                             </select>
                           </div>
                         )}
