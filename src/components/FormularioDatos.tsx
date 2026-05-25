@@ -5,9 +5,10 @@ import { ShieldCheck, RefreshCw, AlertCircle, Sparkles, Check } from 'lucide-rea
 interface FormularioDatosProps {
   initialData?: DatosPersonales;
   onSuccess: (data: DatosPersonales) => void;
+  onBack?: () => void;
 }
 
-export default function FormularioDatos({ initialData, onSuccess }: FormularioDatosProps) {
+export default function FormularioDatos({ initialData, onSuccess, onBack }: FormularioDatosProps) {
   const [tipoIdentificacion, setTipoIdentificacion] = useState<TipoIdentificacion>(
     initialData?.tipoIdentificacion || 'Cedula'
   );
@@ -191,7 +192,7 @@ export default function FormularioDatos({ initialData, onSuccess }: FormularioDa
       <div className="bg-white border border-slate-200 rounded-xl p-5 md:p-6 space-y-6">
         <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
           <div className="w-8 h-8 rounded-lg bg-blue-900 text-white flex items-center justify-center font-bold text-sm">
-            1
+            2
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">Datos Personales del Solicitante</h3>
@@ -393,7 +394,19 @@ export default function FormularioDatos({ initialData, onSuccess }: FormularioDa
         </div>
       </div>
 
-      <div className="flex justify-end pt-2">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between pt-2">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-full sm:w-auto h-12 px-6 rounded border border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-xs hover:bg-slate-50 transition cursor-pointer text-center flex items-center justify-center"
+          >
+            Regresar
+          </button>
+        ) : (
+          <div className="hidden sm:block"></div>
+        )}
+
         <button
           type="submit"
           disabled={verifyingPassport}
@@ -406,7 +419,7 @@ export default function FormularioDatos({ initialData, onSuccess }: FormularioDa
             </>
           ) : (
             <>
-              <span>Siguiente: Elegir Servicio</span>
+              <span>Siguiente: Oficina y Fecha</span>
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>

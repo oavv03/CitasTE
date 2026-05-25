@@ -98,16 +98,16 @@ export default function App() {
     }
   };
 
-  // Step 1 Completed (Personal Details + Math Captcha)
-  const handleStep1Success = (data: DatosPersonales) => {
-    setDatosPersonales(data);
-    setCurrentStep(2);
-  };
-
-  // Step 2 Completed (Service Selection)
+  // Step 1 Completed (Service Selection) - Now service is chosen first
   const handleStep2Success = (categoria: ServicioCategoriaId, subServicioId: string) => {
     setSelectedCategoria(categoria);
     setSelectedSubServicioId(subServicioId);
+    setCurrentStep(2);
+  };
+
+  // Step 2 Completed (Personal Details + Math Captcha) - Form details are filled second
+  const handleStep1Success = (data: DatosPersonales) => {
+    setDatosPersonales(data);
     setCurrentStep(3);
   };
 
@@ -257,6 +257,10 @@ export default function App() {
   // Skip step-by-step helper
   const handleNextStepBypass = () => {
     if (currentStep === 1) {
+      setSelectedCategoria('cedulacion');
+      setSelectedSubServicioId('ced_primera_vez');
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
       setDatosPersonales({
         tipoIdentificacion: 'Cedula',
         identificacion: '8-945-904',
@@ -264,10 +268,6 @@ export default function App() {
         telefono: '6612-3456',
         correo: 'oscargave3003@gmail.com'
       });
-      setCurrentStep(2);
-    } else if (currentStep === 2) {
-      setSelectedCategoria('cedulacion');
-      setSelectedSubServicioId('ced_primera_vez');
       setCurrentStep(3);
     } else if (currentStep === 3) {
       handleStep3Success('anc_main', '2026-05-30', '10:00 AM');
@@ -399,12 +399,12 @@ export default function App() {
                       type="button"
                       onClick={() => setCurrentStep(1)}
                       className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
-                      title="Ir al Paso 1: Datos Personales"
+                      title="Ir al Paso 1: Selección de Trámite"
                     >
                       <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(1)}`}>
                         {currentStep > 1 ? '✓' : '1'}
                       </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Datos</span>
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Trámite</span>
                     </button>
 
                     {/* Step 2 badge */}
@@ -412,12 +412,12 @@ export default function App() {
                       type="button"
                       onClick={() => setCurrentStep(2)}
                       className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
-                      title="Ir al Paso 2: Selección de Trámite"
+                      title="Ir al Paso 2: Datos Personales"
                     >
                       <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(2)}`}>
                         {currentStep > 2 ? '✓' : '2'}
                       </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Trámite</span>
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Datos</span>
                     </button>
 
                     {/* Step 3 badge */}
@@ -447,18 +447,18 @@ export default function App() {
                   transition={{ duration: 0.2 }}
                 >
                   {currentStep === 1 && (
-                    <FormularioDatos 
-                      initialData={datosPersonales || undefined}
-                      onSuccess={handleStep1Success} 
+                    <SeleccionServicio
+                      selectedCategoria={selectedCategoria}
+                      selectedSubServicioId={selectedSubServicioId}
+                      onSelect={handleStep2Success}
                     />
                   )}
 
                   {currentStep === 2 && (
-                    <SeleccionServicio
-                      selectedCategoria={selectedCategoria}
-                      selectedSubServicioId={selectedSubServicioId}
+                    <FormularioDatos 
+                      initialData={datosPersonales || undefined}
+                      onSuccess={handleStep1Success} 
                       onBack={() => setCurrentStep(1)}
-                      onSelect={handleStep2Success}
                     />
                   )}
 
