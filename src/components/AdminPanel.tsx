@@ -24,7 +24,11 @@ import {
   FileSpreadsheet,
   Building,
   Info,
-  Plus
+  Plus,
+  Copy,
+  ExternalLink,
+  Share2,
+  Link
 } from 'lucide-react';
 import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio, ExtranjeriaRecord, AdminRole } from '../types';
 import { SUCURSALES_TE, SERVICIOS_TRIBUNAL, saveTramiteMutation, saveSucursalMutation } from '../data';
@@ -100,6 +104,86 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const [subFormRequisitos, setSubFormRequisitos] = useState<string[]>([]);
   const [newRequisitoText, setNewRequisitoText] = useState('');
 
+  // Pasado de Edad state variables
+  const [expName, setExpName] = useState('');
+  const [expIdentificacion, setExpIdentificacion] = useState('');
+  const [expFechaNacimiento, setExpFechaNacimiento] = useState('');
+  const [expCorreo, setExpCorreo] = useState('');
+  const [expTelefono, setExpTelefono] = useState('');
+  const [expNotes, setExpNotes] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [generatedExp, setGeneratedExp] = useState<{ number: string; citizenName: string; textMessage: string; link: string } | null>(null);
+  
+  const [historicalExp, setHistoricalExp] = useState<any[]>(() => {
+    try {
+      const stored = localStorage.getItem('te_panama_historical_expedientes');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleGenerateExpediente = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expName.trim() || !expIdentificacion.trim() || !expCorreo.trim() || !expTelefono.trim()) {
+      alert('Por favor complete todos los datos obligatorios del ciudadano.');
+      return;
+    }
+
+    // Generate consecutive-like tracking number
+    const uniqueNumber = `EXP-2026-TE-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    // Create direct URL link
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-dev-d62mtcleay3xdcmqivcktx-389293937197.us-east1.run.app';
+    const directLink = `${baseOrigin}/?tramite=ced_pasados_edad&seguimiento=${uniqueNumber}`;
+
+    const textMessage = `Estimado(a) ${expName.trim()}, el Tribunal Electoral le informa que su expediente de inscripción tardía (Pasado de Edad) ha sido procesado con éxito.
+
+Su Número de Seguimiento Obligatorio es: *${uniqueNumber}*
+
+Para agendar su cita de atención presencial en la sucursal de su preferencia, por favor ingrese al siguiente enlace oficial, donde sus datos estarán pre-cargados automáticamente:
+${directLink}
+  
+Recuerde presentar los requisitos correspondientes el día de su cita.`;
+
+    const newRecord = {
+      id: uniqueNumber,
+      number: uniqueNumber,
+      citizenName: expName.trim(),
+      identificacion: expIdentificacion.trim(),
+      fechaNacimiento: expFechaNacimiento,
+      correo: expCorreo.trim(),
+      telefono: expTelefono.trim(),
+      notes: expNotes.trim(),
+      directLink,
+      textMessage,
+      fechaCreacion: new Date().toISOString()
+    };
+
+    const updated = [newRecord, ...historicalExp];
+    setHistoricalExp(updated);
+    try {
+      localStorage.setItem('te_panama_historical_expedientes', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+    }
+
+    setGeneratedExp({
+      number: uniqueNumber,
+      citizenName: expName.trim(),
+      textMessage,
+      link: directLink
+    });
+
+    // Reset simple form inputs
+    setExpName('');
+    setExpIdentificacion('');
+    setExpFechaNacimiento('');
+    setExpCorreo('');
+    setExpTelefono('');
+    setExpNotes('');
+  };
+
   // Quick Demo Credentials info
   const handleQuickLogin = (role: AdminRole) => {
     setCurrentRole(role);
@@ -107,6 +191,8 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     setLoginError('');
     if (role === 'extranjeria') {
       setActiveSubTab('extranjeria');
+    } else if (role === 'pasado_edad') {
+      setActiveSubTab('pasado_edad' as any);
     } else {
       setActiveSubTab('tabla');
     }
@@ -129,6 +215,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       setCurrentRole('extranjeria');
       setIsAdminLoggedIn(true);
       setActiveSubTab('extranjeria');
+      setLoginError('');
+    } else if (username.trim() === 'adminPEdad' && password === 'PasaDodeEdad2026') {
+      setCurrentRole('pasado_edad');
+      setIsAdminLoggedIn(true);
+      setActiveSubTab('pasado_edad' as any);
       setLoginError('');
     } else {
       setLoginError('Credenciales incorrectas. Para pruebas rápidas use los botones de acceso directo o ingrese las credenciales asignadas.');
@@ -661,7 +752,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
           
           {/* SIDEBAR TABS */}
           <div className="w-full md:w-52 bg-slate-950 border-r border-slate-800 p-3 flex flex-row md:flex-col gap-1.5 overflow-x-auto md:overflow-x-visible">
-            {currentRole !== 'extranjeria' && (
+            {currentRole !== 'extranjeria' && currentRole !== 'pasado_edad' && (
               <>
                 <button
                   onClick={() => setActiveSubTab('tabla')}
@@ -701,22 +792,38 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               </>
             )}
 
-            <button
-              onClick={() => setActiveSubTab('extranjeria')}
-              className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                activeSubTab === 'extranjeria'
-                  ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 shadow-inner'
-                  : 'text-slate-400 hover:text-white border border-transparent'
-              }`}
-            >
-              <FileSpreadsheet className="w-4 h-4 shrink-0 text-amber-500" />
-              <span className="flex items-center gap-1">
-                <span>Carga Extranjería</span>
-                <span className="bg-amber-500/20 text-amber-300 px-1 rounded text-[9px] font-black border border-amber-500/30">CSV</span>
-              </span>
-            </button>
+            {currentRole !== 'pasado_edad' && (
+              <button
+                onClick={() => setActiveSubTab('extranjeria')}
+                className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                  activeSubTab === 'extranjeria'
+                    ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 shadow-inner'
+                    : 'text-slate-400 hover:text-white border border-transparent'
+                }`}
+              >
+                <FileSpreadsheet className="w-4 h-4 shrink-0 text-amber-500" />
+                <span className="flex items-center gap-1">
+                  <span>Carga Extranjería</span>
+                  <span className="bg-amber-500/20 text-amber-300 px-1 rounded text-[9px] font-black border border-amber-500/30">CSV</span>
+                </span>
+              </button>
+            )}
 
-            {currentRole !== 'extranjeria' && (
+            {currentRole === 'pasado_edad' && (
+              <button
+                onClick={() => setActiveSubTab('pasado_edad' as any)}
+                className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                  activeSubTab === 'pasado_edad'
+                    ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                    : 'text-slate-400 hover:text-white border border-transparent'
+                }`}
+              >
+                <Shield className="w-4 h-4 shrink-0" />
+                <span>Generar Seguimiento</span>
+              </button>
+            )}
+
+            {currentRole !== 'extranjeria' && currentRole !== 'pasado_edad' && (
               <>
                 <button
                   onClick={() => setActiveSubTab('stats')}
@@ -1807,6 +1914,365 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                 {/* API COMMUNICATOR HOOK-UP COMPONENT */}
                 <ExtranjeriaController currentRole={currentRole} />
 
+              </div>
+            )}
+
+            {/* TAB CONTENT: PASADO DE EDAD (Generar Seguimiento y Enlace) */}
+            {activeSubTab === 'pasado_edad' && (
+              <div className="space-y-6 animate-fade-in font-sans text-slate-200">
+                {/* Intro details */}
+                <div id="pasado-edad-header" className="bg-slate-950 p-5 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-blue-500" />
+                      <span>Control de Inscripción Tardía (Pasados de Edad)</span>
+                    </h3>
+                    <p className="text-[11.5px] text-slate-405 font-medium leading-relaxed">
+                      Oficialía Especializada: Ingrese la información del ciudadano para habilitarle el número de expediente en el sistema electoral y crear su enlace directo de agendamiento.
+                    </p>
+                  </div>
+                  <span className="text-[10px] bg-blue-950/80 text-blue-405 border border-blue-900/50 font-black uppercase tracking-wider px-2.5 py-1 rounded">
+                    👤 Oficial Administrativo
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Form Column */}
+                  <form onSubmit={handleGenerateExpediente} id="form_generador_exp" className="lg:col-span-5 bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-xl">
+                    <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider border-b border-slate-900 pb-2 flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-blue-500" />
+                      Nuevo Expediente Tardío
+                    </h4>
+
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                          Nombre del Solicitante <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ej: Aurelio Ismael Montenegro"
+                          value={expName}
+                          onChange={(e) => setExpName(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650 font-medium"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                            Documento / ID <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej: 8-223-4556"
+                            value={expIdentificacion}
+                            onChange={(e) => setExpIdentificacion(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                            F. Nacimiento <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={expFechaNacimiento}
+                            onChange={(e) => setExpFechaNacimiento(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 text-white p-1.5 rounded text-xs px-2 focus:outline-none focus:ring-1 focus:ring-blue-650 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                            Correo Electrónico <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            placeholder="correo@ejemplo.com"
+                            value={expCorreo}
+                            onChange={(e) => setExpCorreo(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                            Teléfono Móvil <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="tel"
+                            required
+                            placeholder="Ej: 6605-4422"
+                            value={expTelefono}
+                            onChange={(e) => setExpTelefono(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                          Observaciones / Notas Internas
+                        </label>
+                        <textarea
+                          placeholder="Notas opcionales del expediente tardío..."
+                          value={expNotes}
+                          rows={2}
+                          onChange={(e) => setExpNotes(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650 resize-none font-medium text-slate-300"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-extrabold text-xs uppercase tracking-wider py-2.5 rounded transition shadow-lg cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Shield className="w-4 h-4 shrink-0" />
+                      Generar Expediente y Enlace
+                    </button>
+                  </form>
+
+                  {/* Results Column */}
+                  <div className="lg:col-span-7 space-y-4">
+                    {generatedExp ? (
+                      <div id="resultado_generado_exp" className="bg-slate-950 p-5 rounded-lg border border-blue-900/60 shadow-2xl relative overflow-hidden space-y-4">
+                        {/* Decorative background badge */}
+                        <div className="absolute right-[-10px] top-[-10px] opacity-10 pointer-events-none">
+                          <Shield className="w-40 h-40 text-blue-500" />
+                        </div>
+
+                        <div className="flex items-center justify-between border-b border-blue-900/30 pb-3">
+                          <span className="text-xs font-black uppercase text-blue-400 tracking-wider flex items-center gap-2">
+                            <CheckCircle className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
+                            Expediente Creado Exitosamente
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setGeneratedExp(null)}
+                            className="text-slate-400 hover:text-white text-[11px] font-bold border border-slate-800 hover:border-slate-700 px-2 py-0.5 rounded transition"
+                          >
+                            Limpiar Resultado
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Código de Seguimiento Generado</span>
+                            <div className="flex items-center gap-3 mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">
+                              <span className="text-base font-black text-blue-450 font-mono tracking-widest leading-none">
+                                {generatedExp.number}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(generatedExp.number);
+                                  setCopiedId(generatedExp.number);
+                                  setTimeout(() => setCopiedId(null), 2000);
+                                }}
+                                className="ml-auto bg-slate-800 hover:bg-slate-750 text-slate-350 hover:text-white text-[10px] font-extrabold px-3 py-1 rounded transition flex items-center gap-1 border border-slate-700"
+                              >
+                                {copiedId === generatedExp.number ? (
+                                  <>
+                                    <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                    <span>Copiado</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    <span>Copiar Código</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Enlace Personalizado de Agendamiento</span>
+                            <div className="flex items-center gap-3 mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">
+                              <span className="text-[11px] font-mono text-slate-300 truncate tracking-tight">
+                                {generatedExp.link}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(generatedExp.link);
+                                  setCopiedId(generatedExp.link);
+                                  setTimeout(() => setCopiedId(null), 2000);
+                                }}
+                                className="ml-auto bg-slate-800 hover:bg-slate-755 text-slate-355 hover:text-white text-[10px] font-extrabold px-3 py-1 rounded transition flex items-center gap-1 border border-slate-700 max-w-[120px] shrink-0"
+                              >
+                                {copiedId === generatedExp.link ? (
+                                  <>
+                                    <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                    <span>Copiado</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Link className="w-3 h-3" />
+                                    <span>Copiar Enlace</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-slate-455 tracking-wide block mb-1">Kit de Mensajería para Remitir</span>
+                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-850 space-y-2 relative">
+                              <pre className="text-[10.5px] font-sans text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                {generatedExp.textMessage}
+                              </pre>
+                              <div className="border-t border-slate-800 pt-2.5 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(generatedExp.textMessage);
+                                    setCopiedId('kit-' + generatedExp.number);
+                                    setTimeout(() => setCopiedId(null), 2000);
+                                  }}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold uppercase tracking-wider px-4 py-1.5 rounded transition flex items-center gap-1.5 shadow"
+                                >
+                                  {copiedId === 'kit-' + generatedExp.number ? (
+                                    <>
+                                      <CheckCircle className="w-3.5 h-3.5 text-white" />
+                                      <span>Kit de Mensaje Copiado</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Share2 className="w-3.5 h-3.5" />
+                                      <span>Copiar Kit Completo</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-950 p-5 rounded-lg border border-slate-850 shadow-inner flex flex-col items-center justify-center text-center py-16 h-full min-h-[300px] text-slate-500">
+                        <Shield className="w-12 h-12 text-slate-700 mb-3 animate-pulse" />
+                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">A la espera de generación</h4>
+                        <p className="text-[11px] text-slate-500 max-w-xs mt-1 leading-relaxed">
+                          Complete el formulario de la izquierda con los datos del ciudadano y presione el botón de generación para habilitar el expediente.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Historical Log */}
+                <div id="historial_expedientes" className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden shadow-xl">
+                  <div className="bg-slate-900/50 p-4 border-b border-slate-800 flex items-center justify-between">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-350 flex items-center gap-2">
+                      <ClipboardList className="w-4 h-4 text-blue-500" />
+                      Historial de Seguimientos Autorizados ({historicalExp.length})
+                    </h4>
+                    {historicalExp.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('¿Está seguro de limpiar todo el historial local de expedientes autorizados? Esto no borrará las citas registradas.')) {
+                            setHistoricalExp([]);
+                            localStorage.removeItem('te_panama_historical_expedientes');
+                          }
+                        }}
+                        className="text-red-400 hover:text-red-350 text-[10px] font-black uppercase tracking-wider hover:underline"
+                      >
+                        Limpiar Historial
+                      </button>
+                    )}
+                  </div>
+
+                  {historicalExp.length === 0 ? (
+                    <div className="p-10 text-center text-[11px] text-slate-500 font-medium">
+                      No se han generado expedientes tardíos en esta sesión local de oficialía.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left font-sans">
+                        <thead>
+                          <tr className="bg-slate-900 text-[9px] font-black uppercase tracking-widest text-slate-450 border-b border-slate-800">
+                            <th className="p-3 w-16 border-b border-slate-800">Fecha</th>
+                            <th className="p-3 w-40 border-b border-slate-800">N° Seguimiento</th>
+                            <th className="p-3 w-44 border-b border-slate-800">Solicitante</th>
+                            <th className="p-3 w-28 border-b border-slate-800">Documento / ID</th>
+                            <th className="p-3 w-32 border-b border-slate-800">Contacto</th>
+                            <th className="p-3 text-right border-b border-slate-800">Acciones de Remisión</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-850 text-xs text-slate-300">
+                          {historicalExp.map((rec) => (
+                            <tr key={rec.id} className="hover:bg-slate-900/40 border-b border-slate-850/50">
+                              <td className="p-3 text-[10px] font-mono text-slate-450">
+                                {rec.fechaCreacion ? rec.fechaCreacion.substring(0, 10) : '2026-05-25'}
+                              </td>
+                              <td className="p-3">
+                                <span className="font-mono font-black text-blue-450 bg-blue-950/40 px-2 py-0.5 rounded border border-blue-900/30">
+                                  {rec.number}
+                                </span>
+                              </td>
+                              <td className="p-3 font-semibold text-slate-200">
+                                {rec.citizenName}
+                              </td>
+                              <td className="p-3 font-mono text-[11px]">
+                                {rec.identificacion}
+                              </td>
+                              <td className="p-3 font-mono text-[10px] space-y-0.5">
+                                <div className="text-slate-350">{rec.correo}</div>
+                                <div className="text-slate-450">{rec.telefono}</div>
+                              </td>
+                              <td className="p-3 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(rec.directLink);
+                                      setCopiedId('link-' + rec.id);
+                                      setTimeout(() => setCopiedId(null), 2000);
+                                    }}
+                                    className="bg-slate-900 hover:bg-slate-800 text-[10px] font-bold px-2 py-1 rounded transition text-slate-300 border border-slate-750 flex items-center gap-1 cursor-pointer"
+                                    title="Copiar solo el enlace de cita"
+                                  >
+                                    {copiedId === 'link-' + rec.id ? (
+                                      <span className="text-emerald-500 font-extrabold flex items-center gap-0.5"><CheckCircle className="w-3 h-3" /> Enlace!</span>
+                                    ) : (
+                                      <><Link className="w-3 h-3 text-slate-450" /> Enlace</>
+                                    )}
+                                  </button>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(rec.textMessage);
+                                      setCopiedId('kit-' + rec.id);
+                                      setTimeout(() => setCopiedId(null), 2000);
+                                    }}
+                                    className="bg-blue-950/40 hover:bg-blue-900/50 text-[10px] font-bold px-2 py-1 rounded transition text-blue-300 border border-blue-900/40 flex items-center gap-1 cursor-pointer"
+                                    title="Copiar kit de mensaje completo para enviar"
+                                  >
+                                    {copiedId === 'kit-' + rec.id ? (
+                                      <span className="text-emerald-400 font-extrabold flex items-center gap-0.5"><CheckCircle className="w-3 h-3 text-emerald-500" /> Kit!</span>
+                                    ) : (
+                                      <><Share2 className="w-3 h-3 text-blue-400" /> Kit</>
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

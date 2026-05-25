@@ -88,6 +88,33 @@ export default function App() {
     }
   }, []);
 
+  // Hook up deep-linking query parameters for pre-filling "Pasado de Edad" tracking numbers
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tracking = params.get('seguimiento');
+      const tramite = params.get('tramite');
+      if (tramite === 'ced_pasados_edad' || tracking) {
+        setSelectedCategoria('cedulacion');
+        setSelectedSubServicioId('ced_pasados_edad');
+        if (tracking) {
+          setDatosPersonales({
+            tipoIdentificacion: 'Cedula',
+            identificacion: '',
+            fechaNacimiento: '',
+            telefono: '',
+            correo: '',
+            numeroSeguimiento: tracking
+          });
+          // Redirect directly to step 2 to input the citizen's ID, email, telephone with tracking pre-filled!
+          setCurrentStep(2);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse search query parameters", e);
+    }
+  }, []);
+
   // Sync to LocalStorage
   const saveCitas = (updatedList: Cita[]) => {
     setCitasList(updatedList);

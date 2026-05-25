@@ -56,5 +56,5 @@ export interface ExtranjeriaRecord {
   motivo: string;
 }
 
-export type AdminRole = 'sencillo' | 'super' | 'extranjeria';
+export type AdminRole = 'sencillo' | 'super' | 'extranjeria' | 'pasado_edad';
 
