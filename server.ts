@@ -4,161 +4,12 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dns from "dns";
 import fs from "fs";
-import { createClient } from "@supabase/supabase-js";
 
 // Fix Node warning about localhost dns resolution in some runtimes
 dns.setDefaultResultOrder("ipv4first");
 
 const DB_PATH = path.join(process.cwd(), "appointments-db.json");
 const EXTRANJERIA_DB_PATH = path.join(process.cwd(), "extranjeria-db.json");
-const SUPABASE_CONFIG_PATH = path.join(process.cwd(), "supabase-config.json");
-
-interface SupabaseConfig {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  tableName: string;
-  autoSync: boolean;
-  syncToVercel: boolean;
-  vercelUrl: string;
-}
-
-const DEFAULT_SUPABASE_CONFIG: SupabaseConfig = {
-  supabaseUrl: process.env.SUPABASE_URL || "https://spssjbqfphnhaamsmgys.supabase.co",
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwc3NqYnFmcGhuaGFhbXNtZ3lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njc0NDMsImV4cCI6MjA5NTE0MzQ0M30.L4ySu9Vs3HY902KPmusyeijwvBM8Ni7iXuu1mcKvqbw",
-  tableName: "citas",
-  autoSync: true,
-  syncToVercel: true,
-  vercelUrl: "https://sistema-de-ticket.vercel.app/api/tickets"
-};
-
-function getSupabaseConfig(): SupabaseConfig {
-  try {
-    if (fs.existsSync(SUPABASE_CONFIG_PATH)) {
-      const data = fs.readFileSync(SUPABASE_CONFIG_PATH, "utf8");
-      const parsed = JSON.parse(data);
-      return { ...DEFAULT_SUPABASE_CONFIG, ...parsed };
-    }
-  } catch (error) {
-    console.error("Error reading Supabase configuration:", error);
-  }
-  return DEFAULT_SUPABASE_CONFIG;
-}
-
-function saveSupabaseConfig(config: SupabaseConfig): void {
-  try {
-    fs.writeFileSync(SUPABASE_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
-  } catch (error) {
-    console.error("Error saving Supabase configuration:", error);
-  }
-}
-
-function getSupabaseClient(config: SupabaseConfig) {
-  if (!config.supabaseUrl || !config.supabaseAnonKey) {
-    return null;
-  }
-  try {
-    return createClient(config.supabaseUrl, config.supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-  } catch (e) {
-    console.error("Error initializing Supabase client:", e);
-    return null;
-  }
-}
-
-async function syncAppointmentToSupabase(cita: ServerCita, config: SupabaseConfig): Promise<{ success: boolean; error?: string; simulated?: boolean }> {
-  const client = getSupabaseClient(config);
-  if (!client) {
-    return { success: false, error: "Supabase no está configurado o faltan claves de acceso.", simulated: true };
-  }
-
-  try {
-    const table = config.tableName || "citas";
-    
-    // Map application Cita schema to a clean Supabase storage object
-    const payload = {
-      id: cita.id,
-      codigo_cita: cita.codigoTransaccion,
-      nombre_ciudadano: cita.identificacion, // fallback info represented
-      identificacion: cita.identificacion,
-      correo: cita.correo,
-      telefono: cita.telefono,
-      tipo_tramite: cita.categoriaNombre,
-      servicio_detalle: cita.subServicioNombre,
-      sucursal: cita.sucursalNombre,
-      fecha: cita.fecha,
-      hora: cita.hora,
-      estado: cita.estado,
-      prioridad: "alta", // Guaranteed high priority relative to external site tickets
-      fecha_creacion: cita.fechaCreacion || new Date().toISOString()
-    };
-
-    const { error } = await client
-      .from(table)
-      .upsert(payload, { onConflict: "id" });
-
-    if (error) {
-      console.error("[Supabase Sync Database Error]:", error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true };
-  } catch (e: any) {
-    console.error("[Supabase Exception during sync]:", e);
-    return { success: false, error: e.message || String(e) };
-  }
-}
-
-async function syncToVercelTicketSystem(cita: ServerCita, config: SupabaseConfig): Promise<{ success: boolean; response?: any; simulated?: boolean; note?: string }> {
-  if (!config.syncToVercel) {
-    return { success: false, note: "Sincronización con Vercel desactivada." };
-  }
-
-  const url = config.vercelUrl || "https://sistema-de-ticket.vercel.app/api/tickets";
-
-  try {
-    const payload = {
-      id: cita.id,
-      codigo: cita.codigoTransaccion,
-      identificacion: cita.identificacion,
-      servicio: cita.subServicioNombre,
-      sucursal: cita.sucursalNombre,
-      fecha: cita.fecha,
-      hora: cita.hora,
-      prioridad: "alta",
-      origen: "Portal Oficial Tribunal Electoral",
-      timestamp: new Date().toISOString()
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const respData = await res.json().catch(() => ({}));
-      return { success: true, response: respData, note: `Enviado exitosamente a ${url}` };
-    } else {
-      throw new Error(`Código de estado del servidor alterno: ${res.status}`);
-    }
-  } catch (e: any) {
-    console.log(`[Vercel Webhook notification simulated for ${url}]:`, e.message || e);
-    return { 
-      success: true, 
-      simulated: true, 
-      note: `Webhook enviado a ${url}. (Se simuló debido a que el servidor destino no está configurado para recibir peticiones CORS directas o no está activo en esta sesión).` 
-    };
-  }
-}
 
 interface ExtranjeriaRecord {
   pasaporte: string;
@@ -999,7 +850,7 @@ async function startServer() {
   });
 
   // API to register appointment directly
-  app.post("/api/register-appointment", async (req, res) => {
+  app.post("/api/register-appointment", (req, res) => {
     try {
       const { 
         id, 
@@ -1030,7 +881,7 @@ async function startServer() {
         id,
         correo: datosPersonales?.correo || req.body.correo || "",
         codigoTransaccion,
-        categoriaNombre: categoryTranslation(categoriaNombre) || servicioCategoria || "Trámite",
+        categoriaNombre: categoriaNombre || servicioCategoria || "Trámite",
         subServicioNombre: subServicioNombre || subServicioId || "Servicio",
         fecha,
         hora,
@@ -1052,25 +903,7 @@ async function startServer() {
       }
 
       saveAppointments(appointments);
-
-      // Synchronize in real-time if active in configurations
-      const config = getSupabaseConfig();
-      let supabaseSync: any = { success: false, error: "Auto-sync disabled or unconfigured", simulated: true };
-      let vercelSync: any = { success: false, note: "Vercel sync disabled" };
-
-      if (config.autoSync) {
-        supabaseSync = await syncAppointmentToSupabase(serverCita, config);
-      }
-      if (config.syncToVercel) {
-        vercelSync = await syncToVercelTicketSystem(serverCita, config);
-      }
-
-      return res.json({ 
-        success: true, 
-        appointment: serverCita,
-        supabaseSync,
-        vercelSync
-      });
+      return res.json({ success: true, appointment: serverCita });
     } catch (e: any) {
       console.error("Error registering appointment:", e);
       res.status(500).json({ error: e.message });
@@ -1095,7 +928,7 @@ async function startServer() {
   });
 
   // API to cancel an appointment from dashboard
-  app.post("/api/cancel-appointment", async (req, res) => {
+  app.post("/api/cancel-appointment", (req, res) => {
     try {
       const { id } = req.body;
       if (!id) {
@@ -1107,157 +940,12 @@ async function startServer() {
       if (appointment) {
         appointment.estado = 'cancelada';
         saveAppointments(appointments);
-
-        // Update database and tickets as well
-        const config = getSupabaseConfig();
-        if (config.autoSync) {
-          await syncAppointmentToSupabase(appointment, config);
-        }
-        if (config.syncToVercel) {
-          await syncToVercelTicketSystem(appointment, config);
-        }
-
         return res.json({ success: true, status: 'cancelada' });
       }
       return res.status(404).json({ error: "Cita no encontrada en el servidor." });
     } catch (e: any) {
       console.error("Error canceling appointment:", e);
       res.status(500).json({ error: e.message });
-    }
-  });
-
-  // ==========================================
-  // SUPABASE INTEGRATION & WEBHOOK ENDPOINTS
-  // ==========================================
-  
-  app.get("/api/supabase/config", (req, res) => {
-    try {
-      const config = getSupabaseConfig();
-      // Mask key for safety when transmitting to client
-      const maskedConfig = {
-        ...config,
-        supabaseAnonKey: config.supabaseAnonKey 
-          ? `${config.supabaseAnonKey.substring(0, 8)}...${config.supabaseAnonKey.substring(config.supabaseAnonKey.length - 8)}`
-          : ""
-      };
-      return res.json({ success: true, config: maskedConfig });
-    } catch (e: any) {
-      return res.status(500).json({ success: false, error: e.message });
-    }
-  });
-
-  app.post("/api/supabase/config", (req, res) => {
-    try {
-      const { supabaseUrl, supabaseAnonKey, tableName, autoSync, syncToVercel, vercelUrl } = req.body;
-      const current = getSupabaseConfig();
-      
-      const updated: SupabaseConfig = {
-        supabaseUrl: typeof supabaseUrl === "string" ? supabaseUrl.trim() : current.supabaseUrl,
-        tableName: typeof tableName === "string" ? tableName.trim() : current.tableName || "citas",
-        autoSync: typeof autoSync === "boolean" ? autoSync : current.autoSync,
-        syncToVercel: typeof syncToVercel === "boolean" ? syncToVercel : current.syncToVercel,
-        vercelUrl: typeof vercelUrl === "string" ? vercelUrl.trim() : current.vercelUrl,
-        // If password/anonkey comes back masked, do not replace the existing key!
-        supabaseAnonKey: (supabaseAnonKey && typeof supabaseAnonKey === "string" && !supabaseAnonKey.includes("..."))
-          ? supabaseAnonKey.trim()
-          : current.supabaseAnonKey
-      };
-
-      saveSupabaseConfig(updated);
-      return res.json({ success: true, config: updated });
-    } catch (e: any) {
-      return res.status(500).json({ success: false, error: e.message });
-    }
-  });
-
-  app.post("/api/supabase/test", async (req, res) => {
-    try {
-      const { supabaseUrl, supabaseAnonKey, tableName } = req.body;
-      const testConfig = {
-        supabaseUrl: supabaseUrl || "",
-        supabaseAnonKey: supabaseAnonKey || "",
-        tableName: tableName || "citas",
-        autoSync: true,
-        syncToVercel: false,
-        vercelUrl: ""
-      };
-
-      if (!testConfig.supabaseUrl || !testConfig.supabaseAnonKey) {
-        return res.status(400).json({ success: false, error: "La URL y la clave Anon son obligatorias para probar la conexión." });
-      }
-
-      // Initialize test client
-      const client = createClient(testConfig.supabaseUrl, testConfig.supabaseAnonKey);
-      
-      // Try to fetch 1 row from target table to verify permissions and existence
-      const { error } = await client
-        .from(testConfig.tableName)
-        .select("*")
-        .limit(1);
-
-      if (error) {
-        // Relation "citas" does not exist usually throws 42P01 error (or similar postgrest code)
-        if (error.code === "PGRST116" || error.code === "42P01") {
-          return res.json({ 
-            success: true, 
-            connected: true, 
-            tableExists: false, 
-            message: `¡Conexión establecida con éxito! Pero la tabla "${testConfig.tableName}" no existe. Ejecute el script SQL que se muestra a continuación en Supabase para crearla.` 
-          });
-        }
-        return res.json({ success: false, error: error.message, code: error.code });
-      }
-
-      return res.json({ 
-        success: true, 
-        connected: true, 
-        tableExists: true, 
-        message: `¡Conexión exitosa! La tabla "${testConfig.tableName}" fue localizada y está lista para operar en tiempo real.` 
-      });
-    } catch (e: any) {
-      return res.status(500).json({ success: false, error: e.message || String(e) });
-    }
-  });
-
-  app.post("/api/supabase/sync-all", async (req, res) => {
-    try {
-      const appointments = getAppointments();
-      const config = getSupabaseConfig();
-      const client = getSupabaseClient(config);
-
-      if (!client) {
-        return res.status(400).json({ success: false, error: "Supabase no está configurado (URL/Clave faltantes)." });
-      }
-
-      let syncedCount = 0;
-      let failedCount = 0;
-      const errors: string[] = [];
-
-      for (const cita of appointments) {
-        const resDb = await syncAppointmentToSupabase(cita, config);
-        if (resDb.success) {
-          syncedCount++;
-        } else {
-          failedCount++;
-          if (resDb.error && !errors.includes(resDb.error)) {
-            errors.push(resDb.error);
-          }
-        }
-        
-        if (config.syncToVercel) {
-          await syncToVercelTicketSystem(cita, config);
-        }
-      }
-
-      return res.json({ 
-        success: true, 
-        total: appointments.length, 
-        synced: syncedCount, 
-        failed: failedCount,
-        errors 
-      });
-    } catch (e: any) {
-      return res.status(500).json({ success: false, error: e.message });
     }
   });
 
