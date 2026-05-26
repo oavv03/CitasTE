@@ -410,7 +410,7 @@ async function startServer() {
   // Proxy endpoint to load the official logo, bypassing potential hotlinking/CORS protection on the Tribunal Electoral server
   app.get("/api/logo", async (req, res) => {
     try {
-      const targetUrl = "https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/04/WhatsApp-Image-2026-04-30-at-09.45.35.png";
+      const targetUrl = "https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/AGENDATE-01.png";
       const response = await fetch(targetUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",

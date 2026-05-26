@@ -329,7 +329,7 @@ export default function App() {
             {/* Logo Oficial del Tribunal Electoral de Panamá */}
             <div className="flex items-center select-none">
               <img
-                src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/04/WhatsApp-Image-2026-04-30-at-09.45.35.png"
+                src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/AGENDATE-01.png"
                 alt="Tribunal Electoral de Panamá"
                 className="h-14 md:h-16 w-auto object-contain"
                 referrerPolicy="no-referrer"

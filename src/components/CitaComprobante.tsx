@@ -248,7 +248,7 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
             {/* Logo Oficial en contenedor de contraste superior */}
             <div className="bg-white p-1.5 rounded-lg shadow-sm shrink-0 flex items-center justify-center">
               <img
-                src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/04/WhatsApp-Image-2026-04-30-at-09.45.35.png"
+                src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/AGENDATE-01.png"
                 alt="Tribunal Electoral de Panamá"
                 className="h-10 md:h-12 w-auto object-contain"
                 referrerPolicy="no-referrer"
