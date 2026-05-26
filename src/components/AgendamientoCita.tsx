@@ -72,6 +72,8 @@ export default function AgendamientoCita({
       (selectedSubServicioId && (selectedSubServicioId.includes('extranjero') || selectedSubServicioId.startsWith('ext_')));
   }, [selectedCategoria, selectedSubServicioId]);
 
+  const isPastAgeTrámiteSelected = selectedSubServicioId === 'ced_pasados_edad';
+
   // Load custom settings from localStorage or fallback to standard properties
   const [extranjeriaConfig, setExtranjeriaConfig] = useState(() => {
     const start = localStorage.getItem('extranjeria_hora_inicio') || '07:00 AM';
@@ -79,6 +81,14 @@ export default function AgendamientoCita({
     const interval = parseInt(localStorage.getItem('extranjeria_intervalo_minutos') || '15', 10);
     const capacity = parseInt(localStorage.getItem('extranjeria_capacidad_usuarios') || '2', 10);
     return { start, end, interval, capacity };
+  });
+
+  const [tardiaConfig, setTardiaConfig] = useState(() => {
+    const start = localStorage.getItem('tardia_hora_inicio') || '08:00 AM';
+    const end = localStorage.getItem('tardia_hora_fin') || '11:30 AM';
+    const interval = parseInt(localStorage.getItem('tardia_intervalo_minutos') || '30', 10);
+    const capacityTotal = parseInt(localStorage.getItem('tardia_capacidad_total_dia') || '4', 10);
+    return { start, end, interval, capacityTotal };
   });
 
   // Query server to keep setup perfectly in-sync
@@ -106,6 +116,27 @@ export default function AgendamientoCita({
     }
   }, [isExtranjeria]);
 
+  React.useEffect(() => {
+    fetch('/api/tardia/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.config) {
+          const { capacidadTotalDia, intervalo, horaInicio, horaFin } = data.config;
+          setTardiaConfig({
+            start: horaInicio,
+            end: horaFin,
+            interval: intervalo,
+            capacityTotal: capacidadTotalDia
+          });
+          localStorage.setItem('tardia_capacidad_total_dia', String(capacidadTotalDia));
+          localStorage.setItem('tardia_intervalo_minutos', String(intervalo));
+          localStorage.setItem('tardia_hora_inicio', horaInicio);
+          localStorage.setItem('tardia_hora_fin', horaFin);
+        }
+      })
+      .catch(err => console.warn("Failed to retrieve tardia remote configs:", err));
+  }, []);
+
   const availableSlots = useMemo(() => {
     if (isExtranjeria) {
       return generateExtranjeriaSlots(
@@ -114,8 +145,15 @@ export default function AgendamientoCita({
         extranjeriaConfig.interval
       );
     }
+    if (isPastAgeTrámiteSelected) {
+      return generateExtranjeriaSlots(
+        tardiaConfig.start,
+        tardiaConfig.end,
+        tardiaConfig.interval
+      );
+    }
     return HORAS_DISPONIBLES;
-  }, [isExtranjeria, extranjeriaConfig]);
+  }, [isExtranjeria, isPastAgeTrámiteSelected, extranjeriaConfig, tardiaConfig]);
 
   // Load active bookings in order to enforce dynamic capacity constraints
   const activeBookings = useMemo(() => {
@@ -130,10 +168,53 @@ export default function AgendamientoCita({
     return [];
   }, []);
 
+  const [serverBookings, setServerBookings] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/appointments')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.appointments)) {
+          setServerBookings(data.appointments);
+        }
+      })
+      .catch((err) => console.warn("Failed to retrieve server appointments:", err));
+  }, []);
+
+  const mergedBookings = useMemo(() => {
+    const map = new Map<string, any>();
+    // Add local bookings
+    activeBookings.forEach((b) => {
+      if (b.id) map.set(b.id, b);
+    });
+    // Add server bookings (overwriting if same ID)
+    serverBookings.forEach((sb) => {
+      const mapped = {
+        id: sb.id,
+        fecha: sb.fecha,
+        hora: sb.hora,
+        subServicioId: sb.subServicioId || (sb.subServicioNombre?.toLowerCase().includes('pasado') || sb.subServicioNombre?.toLowerCase().includes('tardía') ? 'ced_pasados_edad' : undefined),
+        servicioCategoria: sb.categoriaNombre,
+        estado: sb.estado
+      };
+      map.set(sb.id, mapped);
+    });
+    return Array.from(map.values());
+  }, [activeBookings, serverBookings]);
+
   const [selectedProvincia, setSelectedProvincia] = useState<string>(isExtranjeria ? 'Panamá' : 'Todos');
   const [sucursalId, setSucursalId] = useState<string>(isExtranjeria ? 'anc_main' : (selectedSucursalId || ''));
   const [fecha, setFecha] = useState<string>(selectedFecha || '');
   const [hora, setHora] = useState<string>(selectedHora || '');
+
+  const countPasadosEdadForSelectedDay = useMemo(() => {
+    if (!fecha) return 0;
+    return mergedBookings.filter((c) => 
+      c.fecha === fecha && 
+      (c.subServicioId === 'ced_pasados_edad' || c.subServicioNombre?.toLowerCase().includes('pasado') || c.subServicioNombre?.toLowerCase().includes('tardía')) &&
+      c.estado !== 'cancelada'
+    ).length;
+  }, [fecha, mergedBookings]);
 
   // Automatically switch to Ancón and Panamá province when component is loaded or switching to Extranjería
   React.useEffect(() => {
@@ -362,18 +443,32 @@ export default function AgendamientoCita({
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {nextAvailableDates.map((item) => {
                     const isSelected = fecha === item.dateString;
+                    
+                    // Count current bookings of this type for this date
+                    const isPastAgeTrámite = selectedSubServicioId === 'ced_pasados_edad';
+                    const countPasadosEdad = mergedBookings.filter((c) => 
+                      c.fecha === item.dateString && 
+                      (c.subServicioId === 'ced_pasados_edad' || c.subServicioNombre?.toLowerCase().includes('pasado') || c.subServicioNombre?.toLowerCase().includes('tardía')) &&
+                      c.estado !== 'cancelada'
+                    ).length;
+
+                    const isDayFullForPasados = isPastAgeTrámite && countPasadosEdad >= tardiaConfig.capacityTotal;
+
                     return (
                       <button
                         key={item.dateString}
                         type="button"
+                        disabled={isDayFullForPasados && !isSelected}
                         onClick={() => {
                           setFecha(item.dateString);
                           setHora(''); // Reset time when date changes
                         }}
-                        className={`p-2.5 rounded border-2 text-center transition cursor-pointer flex flex-col items-center justify-center ${
+                        className={`p-2.5 rounded border-2 text-center transition cursor-pointer flex flex-col items-center justify-center relative ${
                           isSelected
-                            ? 'border-blue-700 bg-blue-50/25 text-slate-900 font-extrabold'
-                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                            ? 'border-blue-700 bg-blue-50/25 text-slate-900 font-extrabold shadow-sm'
+                            : isDayFullForPasados
+                              ? 'border-red-900/30 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
+                              : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
                         }`}
                       >
                         <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
@@ -385,6 +480,18 @@ export default function AgendamientoCita({
                         <span className="text-[10px] text-slate-400 font-medium">
                           {item.displayString.split(' de ')[1]}
                         </span>
+
+                        {isPastAgeTrámite && (
+                          <span className={`text-[8.5px] mt-1.5 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight block border ${
+                            isDayFullForPasados
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : countPasadosEdad > 0
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                            {isDayFullForPasados ? '🚫 Sin Cupo' : `${countPasadosEdad}/${tardiaConfig.capacityTotal} Citas`}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -399,60 +506,82 @@ export default function AgendamientoCita({
                     <span>3. Seleccione el Intervalo de Hora</span>
                     <span className="text-red-500">*</span>
                   </label>
-                  <p className="text-xs text-slate-500 font-medium">
-                    {isExtranjeria 
-                      ? `Espacios de atención de ${extranjeriaConfig.interval} minutos disponibles (Capacidad: ${extranjeriaConfig.capacity} usuarios por intervalo):`
-                      : 'Espacios de atención de 30 minutos disponibles:'
-                    }
-                  </p>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {availableSlots.map((slot) => {
-                      const isSelected = hora === slot;
-                      
-                      // Count current bookings in this slot to apply slot limitations
-                      const bookedCount = activeBookings.filter(c => 
-                        c.fecha === fecha && 
-                        c.hora === slot && 
-                        (c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranjero') || c.subServicioId?.startsWith('ext_')) &&
-                        c.estado !== 'cancelada'
-                      ).length;
-                      
-                      const isFull = isExtranjeria && bookedCount >= extranjeriaConfig.capacity;
-                      
-                      return (
-                        <button
-                          key={slot}
-                          type="button"
-                          disabled={isFull && !isSelected}
-                          onClick={() => setHora(slot)}
-                          className={`p-2.5 rounded border text-center text-xs font-bold transition flex flex-col items-center justify-center gap-1 ${
-                            isSelected
-                              ? 'border-blue-700 bg-blue-700 text-white shadow-sm shadow-blue-100'
-                              : isFull
-                                ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <span className="tracking-tight text-[11px] font-bold">{slot}</span>
-                          {isExtranjeria && (
-                            <span className={`text-[9px] tracking-tight block ${
-                              isSelected 
-                                ? 'text-blue-200 font-medium' 
-                                : isFull 
-                                  ? 'text-red-500 font-bold' 
-                                  : 'text-slate-400 font-normal'
-                            }`}>
-                              {isFull 
-                                ? '⛔ Lleno' 
-                                : `${bookedCount}/${extranjeriaConfig.capacity} ocupados`
-                              }
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {isPastAgeTrámiteSelected && (
+                    <div className="bg-blue-50/50 border border-blue-200 text-blue-950 p-3.5 rounded text-xs leading-relaxed space-y-1">
+                      <strong className="text-blue-805 font-black uppercase tracking-wide flex items-center gap-1">
+                        🛡️ Regulación Especial de Pasado de Edad
+                      </strong>
+                      <p className="font-medium text-slate-600">
+                        La Dirección Nacional de Registro Civil limita la atención presencial de cedulación tardía a un <strong>máximo de {tardiaConfig.capacityTotal} ciudadanos por día</strong> para garantizar la exhaustividad biométrica del proceso.
+                      </p>
+                    </div>
+                  )}
+
+                  {isPastAgeTrámiteSelected && countPasadosEdadForSelectedDay >= tardiaConfig.capacityTotal ? (
+                    <div className="bg-red-50 border border-red-200 text-red-950 p-4 rounded text-center space-y-2.5 shadow-sm">
+                      <p className="font-extrabold text-sm uppercase text-red-700 tracking-wide">
+                        🚫 Límite de Cupos Agotado
+                      </p>
+                      <p className="text-xs font-semibold text-slate-605 max-w-sm mx-auto leading-relaxed">
+                        Este día ya cuenta con el límite de **{tardiaConfig.capacityTotal} citas para Pasados de Edad registradas**. Por favor, seleccione un día diferente en el panel del calendario superior.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-slate-500 font-medium">
+                        {isExtranjeria 
+                          ? `Espacios de atención de ${extranjeriaConfig.interval} minutos disponibles (Capacidad: ${extranjeriaConfig.capacity} usuarios por intervalo):`
+                          : isPastAgeTrámiteSelected
+                            ? `Espacios de atención de ${tardiaConfig.interval} minutos disponibles:`
+                            : 'Espacios de atención de 30 minutos disponibles:'
+                        }
+                      </p>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {availableSlots.map((slot) => {
+                          const isSelected = hora === slot;
+                          
+                          // Count current bookings in this slot to apply slot limitations
+                          const bookedCount = activeBookings.filter(c => 
+                            c.fecha === fecha && 
+                            c.hora === slot && 
+                            (c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranjero') || c.subServicioId?.startsWith('ext_')) &&
+                            c.estado !== 'cancelada'
+                          ).length;
+                          
+                          const isFull = isExtranjeria && bookedCount >= extranjeriaConfig.capacity;
+                          
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              disabled={isFull && !isSelected}
+                              onClick={() => setHora(slot)}
+                              className={`p-2.5 rounded border text-center text-xs font-bold transition flex flex-col items-center justify-center gap-1 ${
+                                isSelected
+                                  ? 'border-blue-700 bg-blue-700 text-white shadow-sm shadow-blue-100'
+                                  : isFull
+                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className="tracking-tight text-[11px] font-bold">{slot}</span>
+                              {isExtranjeria && isFull && (
+                                <span className={`text-[9px] tracking-tight block ${
+                                  isSelected 
+                                    ? 'text-blue-200 font-medium' 
+                                    : 'text-red-500 font-bold'
+                                }`}>
+                                  ⛔ Lleno
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="bg-slate-50 border border-slate-200 rounded p-6 text-center text-slate-400 mt-2 text-xs font-medium">

@@ -11,6 +11,69 @@ dns.setDefaultResultOrder("ipv4first");
 const DB_PATH = path.join(process.cwd(), "appointments-db.json");
 const EXTRANJERIA_DB_PATH = path.join(process.cwd(), "extranjeria-db.json");
 const EXTRANJERIA_CONFIG_PATH = path.join(process.cwd(), "extranjeria-config.json");
+const TARDIA_CONFIG_PATH = path.join(process.cwd(), "tardia-config.json");
+const USERS_DB_PATH = path.join(process.cwd(), "users-db.json");
+
+interface ServerUser {
+  username: string;
+  password?: string;
+  role: 'sencillo' | 'super' | 'extranjeria' | 'pasado_edad';
+  nombre: string;
+  fechaCreacion: string;
+}
+
+const DEFAULT_USERS: ServerUser[] = [
+  {
+    username: "adminmini",
+    password: "admin1234",
+    role: "sencillo",
+    nombre: "Administrador Sencillo",
+    fechaCreacion: "2026-05-26T15:18:27Z"
+  },
+  {
+    username: "adminte",
+    password: "Value1234",
+    role: "super",
+    nombre: "Super Administrador TE",
+    fechaCreacion: "2026-05-26T15:18:27Z"
+  },
+  {
+    username: "migra26",
+    password: "12345678",
+    role: "extranjeria",
+    nombre: "Gestor de Extranjería",
+    fechaCreacion: "2026-05-26T15:18:27Z"
+  },
+  {
+    username: "adminpedad",
+    password: "PasaDodeEdad2026",
+    role: "pasado_edad",
+    nombre: "Gestor Pasado de Edad",
+    fechaCreacion: "2026-05-26T15:18:27Z"
+  }
+];
+
+function getUsers(): ServerUser[] {
+  try {
+    if (!fs.existsSync(USERS_DB_PATH)) {
+      fs.writeFileSync(USERS_DB_PATH, JSON.stringify(DEFAULT_USERS, null, 2), "utf8");
+      return DEFAULT_USERS;
+    }
+    const data = fs.readFileSync(USERS_DB_PATH, "utf8");
+    return JSON.parse(data);
+  } catch (error) {
+    console.error("Error reading users DB:", error);
+  }
+  return DEFAULT_USERS;
+}
+
+function saveUsers(users: ServerUser[]): void {
+  try {
+    fs.writeFileSync(USERS_DB_PATH, JSON.stringify(users, null, 2), "utf8");
+  } catch (error) {
+    console.error("Error writing users DB:", error);
+  }
+}
 
 interface ExtranjeriaConfig {
   capacidad: number;
@@ -45,6 +108,42 @@ function saveExtranjeriaConfig(config: ExtranjeriaConfig): void {
     fs.writeFileSync(EXTRANJERIA_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch (error) {
     console.error("Error writing extranjeria config DB:", error);
+  }
+}
+
+interface TardiaConfig {
+  capacidadTotalDia: number;
+  intervalo: number;
+  horaInicio: string;
+  horaFin: string;
+}
+
+const DEFAULT_TARDIA_CONFIG: TardiaConfig = {
+  capacidadTotalDia: 4,
+  intervalo: 30,
+  horaInicio: "08:00 AM",
+  horaFin: "11:30 AM"
+};
+
+function getTardiaConfig(): TardiaConfig {
+  try {
+    if (!fs.existsSync(TARDIA_CONFIG_PATH)) {
+      fs.writeFileSync(TARDIA_CONFIG_PATH, JSON.stringify(DEFAULT_TARDIA_CONFIG, null, 2), "utf8");
+      return DEFAULT_TARDIA_CONFIG;
+    }
+    const data = fs.readFileSync(TARDIA_CONFIG_PATH, "utf8");
+    return JSON.parse(data);
+  } catch (error) {
+    console.error("Error reading tardia config DB:", error);
+  }
+  return DEFAULT_TARDIA_CONFIG;
+}
+
+function saveTardiaConfig(config: TardiaConfig): void {
+  try {
+    fs.writeFileSync(TARDIA_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  } catch (error) {
+    console.error("Error writing tardia config DB:", error);
   }
 }
 
@@ -116,6 +215,7 @@ interface ServerCita {
   codigoTransaccion: string;
   categoriaNombre: string;
   subServicioNombre: string;
+  subServicioId?: string;
   fecha: string;
   hora: string;
   sucursalNombre: string;
@@ -919,6 +1019,35 @@ async function startServer() {
     }
   });
 
+  app.get("/api/tardia/config", (req, res) => {
+    try {
+      const config = getTardiaConfig();
+      return res.json({ success: true, config });
+    } catch (e: any) {
+      console.error("Error fetching tardía settings:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/tardia/config", (req, res) => {
+    try {
+      const { capacidadTotalDia, intervalo, horaInicio, horaFin } = req.body;
+      
+      const updatedConfig: TardiaConfig = {
+        capacidadTotalDia: parseInt(capacidadTotalDia, 10) || DEFAULT_TARDIA_CONFIG.capacidadTotalDia,
+        intervalo: parseInt(intervalo, 10) || DEFAULT_TARDIA_CONFIG.intervalo,
+        horaInicio: String(horaInicio || DEFAULT_TARDIA_CONFIG.horaInicio),
+        horaFin: String(horaFin || DEFAULT_TARDIA_CONFIG.horaFin)
+      };
+
+      saveTardiaConfig(updatedConfig);
+      return res.json({ success: true, config: updatedConfig });
+    } catch (e: any) {
+      console.error("Error saving tardía config:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // API to register appointment directly
   app.post("/api/register-appointment", (req, res) => {
     try {
@@ -969,6 +1098,26 @@ async function startServer() {
         }
       }
 
+      // Enforce daily capacity check for Pasados de Edad (max 4 per day)
+      const isPastAge = subServicioId === 'ced_pasados_edad' || 
+        (subServicioId && (subServicioId.includes('pasado') || subServicioId.toLowerCase().includes('ced_pasados_edad'))) ||
+        (subServicioNombre && (subServicioNombre.toLowerCase().includes('pasado') || subServicioNombre.toLowerCase().includes('tardía')));
+      
+      if (isPastAge) {
+        const activePasadosEdadCitas = appointments.filter(a => 
+          a.fecha === fecha && 
+          (a.subServicioId === 'ced_pasados_edad' || a.subServicioNombre?.toLowerCase().includes('pasado') || a.subServicioNombre?.toLowerCase().includes('tardía')) &&
+          a.estado !== 'cancelada'
+        );
+        const isNewBooking = appointments.findIndex(a => a.id === id) < 0;
+        if (isNewBooking && activePasadosEdadCitas.length >= 4) {
+          return res.status(400).json({
+            success: false,
+            error: "Se completó el límite diario de atención. Solo se permiten hasta 4 citas de inscripción de Pasado de Edad por día."
+          });
+        }
+      }
+
       const existingIdx = appointments.findIndex(a => a.id === id || a.codigoTransaccion === codigoTransaccion);
 
       const serverCita: ServerCita = {
@@ -977,6 +1126,7 @@ async function startServer() {
         codigoTransaccion,
         categoriaNombre: categoriaNombre || servicioCategoria || "Trámite",
         subServicioNombre: subServicioNombre || subServicioId || "Servicio",
+        subServicioId: subServicioId || undefined,
         fecha,
         hora,
         sucursalNombre: sucursalNombre || sucursalId || "Sucursal",
@@ -1019,6 +1169,17 @@ async function startServer() {
     } catch (e: any) {
       console.error("Error syncing appointments:", e);
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // API to get all appointments
+  app.get("/api/appointments", (req, res) => {
+    try {
+      const appointments = getAppointments();
+      return res.json({ success: true, appointments });
+    } catch (e: any) {
+      console.error("Error fetching all appointments:", e);
+      res.status(500).json({ success: false, error: e.message });
     }
   });
 
@@ -1628,6 +1789,82 @@ async function startServer() {
     if (cat === "registro_civil") return "Registro Civil";
     return cat || "Trámites";
   }
+
+  // ==========================================
+  // GESTIÓN DE USUARIOS POR EL SUPER ADMIN
+  // ==========================================
+  app.get("/api/users", (req, res) => {
+    try {
+      const users = getUsers();
+      return res.json({ success: true, users });
+    } catch (e: any) {
+      console.error("Error fetching users list:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/users", (req, res) => {
+    try {
+      const { username, password, role, nombre } = req.body;
+      if (!username || !password || !role || !nombre) {
+        return res.status(400).json({ success: false, error: "Datos incompletos para el usuario." });
+      }
+
+      const cleanUsername = String(username).trim().toLowerCase();
+      // Validate length or patterns can be added
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ success: false, error: "El nombre de usuario debe tener al menos 3 caracteres." });
+      }
+
+      const users = getUsers();
+      const existingIdx = users.findIndex(u => u.username.toLowerCase() === cleanUsername);
+
+      const newUser: ServerUser = {
+        username: cleanUsername,
+        password: String(password).trim(),
+        role: role,
+        nombre: String(nombre).trim(),
+        fechaCreacion: existingIdx >= 0 ? users[existingIdx].fechaCreacion : new Date().toISOString()
+      };
+
+      if (existingIdx >= 0) {
+        users[existingIdx] = newUser;
+      } else {
+        users.push(newUser);
+      }
+
+      saveUsers(users);
+      return res.json({ success: true, user: newUser });
+    } catch (e: any) {
+      console.error("Error registering user:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/users/:username", (req, res) => {
+    try {
+      const usernameToDelete = String(req.params.username).trim().toLowerCase();
+      
+      // Prevent deleting core admins to avoid getting locked out
+      if (usernameToDelete === "adminte") {
+        return res.status(400).json({ success: false, error: "No es posible eliminar el Super Administrador principal (adminte)." });
+      }
+
+      const users = getUsers();
+      const initialLength = users.length;
+      const filteredUsers = users.filter(u => u.username.toLowerCase() !== usernameToDelete);
+
+      if (filteredUsers.length === initialLength) {
+        return res.status(404).json({ success: false, error: "Usuario no encontrado." });
+      }
+
+      saveUsers(filteredUsers);
+      return res.json({ success: true, message: `Usuario '${usernameToDelete}' eliminado exitosamente.` });
+    } catch (e: any) {
+      console.error("Error deleting user:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
 
   // Vite middleware setup for assets and hot builds under development
   if (process.env.NODE_ENV !== "production") {

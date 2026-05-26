@@ -68,3 +68,11 @@ export interface ExtranjeriaRecord {
 
 export type AdminRole = 'sencillo' | 'super' | 'extranjeria' | 'pasado_edad';
 
+export interface AdminUser {
+  username: string;
+  password?: string;
+  role: AdminRole;
+  nombre: string;
+  fechaCreacion: string;
+}
+

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { jsPDF } from 'jspdf';
 import { 
   Shield, 
   ShieldAlert, 
@@ -28,9 +29,10 @@ import {
   Copy,
   ExternalLink,
   Share2,
-  Link
+  Link,
+  Check
 } from 'lucide-react';
-import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio, ExtranjeriaRecord, AdminRole } from '../types';
+import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio, ExtranjeriaRecord, AdminRole, AdminUser } from '../types';
 import { SUCURSALES_TE, SERVICIOS_TRIBUNAL, saveTramiteMutation, saveSucursalMutation } from '../data';
 import ExtranjeriaController from './ExtranjeriaController';
 
@@ -70,6 +72,125 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
   // Bulk operation checks
   const [selectedCitaIds, setSelectedCitaIds] = useState<string[]>([]);
+
+  // User Management state for Super Admin
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userFormUsername, setUserFormUsername] = useState('');
+  const [userFormPassword, setUserFormPassword] = useState('');
+  const [userFormRole, setUserFormRole] = useState<AdminRole>('extranjeria');
+  const [userFormNombre, setUserFormNombre] = useState('');
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [userError, setUserError] = useState('');
+  const [userSuccess, setUserSuccess] = useState('');
+
+  // Fetch users from server-side DB
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.users) {
+          setUsers(data.users);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading users:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // Load users on mount and trigger every time admin panel renders or logs in
+  React.useEffect(() => {
+    fetchUsers();
+  }, [isAdminLoggedIn]);
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserError('');
+    setUserSuccess('');
+
+    if (!userFormUsername.trim() || !userFormPassword.trim() || !userFormNombre.trim() || !userFormRole) {
+      setUserError('Todos los campos son obligatorios para registrar o modificar un usuario.');
+      return;
+    }
+
+    try {
+      const payload = {
+        username: userFormUsername.trim().toLowerCase(),
+        password: userFormPassword.trim(),
+        role: userFormRole,
+        nombre: userFormNombre.trim()
+      };
+
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setUserSuccess(editingUser ? 'Usuario actualizado exitosamente.' : 'Usuario creado exitosamente con la gestión asignada.');
+        fetchUsers();
+        // Reset form
+        setUserFormUsername('');
+        setUserFormPassword('');
+        setUserFormNombre('');
+        setUserFormRole('extranjeria');
+        setEditingUser(null);
+      } else {
+        setUserError(result.error || 'Surgió un error al guardar el usuario en el servidor.');
+      }
+    } catch (err: any) {
+      setUserError('No se pudo conectar con el servidor para guardar el usuario.');
+    }
+  };
+
+  const handleDeleteUser = async (usernameToDelete: string) => {
+    if (!window.confirm(`¿Está seguro que desea eliminar al usuario '${usernameToDelete}'? Esta acción es irreversible.`)) {
+      return;
+    }
+    setUserError('');
+    setUserSuccess('');
+
+    try {
+      const response = await fetch(`/api/users/${usernameToDelete}`, {
+        method: 'DELETE'
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setUserSuccess(result.message || 'Usuario eliminado de la base de datos.');
+        fetchUsers();
+      } else {
+        setUserError(result.error || 'No se pudo eliminar el usuario.');
+      }
+    } catch (err) {
+      setUserError('Error al comunicarse con el servidor.');
+    }
+  };
+
+  const handleEditUserClick = (u: AdminUser) => {
+    setEditingUser(u);
+    setUserFormUsername(u.username);
+    setUserFormPassword(u.password || '');
+    setUserFormNombre(u.nombre);
+    setUserFormRole(u.role);
+    setUserError('');
+    setUserSuccess('');
+  };
+
+  const handleCancelUserEdit = () => {
+    setEditingUser(null);
+    setUserFormUsername('');
+    setUserFormPassword('');
+    setUserFormNombre('');
+    setUserFormRole('extranjeria');
+    setUserError('');
+    setUserSuccess('');
+  };
 
   // Simulated config capacity state
   const [maxSlotsPerHour, setMaxSlotsPerHour] = useState(15);
@@ -131,6 +252,575 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     } catch {}
     return typeof window !== 'undefined' ? window.location.origin : 'https://ais-dev-d62mtcleay3xdcmqivcktx-389293937197.us-east1.run.app';
   });
+
+  // Configuration states for dynamic schedule parameters of Inscripcion Tardia (Pasados de Edad)
+  const [tardiaCapacidadTotal, setTardiaCapacidadTotal] = useState<number>(() => {
+    return parseInt(localStorage.getItem('tardia_capacidad_total_dia') || '4', 10);
+  });
+  const [tardiaIntervalo, setTardiaIntervalo] = useState<number>(() => {
+    return parseInt(localStorage.getItem('tardia_intervalo_minutos') || '30', 10);
+  });
+  const [tardiaHoraInicio, setTardiaHoraInicio] = useState<string>(() => {
+    return localStorage.getItem('tardia_hora_inicio') || '08:00 AM';
+  });
+  const [tardiaHoraFin, setTardiaHoraFin] = useState<string>(() => {
+    return localStorage.getItem('tardia_hora_fin') || '11:30 AM';
+  });
+  const [showConfirmTardiaSave, setShowConfirmTardiaSave] = useState(false);
+
+  // Load Tardía configuration from server
+  React.useEffect(() => {
+    if (isAdminLoggedIn) {
+      fetch('/api/tardia/config')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success && data.config) {
+            const { capacidadTotalDia, intervalo, horaInicio, horaFin } = data.config;
+            setTardiaCapacidadTotal(capacidadTotalDia);
+            setTardiaIntervalo(intervalo);
+            setTardiaHoraInicio(horaInicio);
+            setTardiaHoraFin(horaFin);
+            
+            localStorage.setItem('tardia_capacidad_total_dia', String(capacidadTotalDia));
+            localStorage.setItem('tardia_intervalo_minutos', String(intervalo));
+            localStorage.setItem('tardia_hora_inicio', horaInicio);
+            localStorage.setItem('tardia_hora_fin', horaFin);
+          }
+        })
+        .catch(err => console.warn("Failed to load tardia configs in AdminPanel:", err));
+    }
+  }, [isAdminLoggedIn]);
+
+  const [metricPeriod, setMetricPeriod] = useState<'dia' | 'semana' | 'mes' | 'año' | 'todo'>('mes');
+
+  const handleDownloadMetricsPDFReport = (type: 'extranjeria' | 'tardia' | 'all') => {
+    const filtered = citas.filter(cita => {
+      const isExtranjeria = cita.servicioCategoria === 'extranjeria' || 
+                            cita.subServicioId?.includes('extranj') || 
+                            cita.subServicioId?.startsWith('ext_');
+      
+      const isTardia = cita.subServicioId === 'ced_pasados_edad';
+      
+      if (type === 'extranjeria' && !isExtranjeria) return false;
+      if (type === 'tardia' && !isTardia) return false;
+      if (type === 'all' && !isExtranjeria && !isTardia) return false;
+      
+      if (metricPeriod === 'todo') return true;
+      
+      try {
+        const now = new Date();
+        const refDate = new Date(cita.fecha + 'T00:00:00');
+        
+        if (metricPeriod === 'dia') {
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const todayStr = `${year}-${month}-${day}`;
+          return cita.fecha === todayStr;
+        }
+        
+        if (metricPeriod === 'semana') {
+          const currentDay = now.getDay();
+          const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+          const monday = new Date(now);
+          monday.setDate(now.getDate() - distanceToMonday);
+          monday.setHours(0, 0, 0, 0);
+          
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+          
+          return refDate >= monday && refDate <= sunday;
+        }
+        
+        if (metricPeriod === 'mes') {
+          return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
+        }
+        
+        if (metricPeriod === 'año') {
+          return refDate.getFullYear() === now.getFullYear();
+        }
+      } catch (e) {
+        return false;
+      }
+      return false;
+    });
+
+    if (filtered.length === 0) {
+      alert('No hay citas registradas en el período seleccionado para descargar en PDF.');
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const primaryColor = [15, 23, 42]; // Slate 900
+    const accentColor = type === 'tardia' ? [37, 99, 235] : [217, 119, 6]; // Blue or Amber
+
+    let currentY = 15;
+
+    const drawHeader = () => {
+      // Top bar
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(10, currentY, 190, 10, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('TRIBUNAL ELECTORAL DE PANAMÁ', 15, currentY + 6.5);
+
+      // Section title
+      currentY += 16;
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text('REPORTE OFICIAL DE PLANIFICACIÓN Y CARGA DE CITAS', 10, currentY);
+      
+      currentY += 6;
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      
+      const categoryLabel = type === 'all' 
+        ? 'Consolidado General (Extranjería e Inscripción Tardía)' 
+        : type === 'extranjeria' 
+          ? 'Trámites de Extranjería (Resolución Migratoria)' 
+          : 'Inscripción Tardía (Ciudadanos Pasados de Edad)';
+          
+      doc.text(`Servicio regulado: ${categoryLabel}`, 10, currentY);
+
+      currentY += 5;
+      const periodLabel = metricPeriod === 'dia' ? 'Hoy' : metricPeriod === 'semana' ? 'Esta Semana' : metricPeriod === 'mes' ? 'Este Mes' : metricPeriod === 'año' ? 'Este Año' : 'Histórico Completo';
+      doc.text(`Período analizado: ${periodLabel.toUpperCase()}  |  Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}`, 10, currentY);
+
+      // Accent divider line
+      currentY += 4;
+      doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.setLineWidth(0.8);
+      doc.line(10, currentY, 200, currentY);
+      currentY += 8;
+    };
+
+    drawHeader();
+
+    // Summary Box
+    doc.setFillColor(248, 250, 252); // Slate 50
+    doc.setDrawColor(226, 232, 240); // Slate 200
+    doc.setLineWidth(0.2);
+    doc.rect(10, currentY, 190, 22, 'FD');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.text('RESUMEN DE CARGA OPERATIVA', 15, currentY + 6);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    
+    const countConfirmadas = filtered.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
+    const countOtras = filtered.length - countConfirmadas;
+
+    doc.text(`• Total Citas Registradas: ${filtered.length}`, 15, currentY + 12);
+    doc.text(`• Citas Confirmadas: ${countConfirmadas}`, 75, currentY + 12);
+    doc.text(`• Otras / Canceladas: ${countOtras}`, 135, currentY + 12);
+    
+    doc.text('Este reporte contiene información confidencial sensitiva regulada conforme a las directivas de Registro Civil.', 15, currentY + 18);
+    currentY += 28;
+
+    // Table Headers
+    const drawTableHead = (y: number) => {
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(10, y, 190, 7, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8);
+      
+      doc.text('CÓDIGO/TX', 12, y + 4.8);
+      doc.text('FECHA/HORA', 41, y + 4.8);
+      doc.text('RECIPIENTE/SOLICITANTE', 68, y + 4.8);
+      doc.text('CÉDULA/PASAPORTE', 118, y + 4.8);
+      doc.text('CORREO ELECTRÓNICO', 145, y + 4.8);
+      doc.text('ESTATUS', 180, y + 4.8);
+    };
+
+    drawTableHead(currentY);
+    currentY += 7;
+
+    // Render Rows
+    filtered.forEach((c, index) => {
+      if (currentY > 270) {
+        doc.addPage();
+        currentY = 15;
+        drawHeader();
+        drawTableHead(currentY);
+        currentY += 7;
+      }
+
+      // Alternate row background
+      if (index % 2 === 1) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(10, currentY, 190, 8, 'F');
+      }
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(7.5);
+
+      const isExtrans = c.servicioCategoria === 'extranjeria';
+      const name = isExtrans 
+        ? `${c.datosPersonales.primerNombre || ''} ${c.datosPersonales.primerApellido || ''}`.trim()
+        : (c.datosPersonales.nombreCompleto || '');
+      
+      const labelTx = c.codigoTransaccion.length > 13 ? c.codigoTransaccion.slice(0, 13) + '...' : c.codigoTransaccion;
+      const labelName = name.length > 25 ? name.slice(0, 24) + '...' : name;
+      const labelId = c.datosPersonales.identificacion || c.datosPersonales.pasaporte || 'N/D';
+      const labelCorreo = c.datosPersonales.correo.length > 20 ? c.datosPersonales.correo.slice(0, 19) + '..' : c.datosPersonales.correo;
+      
+      doc.text(labelTx, 12, currentY + 5);
+      doc.text(`${c.fecha} - ${c.hora}`, 41, currentY + 5);
+      doc.text(labelName, 68, currentY + 5);
+      doc.text(labelId, 118, currentY + 5);
+      doc.text(labelCorreo, 145, currentY + 5);
+      
+      const statusText = c.estado === 'confirmada' || c.estado === 'asistire' ? 'CONFIRMADA' : c.estado === 'no_asistire' ? 'NO ASISTIRÁ' : 'CANCELADA';
+      if (statusText === 'CONFIRMADA') {
+        doc.setTextColor(16, 124, 65);
+        doc.setFont('Helvetica', 'bold');
+      } else if (statusText === 'NO ASISTIRÁ') {
+        doc.setTextColor(180, 83, 9);
+        doc.setFont('Helvetica', 'bold');
+      } else {
+        doc.setTextColor(185, 28, 28);
+        doc.setFont('Helvetica', 'bold');
+      }
+      doc.text(statusText, 180, currentY + 5);
+
+      doc.setDrawColor(241, 245, 249);
+      doc.setLineWidth(0.1);
+      doc.line(10, currentY + 8, 200, currentY + 8);
+
+      currentY += 8;
+    });
+
+    const pdfLabel = type === 'all' ? 'general' : type;
+    doc.save(`reporte_carga_${pdfLabel}_${metricPeriod}.pdf`);
+  };
+
+  const handleDownloadTrackingPDF = (exp: any) => {
+    if (!exp) return;
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Dark slate band header
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, 210, 40, 'F');
+
+    // Accent line (Gold/Amber)
+    doc.setFillColor(217, 119, 6);
+    doc.rect(0, 40, 210, 2.5, 'F');
+
+    // Title / Header Text
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('TRIBUNAL ELECTORAL DE PANAMÁ', 20, 16);
+    doc.setFontSize(8);
+    doc.setFont('Helvetica', 'normal');
+    doc.text('DIRECCIÓN NACIONAL DE CEDULACIÓN / REGISTRO CIVIL', 20, 21);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text('CONSTANCIA DE EXPEDIENTE Y SEGUIMIENTO ACTIVO', 20, 31);
+
+    let currentY = 55;
+
+    // Body text
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('CONSTANCIA OFICIAL PARA CITAS DE INSCRIPCIÓN TARDÍA (PASADO DE EDAD)', 20, currentY);
+    
+    currentY += 9;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación e inscripción tardía presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: 170 });
+
+    currentY += 15;
+
+    // Info card box
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.rect(20, currentY, 170, 52, 'FD');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('DATOS DECLARADOS DEL SOLICITANTE', 26, currentY + 8);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+
+    doc.setFont('Helvetica', 'bold'); doc.text('Nombre Completo:', 26, currentY + 17);
+    doc.setFont('Helvetica', 'normal'); doc.text(exp.citizenName || exp.nombreCompleto || exp.citizenName, 65, currentY + 17);
+
+    doc.setFont('Helvetica', 'bold'); doc.text('Identificación / Cédula:', 26, currentY + 24);
+    doc.setFont('Helvetica', 'normal'); doc.text(exp.identificacion, 65, currentY + 24);
+
+    doc.setFont('Helvetica', 'bold'); doc.text('F. de Nacimiento:', 26, currentY + 31);
+    doc.setFont('Helvetica', 'normal'); doc.text(exp.fechaNacimiento || 'N/A', 65, currentY + 31);
+
+    doc.setFont('Helvetica', 'bold'); doc.text('Correo Electrónico:', 26, currentY + 38);
+    doc.setFont('Helvetica', 'normal'); doc.text(exp.correo, 65, currentY + 38);
+
+    doc.setFont('Helvetica', 'bold'); doc.text('Teléfono Móvil:', 26, currentY + 45);
+    doc.setFont('Helvetica', 'normal'); doc.text(exp.telefono, 65, currentY + 45);
+
+    currentY += 62;
+
+    // Tracking Panel box (amber themed)
+    doc.setFillColor(254, 243, amberIndexColor(exp)); // Amber background
+    doc.setDrawColor(251, 191, 36);  // Amber 400
+    doc.setLineWidth(0.4);
+    doc.rect(20, currentY, 170, 36, 'FD');
+
+    doc.setTextColor(180, 83, 9); // Amber 700
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.text('CÓDIGO DE SEGUIMIENTO OBLIGATORIO', 26, currentY + 8);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text(exp.number || exp.id, 26, currentY + 19);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(120, 113, 108);
+    doc.text('Presente este código impreso o en su dispositivo al momento de presentarse a la sucursal seleccionada para su cita.', 26, currentY + 26, { maxWidth: 156 });
+
+    currentY += 46;
+
+    // Booking link block
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('ENLACE EXCLUSIVO DE AGENDAMIENTO DIRECTO:', 20, currentY);
+
+    currentY += 5;
+    doc.setFillColor(241, 245, 249);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.1);
+    doc.rect(20, currentY, 170, 12, 'FD');
+
+    doc.setTextColor(37, 99, 235); // Blue 600
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    const linkText = exp.link || exp.directLink || `${pasadoEdadLinkBase.trim().endsWith('/') ? pasadoEdadLinkBase.trim().slice(0, -1) : pasadoEdadLinkBase.trim()}/?tramite=ced_pasados_edad&seguimiento=${exp.number || exp.id}`;
+    doc.text(linkText, 24, currentY + 7.5, { maxWidth: 162 });
+
+    currentY += 22;
+
+    // Legal & Security instructions
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('INSTRUCCIONES DEL PROCESO:', 20, currentY);
+
+    currentY += 6;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('1. Ingrese al enlace anterior o acceda a la plataforma e ingrese su Código de Seguimiento.\n2. Seleccione la fecha, hora e instalaciones de la sucursal donde desea realizar su proceso de filiación.\n3. Acuda a la hora programada. Se requiere puntualidad (llegar 15 minutos antes con sus documentos originales).', 20, currentY, { maxWidth: 170 });
+
+    currentY += 26;
+
+    // Stamp / Footer area
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.line(20, currentY, 190, currentY);
+
+    currentY += 8;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Constancia generada electrónicamente por el sistema de citas el ${new Date().toLocaleDateString('es-ES')}.`, 20, currentY);
+    doc.text('Este documento digital cumple con los requisitos de verificación en línea del Tribunal Electoral de Panamá.', 20, currentY + 4);
+
+    doc.save(`constancia_seguimiento_${exp.number || exp.id}.pdf`);
+  };
+
+  const amberIndexColor = (exp: any) => {
+    return 199;
+  };
+
+  const handleDownloadMetricsReport = (type: 'extranjeria' | 'tardia' | 'all') => {
+    const filtered = citas.filter(cita => {
+      const isExtranjeria = cita.servicioCategoria === 'extranjeria' || 
+                            cita.subServicioId?.includes('extranj') || 
+                            cita.subServicioId?.startsWith('ext_');
+      
+      const isTardia = cita.subServicioId === 'ced_pasados_edad';
+      
+      if (type === 'extranjeria' && !isExtranjeria) return false;
+      if (type === 'tardia' && !isTardia) return false;
+      if (type === 'all' && !isExtranjeria && !isTardia) return false;
+      
+      if (metricPeriod === 'todo') return true;
+      
+      try {
+        const now = new Date();
+        const refDate = new Date(cita.fecha + 'T00:00:00');
+        
+        if (metricPeriod === 'dia') {
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const todayStr = `${year}-${month}-${day}`;
+          return cita.fecha === todayStr;
+        }
+        
+        if (metricPeriod === 'semana') {
+          const currentDay = now.getDay();
+          const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+          const monday = new Date(now);
+          monday.setDate(now.getDate() - distanceToMonday);
+          monday.setHours(0, 0, 0, 0);
+          
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+          
+          return refDate >= monday && refDate <= sunday;
+        }
+        
+        if (metricPeriod === 'mes') {
+          return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
+        }
+        
+        if (metricPeriod === 'año') {
+          return refDate.getFullYear() === now.getFullYear();
+        }
+      } catch (e) {
+        return false;
+      }
+      return false;
+    });
+
+    if (filtered.length === 0) {
+      alert('No hay citas registradas en el período seleccionado para descargar.');
+      return;
+    }
+
+    const headers = [
+      'Codigo de Cita',
+      'Categoria',
+      'Sub Tramite',
+      'Fecha',
+      'Hora',
+      'Solicitante',
+      'Tipo Identificacion',
+      'Identificacion',
+      'Correo Electronico',
+      'Telefono',
+      'Sucursal ID',
+      'Estado'
+    ];
+
+    const rows = filtered.map(c => {
+      const isExtrans = c.servicioCategoria === 'extranjeria';
+      const name = isExtrans 
+        ? `${c.datosPersonales.primerNombre || ''} ${c.datosPersonales.primerApellido || ''}`.trim()
+        : (c.datosPersonales.nombreCompleto || '');
+      
+      const subservice = c.subServicioId === 'ced_pasados_edad' ? 'Inscripcion Tardia (PE)' : c.subServicioId;
+      
+      return [
+        c.codigoTransaccion,
+        c.servicioCategoria === 'extranjeria' ? 'Extranjeria' : 'Inscripcion Tardia',
+        subservice,
+        c.fecha,
+        c.hora,
+        `"${name.replace(/"/g, '""')}"`,
+        c.datosPersonales.tipoIdentificacion,
+        c.datosPersonales.identificacion,
+        c.datosPersonales.correo,
+        c.datosPersonales.telefono,
+        c.sucursalId,
+        c.estado
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [
+      headers.join(','),
+      ...rows.map(e => e.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    
+    const labelType = type === 'all' ? 'general' : type;
+    link.setAttribute('download', `reporte_carga_${labelType}_${metricPeriod}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const promptSaveTardiaConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentRole === 'sencillo') {
+      alert('Operación denegada. Solo administradores pueden configurar la planificación.');
+      return;
+    }
+    setShowConfirmTardiaSave(true);
+  };
+
+  const executeSaveTardiaConfig = async () => {
+    setShowConfirmTardiaSave(false);
+    
+    // Save locally
+    localStorage.setItem('tardia_capacidad_total_dia', String(tardiaCapacidadTotal));
+    localStorage.setItem('tardia_intervalo_minutos', String(tardiaIntervalo));
+    localStorage.setItem('tardia_hora_inicio', tardiaHoraInicio);
+    localStorage.setItem('tardia_hora_fin', tardiaHoraFin);
+    
+    // Save to server
+    try {
+      const res = await fetch('/api/tardia/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          capacidadTotalDia: tardiaCapacidadTotal,
+          intervalo: tardiaIntervalo,
+          horaInicio: tardiaHoraInicio,
+          horaFin: tardiaHoraFin
+        })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        alert('¡Éxito! Configuración de citas para Inscripción Tardía actualizada y sincronizada en el servidor.');
+      } else {
+        alert('Configuración guardada localmente, pero falló la sincronización con el servidor.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de conexión al guardar configuración.');
+    }
+  };
 
   const handleGenerateExpediente = (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,6 +903,23 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const lcUser = username.trim().toLowerCase();
+
+    // Check against dynamically fetched list
+    const foundUser = users.find(u => u.username.toLowerCase() === lcUser && u.password === password);
+    if (foundUser) {
+      setCurrentRole(foundUser.role);
+      setIsAdminLoggedIn(true);
+      setLoginError('');
+      if (foundUser.role === 'extranjeria') {
+        setActiveSubTab('extranjeria');
+      } else if (foundUser.role === 'pasado_edad') {
+        setActiveSubTab('pasado_edad' as any);
+      } else {
+        setActiveSubTab('tabla');
+      }
+      return;
+    }
+
     if (lcUser === 'adminmini' && password === 'admin1234') {
       setCurrentRole('sencillo');
       setIsAdminLoggedIn(true);
@@ -234,7 +941,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       setActiveSubTab('pasado_edad' as any);
       setLoginError('');
     } else {
-      setLoginError('Credenciales incorrectas. Para pruebas rápidas use los botones de acceso directo o ingrese las credenciales asignadas.');
+      setLoginError('Credenciales incorrectas. Para pruebas rápidas use los botones de acceso directo o ingrese las credenciales asignadas o creadas.');
     }
   };
 
@@ -326,6 +1033,22 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
   // Save edits of standard or super admin
   const handleSaveEdit = () => {
     if (!editingCita) return;
+
+    const isExtranjeria = editingCita.servicioCategoria === 'extranjeria' || 
+                          editingCita.categoriaNombre?.toLowerCase().includes('extranj') || 
+                          editingCita.subServicioId?.includes('extranj') || 
+                          editingCita.subServicioId?.startsWith('ext_');
+
+    const isTardia = editingCita.subServicioId === 'ced_pasados_edad' || 
+                     editingCita.subServicioNombre?.toLowerCase().includes('pasado') || 
+                     editingCita.subServicioNombre?.toLowerCase().includes('tardía');
+
+    if (isExtranjeria || isTardia) {
+      const typeStr = isExtranjeria ? 'Extranjería' : 'Inscripción Tardía';
+      if (!window.confirm(`¿Está seguro de los cambios para esta cita de ${typeStr}?`)) {
+        return;
+      }
+    }
 
     const updated = citas.map((c) => {
       if (c.id === editingCita.id) {
@@ -872,6 +1595,20 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                   <Settings className="w-4 h-4 shrink-0" />
                   <span>Configuración</span>
                 </button>
+
+                {currentRole === 'super' && (
+                  <button
+                    onClick={() => setActiveSubTab('usuarios' as any)}
+                    className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                      activeSubTab === ('usuarios' as any)
+                        ? 'bg-purple-600/15 text-purple-400 border border-purple-500/30'
+                        : 'text-slate-400 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    <Users className="w-4 h-4 shrink-0 text-purple-400" />
+                    <span>Gestión Usuarios</span>
+                  </button>
+                )}
               </>
             )}
             
@@ -1314,6 +2051,226 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                     </div>
                   </div>
 
+                </div>
+
+                {/* NUEVO: PANEL DE ANÁLISIS DE CARGA DE EXTRANJERÍA E INSCRIPCIÓN TARDÍA */}
+                <div id="analisis_carga_especial" className="bg-slate-950 rounded-lg border border-slate-800 p-5 mt-6 shadow-xl space-y-5">
+                  <div className="border-b border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <h3 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-amber-500" />
+                        <span>Métricas de Carga: Extranjería e Inscripción Tardía</span>
+                      </h3>
+                      <p className="text-[10px] text-slate-400 font-medium">Análisis detallado de demanda operativa regulada con descarga de reportes oficiales</p>
+                    </div>
+                    
+                    {/* Period selectors */}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {(['dia', 'semana', 'mes', 'año', 'todo'] as const).map((period) => (
+                        <button
+                          key={`period-${period}`}
+                          type="button"
+                          onClick={() => setMetricPeriod(period)}
+                          className={`px-3 py-1 rounded text-[9px] font-black uppercase tracking-wider border transition cursor-pointer ${
+                            metricPeriod === period
+                              ? 'bg-amber-600 border-amber-600 text-white shadow-md'
+                              : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          {period === 'dia' && 'Día'}
+                          {period === 'semana' && 'Semana'}
+                          {period === 'mes' && 'Mes'}
+                          {period === 'año' && 'Año'}
+                          {period === 'todo' && 'Histórico'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Calculations */}
+                  {(() => {
+                    const filteredCitasForCard = (type: 'extranjeria' | 'tardia') => {
+                      return citas.filter(c => {
+                        const isExt = c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranj') || c.subServicioId?.startsWith('ext_');
+                        const isTd = c.subServicioId === 'ced_pasados_edad';
+                        
+                        if (type === 'extranjeria' && !isExt) return false;
+                        if (type === 'tardia' && !isTd) return false;
+                        
+                        if (metricPeriod === 'todo') return true;
+                        try {
+                          const now = new Date();
+                          const refDate = new Date(c.fecha + 'T00:00:00');
+                          if (metricPeriod === 'dia') {
+                            const year = now.getFullYear();
+                            const month = String(now.getMonth() + 1).padStart(2, '0');
+                            const day = String(now.getDate()).padStart(2, '0');
+                            return c.fecha === `${year}-${month}-${day}`;
+                          }
+                          if (metricPeriod === 'semana') {
+                            const currentDay = now.getDay();
+                            const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+                            const monday = new Date(now);
+                            monday.setDate(now.getDate() - distanceToMonday);
+                            monday.setHours(0,0,0,0);
+                            const sunday = new Date(monday);
+                            sunday.setDate(monday.getDate() + 6);
+                            sunday.setHours(23,59,59,999);
+                            return refDate >= monday && refDate <= sunday;
+                          }
+                          if (metricPeriod === 'mes') {
+                            return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
+                          }
+                          if (metricPeriod === 'año') {
+                            return refDate.getFullYear() === now.getFullYear();
+                          }
+                        } catch (e) { return false; }
+                        return false;
+                      });
+                    };
+
+                    const extCitas = filteredCitasForCard('extranjeria');
+                    const tardiaCitas = filteredCitasForCard('tardia');
+                    const totalCitasCarga = extCitas.length + tardiaCitas.length;
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          
+                          {/* CARD 1: EXTRANJERÍA */}
+                          <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 shadow flex flex-col justify-between">
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest block">Trámites Migratorios</span>
+                                <span className="text-[9px] font-bold bg-amber-950/60 border border-amber-900 text-amber-400 px-2.5 py-0.5 rounded-full uppercase">
+                                  Extranjería
+                                </span>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-4xl font-mono font-black text-slate-100">{extCitas.length}</span>
+                                <span className="text-[11px] text-slate-450 font-medium">citas agendadas</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                                Carga de atención para toma de fotografía, biometría dactilar y validación de resoluciones de migración aprobadas por el SNM.
+                              </p>
+                              
+                              {/* Visual Mini Progress Bar */}
+                              <div className="space-y-1 pt-1">
+                                <div className="flex justify-between text-[9px] text-slate-500 font-extrabold uppercase">
+                                  <span>Proporción de carga</span>
+                                  <span>{totalCitasCarga > 0 ? Math.round((extCitas.length / totalCitasCarga) * 100) : 0}%</span>
+                                </div>
+                                <div className="h-1 bg-slate-950 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-amber-500 transition-all duration-500" 
+                                    style={{ width: `${totalCitasCarga > 0 ? (extCitas.length / totalCitasCarga) * 100 : 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-3">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsReport('extranjeria')}
+                                className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                <span>CSV ({extCitas.length})</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('extranjeria')}
+                                className="bg-slate-950 hover:bg-slate-850 text-amber-500 border border-amber-500/20 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                              >
+                                <Download className="w-3.5 h-3.5 shrink-0" />
+                                <span>PDF ({extCitas.length})</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* CARD 2: INSCRIPCIÓN TARDÍA */}
+                          <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 shadow flex flex-col justify-between">
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest block">Registro Civil Especial</span>
+                                <span className="text-[9px] font-bold bg-blue-950/50 border border-blue-900/60 text-blue-400 px-2.5 py-0.5 rounded-full uppercase">
+                                  Inscripción Tardía
+                                </span>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-4xl font-mono font-black text-slate-100">{tardiaCitas.length}</span>
+                                <span className="text-[11px] text-slate-450 font-medium">citas agendadas</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                                Cedulación tardía presencial para ciudadanos panameños mayores de edad (Pasados de Edad) con cupos limitados por resoluciones biométricas.
+                              </p>
+                              
+                              {/* Visual Mini Progress Bar */}
+                              <div className="space-y-1 pt-1">
+                                <div className="flex justify-between text-[9px] text-slate-500 font-extrabold uppercase">
+                                  <span>Proporción de carga</span>
+                                  <span>{totalCitasCarga > 0 ? Math.round((tardiaCitas.length / totalCitasCarga) * 100) : 0}%</span>
+                                </div>
+                                <div className="h-1 bg-slate-950 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-blue-500 transition-all duration-500" 
+                                    style={{ width: `${totalCitasCarga > 0 ? (tardiaCitas.length / totalCitasCarga) * 100 : 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-3">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsReport('tardia')}
+                                className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                <span>CSV ({tardiaCitas.length})</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('tardia')}
+                                className="bg-slate-950 hover:bg-slate-855 text-blue-400 border border-blue-500/20 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                              >
+                                <Download className="w-3.5 h-3.5 shrink-0" />
+                                <span>PDF ({tardiaCitas.length})</span>
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* General Consolidate downloads */}
+                        <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-900 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-300">
+                          <div className="text-[11px] font-medium">
+                            Se encontraron <strong className="text-white">{totalCitasCarga} citas activas</strong> de tipo Extranjería e Inscripción Tardía para el período <strong className="text-amber-500 uppercase font-mono">{metricPeriod}</strong>.
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadMetricsReport('all')}
+                              className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded-lg transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-500" />
+                              <span>Descargar CSV Consolidado</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadMetricsPDFReport('all')}
+                              className="bg-gradient-to-r from-amber-600 to-blue-600 hover:from-amber-700 hover:to-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Descargar PDF Consolidado</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
               </div>
@@ -1973,30 +2930,8 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
             {/* TAB CONTENT: EXTRANJERIA (Carga CSV y Control Estatus Migratorio) */}
             {activeSubTab === 'extranjeria' && (
               <div className="space-y-6 animate-fade-in font-sans">
-                <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
-                      <FileSpreadsheet className="w-5 h-5 text-amber-500" />
-                      <span>Base de Elegibilidad Extranjería (Pasaportes)</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      Gestione la lista consolidada de pasaportes extranjeros elegibles para realizar trámites. Suba un archivo CSV o modifique registros de forma manual.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
-                      currentRole === 'sencillo' 
-                        ? 'bg-red-950/80 text-red-400 border-red-900/50' 
-                        : 'bg-emerald-950/80 text-emerald-400 border-emerald-900/50'
-                    }`}>
-                      {currentRole === 'sencillo' ? '🔒 Solo Lectura' : '✍ Permiso de Carga Activo'}
-                    </span>
-                  </div>
-                </div>
-
                 {/* API COMMUNICATOR HOOK-UP COMPONENT */}
                 <ExtranjeriaController currentRole={currentRole} />
-
               </div>
             )}
 
@@ -2131,18 +3066,28 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                           <Shield className="w-40 h-40 text-blue-500" />
                         </div>
 
-                        <div className="flex items-center justify-between border-b border-blue-900/30 pb-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-blue-900/30 pb-3 gap-2">
                           <span className="text-xs font-black uppercase text-blue-400 tracking-wider flex items-center gap-2">
                             <CheckCircle className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
                             Expediente Creado Exitosamente
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setGeneratedExp(null)}
-                            className="text-slate-400 hover:text-white text-[11px] font-bold border border-slate-800 hover:border-slate-700 px-2 py-0.5 rounded transition"
-                          >
-                            Limpiar Resultado
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadTrackingPDF(generatedExp)}
+                              className="bg-amber-600 hover:bg-amber-700 text-white text-[10.5px] font-black uppercase tracking-wider px-3.5 py-1 py-1 rounded transition flex items-center gap-1.5 shadow-md cursor-pointer border border-amber-500"
+                            >
+                              <Download className="w-3.5 h-3.5 text-white" />
+                              <span>Descargar PDF</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setGeneratedExp(null)}
+                              className="text-slate-400 hover:text-white text-[10.5px] font-black uppercase px-2.5 py-1 rounded border border-slate-800 hover:border-slate-700 transition cursor-pointer"
+                            >
+                              Limpiar
+                            </button>
+                          </div>
                         </div>
 
                         <div className="space-y-3">
@@ -2251,6 +3196,126 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                   </div>
                 </div>
 
+                {/* NUEVO: PANEL DE CONTROL DE HORARIOS Y CUPOS PARA INSCRIPCIÓN TARDÍA */}
+                <div id="tardia_planificacion_control" className="bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-xl">
+                  <div className="border-b border-slate-900 pb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-500" />
+                      <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">
+                        Control de Horarios y Cupos (Inscripción Tardía)
+                      </h4>
+                    </div>
+                    <span className="text-[9px] bg-blue-950 text-blue-400 border border-blue-900/60 px-2 py-0.5 rounded font-bold uppercase">
+                      Planificación Activa: {tardiaCapacidadTotal} Citas por día
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                    Personalice los límites operativos, intervalos de reunión, hora de apertura, hora de cierre de la agenda para trámites de cédulas para ciudadanos Pasados de Edad. Standard: 4 citas por día de 8:00 AM a 11:30 AM con lapso de 30 min.
+                  </p>
+
+                  <form onSubmit={promptSaveTardiaConfig} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end pt-1">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Cupo Máximo Diario (Citas/Día)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={tardiaCapacidadTotal}
+                        onChange={(e) => setTardiaCapacidadTotal(parseInt(e.target.value, 10) || 1)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Intervalo de Cita (Minutos)</label>
+                      <select
+                        value={tardiaIntervalo}
+                        onChange={(e) => setTardiaIntervalo(parseInt(e.target.value, 10))}
+                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                      >
+                        <option value="10">10 minutos</option>
+                        <option value="15">15 minutos</option>
+                        <option value="20">20 minutos</option>
+                        <option value="30">30 minutos</option>
+                        <option value="45">45 minutos</option>
+                        <option value="60">60 minutos</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Hora Apertura (Inicio)</label>
+                      <select
+                        value={tardiaHoraInicio}
+                        onChange={(e) => setTardiaHoraInicio(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
+                      >
+                        {[
+                          '07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM'
+                        ].map(time => (
+                          <option key={`tardia-start-${time}`} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-extrabold uppercase text-slate-455 block">Hora Cierre (Límite)</label>
+                      <select
+                        value={tardiaHoraFin}
+                        onChange={(e) => setTardiaHoraFin(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
+                      >
+                        {[
+                          '11:00 AM', '11:35 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'
+                        ].map(time => (
+                          <option key={`tardia-end-${time}`} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-4 flex justify-end">
+                      <button
+                        type="submit"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2 py-5 px-6 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5 text-white" />
+                        <span>Guardar Planificación Tardía</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* CONFIRMATION DIALOG MODAL FOR INSCRIPCIÓN TARDÍA CONFIG SAVE */}
+                {showConfirmTardiaSave && (
+                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-fade-in font-sans">
+                    <div className="bg-slate-900 border border-blue-500/40 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4 text-slate-100">
+                      <div className="flex items-center gap-3 border-b border-blue-500/20 pb-3 text-blue-400">
+                        <AlertCircle className="w-6 h-6 shrink-0 text-blue-400" />
+                        <h4 className="text-sm font-black uppercase tracking-wider text-slate-100 font-sans">Confirmar Planificación Tardía</h4>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed font-semibold font-sans">
+                        ¿Está seguro de que desea aplicar estos cambios a la planificación de Inscripción Tardía? 
+                        Los nuevos cupos diarios de **{tardiaCapacidadTotal} citas**, un intervalo de **{tardiaIntervalo} minutos** y el horario laborable regulado de **{tardiaHoraInicio} a {tardiaHoraFin}** se guardarán y entrarán en vigencia inmediatamente.
+                      </p>
+                      <div className="flex items-center justify-end gap-3 pt-2 font-sans font-black">
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmTardiaSave(false)}
+                          className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-350 border border-slate-700 rounded text-xs uppercase tracking-wide cursor-pointer transition"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={executeSaveTardiaConfig}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs uppercase tracking-wider shadow-md cursor-pointer transition"
+                        >
+                          Sí, Confirmar Planificación
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Historical Log */}
                 <div id="historial_expedientes" className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden shadow-xl">
                   <div className="bg-slate-900/50 p-4 border-b border-slate-800 flex items-center justify-between">
@@ -2258,7 +3323,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                       <ClipboardList className="w-4 h-4 text-blue-500" />
                       Historial de Seguimientos Autorizados ({historicalExp.length})
                     </h4>
-                    {historicalExp.length > 0 && (
+                    {historicalExp.length > 0 && currentRole === 'super' && (
                       <button
                         type="button"
                         onClick={() => {
@@ -2316,6 +3381,15 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     type="button"
+                                    onClick={() => handleDownloadTrackingPDF(rec)}
+                                    className="bg-amber-950/40 hover:bg-amber-900/50 text-[10px] font-bold px-2 py-1 rounded transition text-amber-500 hover:text-amber-400 border border-amber-900/40 flex items-center gap-1 cursor-pointer"
+                                    title="Descargar Constancia Oficial en PDF"
+                                  >
+                                    <Download className="w-3 h-3 text-amber-500 shrink-0" />
+                                    <span>PDF</span>
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={() => {
                                       navigator.clipboard.writeText(rec.directLink);
                                       setCopiedId('link-' + rec.id);
@@ -2355,6 +3429,231 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                       </table>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: GESTIÓN DE USUARIOS (CREAR Y ASIGNAR GESTONES) */}
+            {activeSubTab === ('usuarios' as any) && currentRole === 'super' && (
+              <div className="space-y-6 animate-fade-in font-sans text-slate-200">
+                {/* Intro details */}
+                <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                      <Users className="w-5 h-5 text-purple-400" />
+                      <span>Gestión y Asignación de Usuarios de Administración</span>
+                    </h3>
+                    <p className="text-[11.5px] text-slate-400 font-medium leading-relaxed">
+                      Control de accesos y delegación de responsabilidades. Registre nuevos usuarios de administración y asigne sus gestiones específicas como Extranjería y control de ciudadanos Pasados de Edad.
+                    </p>
+                  </div>
+                  <div>
+                    <span className="bg-purple-950 text-purple-300 border border-purple-800 text-[10px] font-black uppercase px-2.5 py-1 rounded shadow-sm">
+                      Módulo Super Admin
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* FORM TO REGISTER OR EDIT USER */}
+                  <div className="lg:col-span-4 bg-slate-950 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg self-start">
+                    <h4 className="text-xs font-black uppercase text-white tracking-wider border-b border-slate-850 pb-2 flex items-center gap-1.5">
+                      <Plus className="w-4 h-4 text-purple-400" />
+                      <span>{editingUser ? 'Modificar Gestión' : 'Registrar Nuevo Usuario'}</span>
+                    </h4>
+
+                    {userError && (
+                      <div className="bg-red-950/60 border border-red-900/50 text-red-200 p-3 rounded text-xs leading-relaxed flex items-start gap-2 animate-shake">
+                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <span>{userError}</span>
+                      </div>
+                    )}
+
+                    {userSuccess && (
+                      <div className="bg-emerald-950/60 border border-emerald-900/50 text-emerald-200 p-3 rounded text-xs leading-relaxed flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{userSuccess}</span>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSaveUser} className="space-y-4">
+                      {/* Nombre Completo */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider block">Nombre Completo</label>
+                        <input
+                          type="text"
+                          required
+                          value={userFormNombre}
+                          onChange={(e) => setUserFormNombre(e.target.value)}
+                          placeholder="Ej: Lic. Carlos Meléndez Prado"
+                          className="w-full bg-slate-900 border border-slate-750 text-sm text-white p-2.5 rounded focus:outline-none focus:ring-1 focus:ring-purple-600 transition"
+                        />
+                      </div>
+
+                      {/* Usuario (Username) */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider block">Nombre de Usuario Login</label>
+                        <input
+                          type="text"
+                          required
+                          disabled={!!editingUser}
+                          value={userFormUsername}
+                          onChange={(e) => setUserFormUsername(e.target.value)}
+                          placeholder="Ej: carmel26 (Mín. 3 letras)"
+                          className="w-full bg-slate-900 border border-slate-750 text-sm text-white p-2.5 rounded focus:outline-none focus:ring-1 focus:ring-purple-600 transition disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                        />
+                      </div>
+
+                      {/* Contraseña (Password) */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider block">Contraseña de Acceso</label>
+                        <input
+                          type="text"
+                          required
+                          value={userFormPassword}
+                          onChange={(e) => setUserFormPassword(e.target.value)}
+                          placeholder="Mínimo 4 caracteres"
+                          className="w-full bg-slate-900 border border-slate-750 text-sm text-white p-2.5 rounded focus:outline-none focus:ring-1 focus:ring-purple-600 transition font-mono"
+                        />
+                      </div>
+
+                      {/* Asignar Gestión / Rol */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider block">Asignar Gestión (Rol)</label>
+                        <select
+                          value={userFormRole}
+                          onChange={(e) => setUserFormRole(e.target.value as AdminRole)}
+                          className="w-full bg-slate-900 border border-slate-750 text-sm text-slate-300 p-2.5 rounded focus:outline-none focus:ring-1 focus:ring-purple-600 cursor-pointer font-bold"
+                        >
+                          <option value="extranjeria">🛂 Gestión de Extranjería / Inmigración</option>
+                          <option value="pasado_edad">🛡️ Gestión de Inscripciones Tardías (Pasados de Edad)</option>
+                          <option value="sencillo">👤 Administrador Sencillo (Solo Citas Generales)</option>
+                          <option value="super">⚡ Super Administrador (Control Total del Tribunal)</option>
+                        </select>
+                        <p className="text-[10px] text-slate-500 font-medium leading-normal pt-1">
+                          El usuario ingresará con estas credenciales y tendrá restringidas o asignadas las pestañas correspondientes en base a su rol de gestión.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                        {editingUser && (
+                          <button
+                            type="button"
+                            onClick={handleCancelUserEdit}
+                            className="bg-slate-800 hover:bg-slate-750 text-slate-300 font-extrabold text-[10px] uppercase tracking-wider py-2.5 px-4 rounded transition flex-1 text-center cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                        <button
+                          type="submit"
+                          className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2.5 px-4 rounded transition flex-1 text-center shadow-lg cursor-pointer"
+                        >
+                          {editingUser ? 'Guardar Cambios' : 'Registrar y Sincronizar'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* ACTIVE USERS TABLE */}
+                  <div className="lg:col-span-8 bg-slate-950 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg flex flex-col">
+                    <h4 className="text-xs font-black uppercase text-white tracking-wider border-b border-slate-850 pb-2 flex items-center justify-between animate-fade-in">
+                      <span className="flex items-center gap-1.5">
+                        <Shield className="w-4 h-4 text-purple-400" />
+                        <span>Usuarios y Responsabilidades Registradas</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-semibold font-mono bg-slate-900 border border-slate-800 px-2.5 py-1 rounded">
+                        Total: {users.length} Cuentas
+                      </span>
+                    </h4>
+
+                    {loadingUsers ? (
+                      <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-400 gap-2">
+                        <RefreshCw className="w-8 h-8 text-purple-400 animate-spin" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Cargando base de usuarios...</span>
+                      </div>
+                    ) : users.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-400 text-center space-y-2 border border-dashed border-slate-800 rounded">
+                        <Users className="w-10 h-10 text-slate-600" />
+                        <p className="text-xs font-bold uppercase text-slate-400">Sin cuentas de gestión registradas</p>
+                        <p className="text-[11px] text-slate-500 max-w-sm">No se pudieron recuperar usuarios del servidor o la base de datos está vacía. Registre un usuario con el formulario de la izquierda.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded border border-slate-850">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-900 border-b border-slate-850 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                              <th className="p-3.5">Nombre Completo</th>
+                              <th className="p-3.5">Credenciales Acceso</th>
+                              <th className="p-3.5">Gestión Asignada</th>
+                              <th className="p-3.5 text-right">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-900 text-xs text-slate-300">
+                            {users.map((u) => (
+                              <tr key={u.username} className="hover:bg-slate-900/40 transition">
+                                <td className="p-3.5">
+                                  <div className="font-bold text-white capitalize">{u.nombre}</div>
+                                  <div className="text-[10px] text-slate-500 mt-0.5">Creación: {u.fechaCreacion ? new Date(u.fechaCreacion).toLocaleDateString() : 'Original'}</div>
+                                </td>
+                                <td className="p-3.5 font-mono">
+                                  <div className="text-slate-200">Usuario: <strong className="text-slate-100 font-extrabold bg-slate-900 px-1 py-0.5 rounded border border-slate-800">{u.username}</strong></div>
+                                  <div className="text-slate-400 mt-1">Clave: <strong className="text-slate-200 font-normal bg-slate-900 px-1 py-0.5 rounded border border-slate-800 select-all font-mono">{u.password}</strong></div>
+                                </td>
+                                <td className="p-3.5">
+                                  <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                    u.role === 'super'
+                                      ? 'bg-red-950/80 text-red-400 border-red-900/50'
+                                      : u.role === 'extranjeria'
+                                        ? 'bg-amber-950/80 text-amber-400 border-amber-900/50'
+                                        : u.role === 'pasado_edad'
+                                          ? 'bg-blue-950/80 text-blue-400 border-blue-900/50'
+                                          : 'bg-emerald-950/80 text-emerald-400 border-emerald-900/50'
+                                  }`}>
+                                    {u.role === 'super' 
+                                      ? '⚡ Super Admin' 
+                                      : u.role === 'extranjeria' 
+                                        ? 'Inmigración / Extranjería' 
+                                        : u.role === 'pasado_edad' 
+                                          ? '🛡️ Inscripción Pasado Edad' 
+                                          : '👤 Administrador Sencillo'}
+                                  </span>
+                                </td>
+                                <td className="p-3.5">
+                                  <div className="flex items-center justify-end gap-1.5 w-full">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditUserClick(u)}
+                                      className="p-1.5 hover:bg-slate-850 text-slate-400 hover:text-white rounded border border-transparent hover:border-slate-800 transition cursor-pointer"
+                                      title="Editar usuario"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={u.username === 'adminte'}
+                                      onClick={() => handleDeleteUser(u.username)}
+                                      className="p-1.5 hover:bg-slate-850 text-red-400 hover:text-red-350 rounded border border-transparent hover:border-red-950/40 transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                      title={u.username === 'adminte' ? 'No se puede borrar el Super Admin principal' : 'Eliminar usuario'}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="bg-slate-900/50 p-4 rounded border border-slate-850 mt-auto flex items-start gap-2.5 text-slate-400 text-[11px] leading-relaxed">
+                      <Info className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong>Acerca de la Seguridad de Acceso:</strong> Las credenciales creadas aquí se guardan de forma permanente y se aplican en tiempo real. Al iniciar sesión, los gestores solo podrán interactuar con el módulo correspondiente a su gestión (Extranjería o Ciudadanos Pasado de Edad).
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
