@@ -40,6 +40,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
   const [fechaNacimiento, setFechaNacimiento] = useState(initialData?.fechaNacimiento || '');
   const [telefono, setTelefono] = useState(initialData?.telefono || '');
   const [correo, setCorreo] = useState(initialData?.correo || '');
+  const [nombreCompleto, setNombreCompleto] = useState(initialData?.nombreCompleto || '');
   const [numeroSeguimiento, setNumeroSeguimiento] = useState(initialData?.numeroSeguimiento || '');
 
   // Campos específicos para el trámite de extranjería
@@ -189,6 +190,10 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
     }
 
     // Basic Fields validation (for normal categories)
+    if (!nombreCompleto.trim()) {
+      newErrors.nombreCompleto = 'El nombre completo es obligatorio';
+    }
+
     if (!identificacion.trim()) {
       newErrors.identificacion = 'Ingrese su número de documento o cédula';
     } else if (tipoIdentificacion === 'Cedula' && !/^\d+-(\d+)-\d+$/.test(identificacion.trim()) && identificacion.length < 5) {
@@ -290,6 +295,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
       fechaNacimiento,
       telefono: telefono.trim(),
       correo: correo.trim(),
+      nombreCompleto: nombreCompleto.trim(),
       numeroSeguimiento: isPasadoEdad ? numeroSeguimiento.trim() : undefined,
     });
   };
@@ -704,6 +710,32 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
               </span>
             )}
           </div>
+        </div>
+
+        {/* Nombre Completo */}
+        <div className="flex flex-col gap-1.5 animate-slide-up">
+          <label htmlFor="nombre_completo" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Nombre Completo <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="nombre_completo"
+            value={nombreCompleto}
+            onChange={(e) => setNombreCompleto(e.target.value)}
+            placeholder="Ej: Juan Antonio Pérez Rodríguez"
+            className={`h-11 w-full bg-white border ${
+              errors.nombreCompleto ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+            } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition`}
+          />
+          {errors.nombreCompleto ? (
+            <span className="flex items-center gap-1 text-xs text-red-500 mt-1 font-medium animate-pulse">
+              <AlertCircle className="w-3.5 h-3.5" /> {errors.nombreCompleto}
+            </span>
+          ) : (
+            <span className="text-[11px] text-slate-400 font-medium mt-1">
+              Ingrese su nombre completo tal como aparece en su documento de identidad.
+            </span>
+          )}
         </div>
 
         {/* Fecha de nacimiento, teléfono y correo */}

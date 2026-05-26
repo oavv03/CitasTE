@@ -6,6 +6,7 @@ export interface DatosPersonales {
   fechaNacimiento: string;
   telefono: string;
   correo: string;
+  nombreCompleto?: string;
   numeroSeguimiento?: string;
   // Campos específicos para el trámite de extranjería
   primerNombre?: string;

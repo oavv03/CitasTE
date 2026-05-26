@@ -353,15 +353,21 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
               </div>
             ) : (
               <div className="bg-slate-50 border border-slate-200 rounded p-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {cita.datosPersonales.nombreCompleto && (
+                  <div className="flex items-center gap-2 text-[11px] text-slate-700 col-span-1 sm:col-span-2 pb-1 border-b border-dashed border-slate-200">
+                    <User className="w-3.5 h-3.5 text-blue-800 shrink-0" />
+                    <span className="truncate">Nombre Completo: <strong className="font-extrabold text-slate-800 uppercase">{cita.datosPersonales.nombreCompleto}</strong></span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-[11px] text-slate-700">
-                  <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="truncate">Cédula No: <strong className="font-extrabold text-slate-800">{cita.datosPersonales.identificacion}</strong></span>
+                  <span className="text-[9px] font-extrabold text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded uppercase tracking-wider">{cita.datosPersonales.tipoIdentificacion === 'Cedula' ? 'CÉDULA' : cita.datosPersonales.tipoIdentificacion === 'CedulaJuvenil' ? 'CÉD. JUVENIL' : cita.datosPersonales.tipoIdentificacion === 'Extranjero' ? 'CÉD. EXT.' : 'PASAPORTE'}</span>
+                  <span className="truncate font-mono"><strong className="font-extrabold text-slate-800">{cita.datosPersonales.identificacion}</strong></span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-slate-700">
                   <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="truncate">Teléfono: <strong className="font-bold text-slate-800">{cita.datosPersonales.telefono}</strong></span>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-700 col-span-1 sm:col-span-2 border-t border-slate-200 pt-2 mt-1">
+                <div className="flex items-center gap-2 text-[11px] text-slate-700 col-span-1 sm:col-span-2 border-t border-slate-100 pt-2">
                   <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="truncate">Correo: <strong className="font-bold text-slate-800">{cita.datosPersonales.correo}</strong></span>
                 </div>

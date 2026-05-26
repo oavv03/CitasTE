@@ -66,6 +66,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const [editIdentificacion, setEditIdentificacion] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
   const [editCorreo, setEditCorreo] = useState('');
+  const [editNombreCompleto, setEditNombreCompleto] = useState('');
 
   // Bulk operation checks
   const [selectedCitaIds, setSelectedCitaIds] = useState<string[]>([]);
@@ -286,6 +287,8 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       let extraText = '';
       if (cita.servicioCategoria === 'extranjeria') {
         extraText = ` ${cita.datosPersonales.primerNombre || ''} ${cita.datosPersonales.segundoNombre || ''} ${cita.datosPersonales.primerApellido || ''} ${cita.datosPersonales.segundoApellido || ''} ${cita.datosPersonales.pasaporte || ''} ${cita.datosPersonales.numeroResolucion || ''} ${cita.datosPersonales.nacionalidad || ''}`;
+      } else {
+        extraText = ` ${cita.datosPersonales.nombreCompleto || ''}`;
       }
       const text = `${cita.codigoTransaccion} ${cita.datosPersonales.identificacion} ${cita.datosPersonales.correo} ${cita.datosPersonales.telefono}${extraText}`.toLowerCase();
       const matchesSearch = text.includes(searchQuery.toLowerCase());
@@ -333,11 +336,12 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
           estado: editEstado,
           // Only if super admin allows editing personal data
           datosPersonales: currentRole === 'super' ? {
+            ...c.datosPersonales,
             tipoIdentificacion: editTipoIdentificacion,
             identificacion: editIdentificacion,
-            fechaNacimiento: c.datosPersonales.fechaNacimiento, // preserve
             telefono: editTelefono,
-            correo: editCorreo
+            correo: editCorreo,
+            nombreCompleto: editNombreCompleto.trim() || undefined
           } : c.datosPersonales
         };
       }
@@ -425,6 +429,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     setEditIdentificacion(cita.datosPersonales.identificacion);
     setEditTelefono(cita.datosPersonales.telefono);
     setEditCorreo(cita.datosPersonales.correo);
+    setEditNombreCompleto(cita.datosPersonales.nombreCompleto || '');
   };
 
   // --- OPERATIONS FOR REGIONAL BRANCHES (AVAILABLE FOR ALL ADMINS) ---
@@ -1075,11 +1080,16 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                                   </>
                                 ) : (
                                   <>
-                                    <span className="font-mono text-[11px] font-bold text-slate-200">
-                                      {cit.datosPersonales.identificacion}
+                                    {cit.datosPersonales.nombreCompleto && (
+                                      <span className="text-[11px] font-extrabold text-slate-200 leading-tight">
+                                        {cit.datosPersonales.nombreCompleto.toUpperCase()}
+                                      </span>
+                                    )}
+                                    <span className="font-mono text-[10px] font-bold text-slate-400 mt-0.5">
+                                      {cit.datosPersonales.tipoIdentificacion === 'Cedula' ? 'Cédula' : cit.datosPersonales.tipoIdentificacion === 'CedulaJuvenil' ? 'Céd. Juvenil' : cit.datosPersonales.tipoIdentificacion === 'Extranjero' ? 'Céd. Ext' : 'Pasaporte'}: <span className="text-blue-300">{cit.datosPersonales.identificacion}</span>
                                     </span>
                                     <span className="text-[10px] text-slate-450 leading-tight">
-                                      {cit.datosPersonales.tipoIdentificacion} • {cit.datosPersonales.telefono}
+                                      Tel: {cit.datosPersonales.telefono}
                                     </span>
                                     {cit.datosPersonales.numeroSeguimiento && (
                                       <span className="text-[10px] text-amber-400 font-mono font-bold leading-tight mt-0.5">
@@ -2459,6 +2469,18 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                       className="w-full bg-slate-950 border border-slate-750 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-50"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Nombre Completo del Comitente</label>
+                  <input
+                    type="text"
+                    disabled={currentRole !== 'super'}
+                    value={editNombreCompleto}
+                    onChange={(e) => setEditNombreCompleto(e.target.value)}
+                    placeholder="Ej: Juan Antonio Pérez Rodríguez"
+                    className="w-full bg-slate-950 border border-slate-755 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 disabled:opacity-50"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
