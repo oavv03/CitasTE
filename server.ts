@@ -45,11 +45,18 @@ const DEFAULT_USERS: ServerUser[] = [
     fechaCreacion: "2026-05-26T15:18:27Z"
   },
   {
-    username: "adminpedad",
-    password: "PasaDodeEdad2026",
-    role: "pasado_edad",
-    nombre: "Gestor Pasado de Edad",
-    fechaCreacion: "2026-05-26T15:18:27Z"
+    "username": "adminpedad",
+    "password": "PasaDodeEdad2026",
+    "role": "pasado_edad",
+    "nombre": "Gestor Pasado de Edad",
+    "fechaCreacion": "2026-05-26T15:18:27Z"
+  },
+  {
+    "username": "superit",
+    "password": "1234",
+    "role": "pasado_edad",
+    "nombre": "SuperIT - Supervisor Inscripción Tardía",
+    "fechaCreacion": "2026-05-27T19:27:00Z"
   }
 ];
 

@@ -35,6 +35,7 @@ import {
 import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio, ExtranjeriaRecord, AdminRole, AdminUser } from '../types';
 import { SUCURSALES_TE, SERVICIOS_TRIBUNAL, saveTramiteMutation, saveSucursalMutation } from '../data';
 import ExtranjeriaController from './ExtranjeriaController';
+import TardiaController from './TardiaController';
 
 interface AdminPanelProps {
   citas: Cita[];
@@ -63,7 +64,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   // Custom states for editing
   const [editFecha, setEditFecha] = useState('');
   const [editHora, setEditHora] = useState('');
-  const [editEstado, setEditEstado] = useState<'confirmada' | 'cancelada' | 'asistire' | 'no_asistire'>('confirmada');
+  const [editEstado, setEditEstado] = useState<'confirmada' | 'cancelada' | 'asistire' | 'no_asistire' | 'realizada'>('confirmada');
   const [editTipoIdentificacion, setEditTipoIdentificacion] = useState<TipoIdentificacion>('Cedula');
   const [editIdentificacion, setEditIdentificacion] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
@@ -226,70 +227,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const [subFormRequisitos, setSubFormRequisitos] = useState<string[]>([]);
   const [newRequisitoText, setNewRequisitoText] = useState('');
 
-  // Pasado de Edad state variables
-  const [expName, setExpName] = useState('');
-  const [expIdentificacion, setExpIdentificacion] = useState('');
-  const [expFechaNacimiento, setExpFechaNacimiento] = useState('');
-  const [expCorreo, setExpCorreo] = useState('');
-  const [expTelefono, setExpTelefono] = useState('');
-  const [expNotes, setExpNotes] = useState('');
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [generatedExp, setGeneratedExp] = useState<{ number: string; citizenName: string; textMessage: string; link: string } | null>(null);
-  
-  const [historicalExp, setHistoricalExp] = useState<any[]>(() => {
-    try {
-      const stored = localStorage.getItem('te_panama_historical_expedientes');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
   const [pasadoEdadLinkBase, setPasadoEdadLinkBase] = useState(() => {
     try {
       const stored = localStorage.getItem('te_panama_pasado_edad_link_base');
       if (stored) return stored;
     } catch {}
-    return typeof window !== 'undefined' ? window.location.origin : 'https://ais-dev-d62mtcleay3xdcmqivcktx-389293937197.us-east1.run.app';
+    return typeof window !== 'undefined' ? window.location.origin : 'https://citas.tribunal-electoral.gob.pa';
   });
-
-  // Configuration states for dynamic schedule parameters of Inscripcion Tardia (Pasados de Edad)
-  const [tardiaCapacidadTotal, setTardiaCapacidadTotal] = useState<number>(() => {
-    return parseInt(localStorage.getItem('tardia_capacidad_total_dia') || '4', 10);
-  });
-  const [tardiaIntervalo, setTardiaIntervalo] = useState<number>(() => {
-    return parseInt(localStorage.getItem('tardia_intervalo_minutos') || '30', 10);
-  });
-  const [tardiaHoraInicio, setTardiaHoraInicio] = useState<string>(() => {
-    return localStorage.getItem('tardia_hora_inicio') || '08:00 AM';
-  });
-  const [tardiaHoraFin, setTardiaHoraFin] = useState<string>(() => {
-    return localStorage.getItem('tardia_hora_fin') || '11:30 AM';
-  });
-  const [showConfirmTardiaSave, setShowConfirmTardiaSave] = useState(false);
-
-  // Load Tardía configuration from server
-  React.useEffect(() => {
-    if (isAdminLoggedIn) {
-      fetch('/api/tardia/config')
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.success && data.config) {
-            const { capacidadTotalDia, intervalo, horaInicio, horaFin } = data.config;
-            setTardiaCapacidadTotal(capacidadTotalDia);
-            setTardiaIntervalo(intervalo);
-            setTardiaHoraInicio(horaInicio);
-            setTardiaHoraFin(horaFin);
-            
-            localStorage.setItem('tardia_capacidad_total_dia', String(capacidadTotalDia));
-            localStorage.setItem('tardia_intervalo_minutos', String(intervalo));
-            localStorage.setItem('tardia_hora_inicio', horaInicio);
-            localStorage.setItem('tardia_hora_fin', horaFin);
-          }
-        })
-        .catch(err => console.warn("Failed to load tardia configs in AdminPanel:", err));
-    }
-  }, [isAdminLoggedIn]);
 
   const [metricPeriod, setMetricPeriod] = useState<'dia' | 'semana' | 'mes' | 'año' | 'todo'>('mes');
 
@@ -780,112 +724,6 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     document.body.removeChild(link);
   };
 
-  const promptSaveTardiaConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (currentRole === 'sencillo') {
-      alert('Operación denegada. Solo administradores pueden configurar la planificación.');
-      return;
-    }
-    setShowConfirmTardiaSave(true);
-  };
-
-  const executeSaveTardiaConfig = async () => {
-    setShowConfirmTardiaSave(false);
-    
-    // Save locally
-    localStorage.setItem('tardia_capacidad_total_dia', String(tardiaCapacidadTotal));
-    localStorage.setItem('tardia_intervalo_minutos', String(tardiaIntervalo));
-    localStorage.setItem('tardia_hora_inicio', tardiaHoraInicio);
-    localStorage.setItem('tardia_hora_fin', tardiaHoraFin);
-    
-    // Save to server
-    try {
-      const res = await fetch('/api/tardia/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          capacidadTotalDia: tardiaCapacidadTotal,
-          intervalo: tardiaIntervalo,
-          horaInicio: tardiaHoraInicio,
-          horaFin: tardiaHoraFin
-        })
-      });
-      const data = await res.json();
-      if (data && data.success) {
-        alert('¡Éxito! Configuración de citas para Inscripción Tardía actualizada y sincronizada en el servidor.');
-      } else {
-        alert('Configuración guardada localmente, pero falló la sincronización con el servidor.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error de conexión al guardar configuración.');
-    }
-  };
-
-  const handleGenerateExpediente = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expName.trim() || !expIdentificacion.trim() || !expCorreo.trim() || !expTelefono.trim()) {
-      alert('Por favor complete todos los datos obligatorios del ciudadano.');
-      return;
-    }
-
-    // Generate consecutive-like tracking number
-    const uniqueNumber = `EXP-2026-TE-${Math.floor(100000 + Math.random() * 900000)}`;
-    
-    // Create direct URL link
-    let base = pasadoEdadLinkBase.trim();
-    if (base.endsWith('/')) {
-      base = base.slice(0, -1);
-    }
-    const directLink = `${base}/?tramite=ced_pasados_edad&seguimiento=${uniqueNumber}`;
-
-    const textMessage = `Estimado(a) ${expName.trim()}, el Tribunal Electoral le informa que su expediente de inscripción tardía (Pasado de Edad) ha sido procesado con éxito.
-
-Su Número de Seguimiento Obligatorio es: *${uniqueNumber}*
-
-Para agendar su cita de atención presencial en la sucursal de su preferencia, por favor ingrese al siguiente enlace oficial, donde sus datos estarán pre-cargados automáticamente:
-${directLink}
-  
-Recuerde presentar los requisitos correspondientes el día de su cita.`;
-
-    const newRecord = {
-      id: uniqueNumber,
-      number: uniqueNumber,
-      citizenName: expName.trim(),
-      identificacion: expIdentificacion.trim(),
-      fechaNacimiento: expFechaNacimiento,
-      correo: expCorreo.trim(),
-      telefono: expTelefono.trim(),
-      notes: expNotes.trim(),
-      directLink,
-      textMessage,
-      fechaCreacion: new Date().toISOString()
-    };
-
-    const updated = [newRecord, ...historicalExp];
-    setHistoricalExp(updated);
-    try {
-      localStorage.setItem('te_panama_historical_expedientes', JSON.stringify(updated));
-    } catch (err) {
-      console.error(err);
-    }
-
-    setGeneratedExp({
-      number: uniqueNumber,
-      citizenName: expName.trim(),
-      textMessage,
-      link: directLink
-    });
-
-    // Reset simple form inputs
-    setExpName('');
-    setExpIdentificacion('');
-    setExpFechaNacimiento('');
-    setExpCorreo('');
-    setExpTelefono('');
-    setExpNotes('');
-  };
-
   // Quick Demo Credentials info
   const handleQuickLogin = (role: AdminRole) => {
     setCurrentRole(role);
@@ -962,18 +800,287 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     return id;
   };
 
+  // Filter appointments according to user role:
+  // - Super Admin ('super'): sees everything
+  // - Simple Admin ('sencillo'): sees only Organización Electoral, Cedulación (all except Pasados de Edad), and Registro Civil
+  // - Extranjería ('extranjeria'): sees extranjeria records
+  // - Pasado de Edad ('pasado_edad'): sees Pasado de Edad records
+  const roleFilteredCitas = useMemo(() => {
+    if (currentRole === 'super') return citas;
+    if (currentRole === 'sencillo') {
+      return citas.filter(cita => 
+        cita.servicioCategoria === 'organizacion_electoral' ||
+        cita.servicioCategoria === 'registro_civil' ||
+        (cita.servicioCategoria === 'cedulacion' && cita.subServicioId !== 'ced_pasados_edad')
+      );
+    }
+    if (currentRole === 'extranjeria') {
+      return citas.filter(cita => 
+        cita.servicioCategoria === 'extranjeria' || 
+        cita.subServicioId?.includes('extranj') || 
+        cita.subServicioId?.startsWith('ext_')
+      );
+    }
+    if (currentRole === 'pasado_edad') {
+      return citas.filter(cita => cita.subServicioId === 'ced_pasados_edad');
+    }
+    return citas;
+  }, [citas, currentRole]);
+
+  // Reactive subset for simple admin on selected period
+  const roleFilteredCitasForPeriod = useMemo(() => {
+    return roleFilteredCitas.filter(cita => {
+      if (metricPeriod === 'todo') return true;
+      try {
+        const now = new Date();
+        const refDate = new Date(cita.fecha + 'T00:00:00');
+        
+        if (metricPeriod === 'dia') {
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          return cita.fecha === `${year}-${month}-${day}`;
+        }
+        
+        if (metricPeriod === 'semana') {
+          const currentDay = now.getDay();
+          const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+          const monday = new Date(now);
+          monday.setDate(now.getDate() - distanceToMonday);
+          monday.setHours(0, 0, 0, 0);
+          
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+          
+          return refDate >= monday && refDate <= sunday;
+        }
+        
+        if (metricPeriod === 'mes') {
+          return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
+        }
+        
+        if (metricPeriod === 'año') {
+          return refDate.getFullYear() === now.getFullYear();
+        }
+      } catch (e) {
+        return false;
+      }
+      return false;
+    });
+  }, [roleFilteredCitas, metricPeriod]);
+
+  // PDF report downloader specifically for Simple Admin
+  const handleDownloadSencilloPDF = (periodToCheck: 'dia' | 'semana' | 'mes' | 'año' | 'todo') => {
+    const listForPeriod = roleFilteredCitas.filter(cita => {
+      if (periodToCheck === 'todo') return true;
+      try {
+        const now = new Date();
+        const refDate = new Date(cita.fecha + 'T00:00:00');
+        
+        if (periodToCheck === 'dia') {
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          return cita.fecha === `${year}-${month}-${day}`;
+        }
+        
+        if (periodToCheck === 'semana') {
+          const currentDay = now.getDay();
+          const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+          const monday = new Date(now);
+          monday.setDate(now.getDate() - distanceToMonday);
+          monday.setHours(0, 0, 0, 0);
+          
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+          
+          return refDate >= monday && refDate <= sunday;
+        }
+        
+        if (periodToCheck === 'mes') {
+          return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
+        }
+        
+        if (periodToCheck === 'año') {
+          return refDate.getFullYear() === now.getFullYear();
+        }
+      } catch (e) {
+        return false;
+      }
+      return false;
+    });
+
+    if (listForPeriod.length === 0) {
+      alert('No hay citas registradas en el período seleccionado para descargar en PDF.');
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const primaryColor = [15, 23, 42]; // Slate 900
+    const accentColor = [37, 99, 235]; // Blue 600
+
+    let currentY = 15;
+
+    const drawHeader = () => {
+      // Top bar
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(10, currentY, 190, 10, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('TRIBUNAL ELECTORAL DE PANAMÁ', 15, currentY + 6.5);
+
+      // Section title
+      currentY += 16;
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('AUDITORÍA E INFORMES DE GESTIÓN (REPORTE DE CITAS)', 10, currentY);
+      
+      currentY += 6;
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      
+      doc.text('Servicios: Organización Electoral, Cedulación y Registro Civil (Excluye Pasados de Edad)', 10, currentY);
+
+      currentY += 5;
+      const periodLabel = periodToCheck === 'dia' ? 'Hoy' : periodToCheck === 'semana' ? 'Esta Semana' : periodToCheck === 'mes' ? 'Este Mes' : periodToCheck === 'año' ? 'Este Año' : 'Histórico Completo';
+      doc.text(`Período analizado: ${periodLabel.toUpperCase()}  |  Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}`, 10, currentY);
+
+      // Accent divider line
+      currentY += 4;
+      doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.setLineWidth(0.8);
+      doc.line(10, currentY, 200, currentY);
+      currentY += 8;
+    };
+
+    drawHeader();
+
+    // Summary Box
+    doc.setFillColor(248, 250, 252); // Slate 50
+    doc.setDrawColor(226, 232, 240); // Slate 200
+    doc.setLineWidth(0.2);
+    doc.rect(10, currentY, 190, 22, 'FD');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.text('RESUMEN DE DESEMPEÑO Y CARGA OPERATIVA', 15, currentY + 6);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    
+    const countConfirmadas = listForPeriod.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
+    const countOtras = listForPeriod.length - countConfirmadas;
+
+    doc.text(`• Total Citas Registradas: ${listForPeriod.length}`, 15, currentY + 12);
+    doc.text(`• Citas Confirmadas: ${countConfirmadas}`, 75, currentY + 12);
+    doc.text(`• Otras / Canceladas: ${countOtras}`, 135, currentY + 12);
+    
+    doc.text('Este reporte contiene métricas operativas confidenciales del flujo continuo de ciudadanos, conforme a directivas institucionales.', 15, currentY + 18);
+    currentY += 28;
+
+    // Table Headers
+    const drawTableHead = (y: number) => {
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(10, y, 190, 7, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8);
+      
+      doc.text('CÓDIGO/TX', 12, y + 4.8);
+      doc.text('TRÁMITE / CATEGORÍA', 52, y + 4.8);
+      doc.text('RECIPIENTE / SOLICITANTE', 102, y + 4.8);
+      doc.text('CÉDULA / ID', 142, y + 4.8);
+      doc.text('FECHA/HORA', 165, y + 4.8);
+      doc.text('ESTATUS', 185, y + 4.8);
+    };
+
+    drawTableHead(currentY);
+    currentY += 7;
+
+    // Render Rows
+    listForPeriod.forEach((c, index) => {
+      if (currentY > 270) {
+        doc.addPage();
+        currentY = 15;
+        drawHeader();
+        drawTableHead(currentY);
+        currentY += 7;
+      }
+
+      // Alternate row background
+      if (index % 2 === 1) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(10, currentY, 190, 8, 'F');
+      }
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(7);
+
+      const name = c.datosPersonales.nombreCompleto || 'N/D';
+      
+      const labelTx = c.codigoTransaccion.length > 15 ? c.codigoTransaccion.slice(0, 15) + '...' : c.codigoTransaccion;
+      const labelCategory = getSubServicioName(c.subServicioId);
+      const labelCategoryDisplay = labelCategory.length > 30 ? labelCategory.slice(0, 28) + '...' : labelCategory;
+      const labelName = name.length > 25 ? name.slice(0, 24) + '...' : name;
+      const labelId = c.datosPersonales.identificacion || 'N/D';
+      
+      doc.text(labelTx, 12, currentY + 5);
+      doc.text(labelCategoryDisplay, 52, currentY + 5);
+      doc.text(labelName, 102, currentY + 5);
+      doc.text(labelId, 142, currentY + 5);
+      doc.text(`${c.fecha}\n${c.hora}`, 165, currentY + 3.5);
+      
+      const statusText = c.estado === 'confirmada' || c.estado === 'asistire' ? 'CONFIRMADA' : c.estado === 'no_asistire' ? 'NO ASISTIRÁ' : 'CANCELADA';
+      if (statusText === 'CONFIRMADA') {
+        doc.setTextColor(16, 124, 65);
+        doc.setFont('Helvetica', 'bold');
+      } else if (statusText === 'NO ASISTIRÁ') {
+        doc.setTextColor(180, 83, 9);
+        doc.setFont('Helvetica', 'bold');
+      } else {
+        doc.setTextColor(185, 28, 28);
+        doc.setFont('Helvetica', 'bold');
+      }
+      doc.text(statusText, 185, currentY + 5);
+
+      doc.setDrawColor(241, 245, 249);
+      doc.setLineWidth(0.1);
+      doc.line(10, currentY + 8, 200, currentY + 8);
+
+      currentY += 8;
+    });
+
+    doc.save(`reporte_gestion_sencillo_${periodToCheck}.pdf`);
+  };
+
   // Dynamic calculations for Stats dashboard
   const stats = useMemo(() => {
-    const total = citas.length;
-    const confirmadas = citas.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
-    const canceladas = citas.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
+    const list = roleFilteredCitas;
+    const total = list.length;
+    const confirmadas = list.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
+    const canceladas = list.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
 
     // By Category
     const porCategoria: Record<string, number> = {};
     // By Branch
     const porSucursal: Record<string, number> = {};
 
-    citas.forEach(c => {
+    list.forEach(c => {
       porCategoria[c.servicioCategoria] = (porCategoria[c.servicioCategoria] || 0) + 1;
       porSucursal[c.sucursalId] = (porSucursal[c.sucursalId] || 0) + 1;
     });
@@ -985,11 +1092,11 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       porCategoria,
       porSucursal
     };
-  }, [citas]);
+  }, [roleFilteredCitas]);
 
   // Filtering filter logic
   const filteredCitas = useMemo(() => {
-    return citas.filter(cita => {
+    return roleFilteredCitas.filter(cita => {
       // Search
       let extraText = '';
       if (cita.servicioCategoria === 'extranjeria') {
@@ -1011,7 +1118,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
 
       return matchesSearch && matchesCategory && matchesSucursal && matchesEstado;
     });
-  }, [citas, searchQuery, filterCategoria, filterSucursal, filterEstado, mutableSucursales, mutableServicios]);
+  }, [roleFilteredCitas, searchQuery, filterCategoria, filterSucursal, filterEstado, mutableSucursales, mutableServicios]);
 
   // Select all checkboxes toggle
   const toggleSelectAll = () => {
@@ -2053,225 +2160,362 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
 
                 </div>
 
-                {/* NUEVO: PANEL DE ANÁLISIS DE CARGA DE EXTRANJERÍA E INSCRIPCIÓN TARDÍA */}
-                <div id="analisis_carga_especial" className="bg-slate-950 rounded-lg border border-slate-800 p-5 mt-6 shadow-xl space-y-5">
-                  <div className="border-b border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <h3 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-amber-500" />
-                        <span>Métricas de Carga: Extranjería e Inscripción Tardía</span>
-                      </h3>
-                      <p className="text-[10px] text-slate-400 font-medium">Análisis detallado de demanda operativa regulada con descarga de reportes oficiales</p>
+                {/* PANEL DE ANÁLISIS DE CARGA DE EXTRANJERÍA E INSCRIPCIÓN TARDÍA (Solo para Super, Extranjería y Pasado de Edad) */}
+                {currentRole !== 'sencillo' && (
+                  <div id="analisis_carga_especial" className="bg-slate-950 rounded-lg border border-slate-800 p-5 mt-6 shadow-xl space-y-5">
+                    <div className="border-b border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <h3 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-amber-500" />
+                          <span>Métricas de Carga: Extranjería e Inscripción Tardía</span>
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-medium">Análisis detallado de demanda operativa regulada con descarga de reportes oficiales</p>
+                      </div>
+                      
+                      {/* Period selectors */}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {(['dia', 'semana', 'mes', 'año', 'todo'] as const).map((period) => (
+                          <button
+                            key={`period-${period}`}
+                            type="button"
+                            onClick={() => setMetricPeriod(period)}
+                            className={`px-3 py-1 rounded text-[9px] font-black uppercase tracking-wider border transition cursor-pointer ${
+                              metricPeriod === period
+                                ? 'bg-amber-600 border-amber-600 text-white shadow-md'
+                                : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300'
+                            }`}
+                          >
+                            {period === 'dia' && 'Día'}
+                            {period === 'semana' && 'Semana'}
+                            {period === 'mes' && 'Mes'}
+                            {period === 'año' && 'Año'}
+                            {period === 'todo' && 'Histórico'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    
-                    {/* Period selectors */}
-                    <div className="flex flex-wrap items-center gap-1">
-                      {(['dia', 'semana', 'mes', 'año', 'todo'] as const).map((period) => (
-                        <button
-                          key={`period-${period}`}
-                          type="button"
-                          onClick={() => setMetricPeriod(period)}
-                          className={`px-3 py-1 rounded text-[9px] font-black uppercase tracking-wider border transition cursor-pointer ${
-                            metricPeriod === period
-                              ? 'bg-amber-600 border-amber-600 text-white shadow-md'
-                              : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300'
-                          }`}
-                        >
-                          {period === 'dia' && 'Día'}
-                          {period === 'semana' && 'Semana'}
-                          {period === 'mes' && 'Mes'}
-                          {period === 'año' && 'Año'}
-                          {period === 'todo' && 'Histórico'}
-                        </button>
-                      ))}
+
+                    {/* Calculations */}
+                    {(() => {
+                      const filteredCitasForCard = (type: 'extranjeria' | 'tardia') => {
+                        return citas.filter(c => {
+                          const isExt = c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranj') || c.subServicioId?.startsWith('ext_');
+                          const isTd = c.subServicioId === 'ced_pasados_edad';
+                          
+                          if (type === 'extranjeria' && !isExt) return false;
+                          if (type === 'tardia' && !isTd) return false;
+                          
+                          if (metricPeriod === 'todo') return true;
+                          try {
+                            const now = new Date();
+                            const refDate = new Date(c.fecha + 'T00:00:00');
+                            if (metricPeriod === 'dia') {
+                              const year = now.getFullYear();
+                              const month = String(now.getMonth() + 1).padStart(2, '0');
+                              const day = String(now.getDate()).padStart(2, '0');
+                              return c.fecha === `${year}-${month}-${day}`;
+                            }
+                            if (metricPeriod === 'semana') {
+                              const currentDay = now.getDay();
+                              const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+                              const monday = new Date(now);
+                              monday.setDate(now.getDate() - distanceToMonday);
+                              monday.setHours(0,0,0,0);
+                              const sunday = new Date(monday);
+                              sunday.setDate(monday.getDate() + 6);
+                              sunday.setHours(23,59,59,999);
+                              return refDate >= monday && refDate <= sunday;
+                            }
+                            if (metricPeriod === 'mes') {
+                              return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
+                            }
+                            if (metricPeriod === 'año') {
+                              return refDate.getFullYear() === now.getFullYear();
+                            }
+                          } catch (e) { return false; }
+                          return false;
+                        });
+                      };
+
+                      const extCitas = filteredCitasForCard('extranjeria');
+                      const tardiaCitas = filteredCitasForCard('tardia');
+                      const totalCitasCarga = extCitas.length + tardiaCitas.length;
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            
+                            {/* CARD 1: EXTRANJERÍA */}
+                            <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 shadow flex flex-col justify-between">
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest block">Trámites Migratorios</span>
+                                  <span className="text-[9px] font-bold bg-amber-950/60 border border-amber-900 text-amber-400 px-2.5 py-0.5 rounded-full uppercase">
+                                    Extranjería
+                                  </span>
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-4xl font-mono font-black text-slate-100">{extCitas.length}</span>
+                                  <span className="text-[11px] text-slate-455 font-medium">citas agendadas</span>
+                                </div>
+                                <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                                  Carga de atención para toma de fotografía, biometría dactilar y validación de resoluciones de migración aprobadas por el SNM.
+                                </p>
+                                
+                                {/* Visual Mini Progress Bar */}
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex justify-between text-[9px] text-slate-505 font-extrabold uppercase">
+                                    <span>Proporción de carga</span>
+                                    <span>{totalCitasCarga > 0 ? Math.round((extCitas.length / totalCitasCarga) * 100) : 0}%</span>
+                                  </div>
+                                  <div className="h-1 bg-slate-950 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-amber-500 transition-all duration-500" 
+                                      style={{ width: `${totalCitasCarga > 0 ? (extCitas.length / totalCitasCarga) * 100 : 0}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 mt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadMetricsReport('extranjeria')}
+                                  className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                                >
+                                  <FileSpreadsheet className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                  <span>CSV ({extCitas.length})</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadMetricsPDFReport('extranjeria')}
+                                  className="bg-slate-950 hover:bg-slate-850 text-amber-500 border border-amber-500/20 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                                >
+                                  <Download className="w-3.5 h-3.5 shrink-0" />
+                                  <span>PDF ({extCitas.length})</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* CARD 2: INSCRIPCIÓN TARDÍA */}
+                            <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 shadow flex flex-col justify-between">
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest block">Registro Civil Especial</span>
+                                  <span className="text-[9px] font-bold bg-blue-950/50 border border-blue-900/60 text-blue-400 px-2.5 py-0.5 rounded-full uppercase">
+                                    Inscripción Tardía
+                                  </span>
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-4xl font-mono font-black text-slate-100">{tardiaCitas.length}</span>
+                                  <span className="text-[11px] text-slate-455 font-medium">citas agendadas</span>
+                                </div>
+                                <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                                  Cedulación tardía presencial para ciudadanos panameños mayores de edad (Pasados de Edad) con cupos limitados por resoluciones biométricas.
+                                </p>
+                                
+                                {/* Visual Mini Progress Bar */}
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex justify-between text-[9px] text-slate-505 font-extrabold uppercase">
+                                    <span>Proporción de carga</span>
+                                    <span>{totalCitasCarga > 0 ? Math.round((tardiaCitas.length / totalCitasCarga) * 100) : 0}%</span>
+                                  </div>
+                                  <div className="h-1 bg-slate-950 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-blue-500 transition-all duration-500" 
+                                      style={{ width: `${totalCitasCarga > 0 ? (tardiaCitas.length / totalCitasCarga) * 100 : 0}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 mt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadMetricsReport('tardia')}
+                                  className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                                >
+                                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                  <span>CSV ({tardiaCitas.length})</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadMetricsPDFReport('tardia')}
+                                  className="bg-slate-950 hover:bg-slate-855 text-blue-400 border border-blue-500/20 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
+                                >
+                                  <Download className="w-3.5 h-3.5 shrink-0" />
+                                  <span>PDF ({tardiaCitas.length})</span>
+                                </button>
+                              </div>
+                            </div>
+
+                          </div>
+
+                          {/* General Consolidate downloads */}
+                          <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-900 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-300">
+                            <div className="text-[11px] font-medium">
+                              Se encontraron <strong className="text-white">{totalCitasCarga} citas activas</strong> de tipo Extranjería e Inscripción Tardía para el período <strong className="text-amber-500 uppercase font-mono">{metricPeriod}</strong>.
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsReport('all')}
+                                className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded-lg transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Descargar CSV Consolidado</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('all')}
+                                className="bg-gradient-to-r from-amber-600 to-blue-600 hover:from-amber-700 hover:to-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Descargar PDF Consolidado</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* NUEVO: PANEL DE AUDITORÍA E INFORMES DE GESTIÓN (Exclusivo para Administrador Sencillo) */}
+                {currentRole === 'sencillo' && (
+                  <div id="auditoria_informes_sencillo" className="bg-slate-950 rounded-lg border border-slate-800 p-5 mt-6 shadow-xl space-y-5 animate-fade-in">
+                    <div className="border-b border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <h3 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
+                          <BarChart3 className="w-4 h-4 text-blue-500" />
+                          <span>AUDITORÍA E INFORMES DE GESTIÓN</span>
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-medium">Genere y descargue reportes oficiales en formato PDF con métricas del flujo continuo de ciudadanos, tiempos en sala de espera y eficiencias de los agentes.</p>
+                      </div>
+                      
+                      {/* Period selectors inline */}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {(['dia', 'semana', 'mes', 'año', 'todo'] as const).map((period) => (
+                          <button
+                            key={`period-sencillo-${period}`}
+                            type="button"
+                            onClick={() => setMetricPeriod(period)}
+                            className={`px-3 py-1 rounded text-[9px] font-black uppercase tracking-wider border transition cursor-pointer ${
+                              metricPeriod === period
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                                : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300'
+                            }`}
+                          >
+                            {period === 'dia' && 'Día'}
+                            {period === 'semana' && 'Semana'}
+                            {period === 'mes' && 'Mes'}
+                            {period === 'año' && 'Año'}
+                            {period === 'todo' && 'Histórico'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Interactive cards grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      {/* CARD 1: DÍA ACTUAL */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMetricPeriod('dia');
+                          setTimeout(() => handleDownloadSencilloPDF('dia'), 70);
+                        }}
+                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
+                          metricPeriod === 'dia'
+                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
+                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                        }`}
+                        title="Generar informe detallado de la jornada de hoy"
+                      >
+                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
+                        <span className="text-[11px] font-black uppercase tracking-wider">DÍA ACTUAL</span>
+                        <span className="text-[9px] opacity-70">Informe Diario (Hoy)</span>
+                      </button>
+
+                      {/* CARD 2: SEMANAL */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMetricPeriod('semana');
+                          setTimeout(() => handleDownloadSencilloPDF('semana'), 70);
+                        }}
+                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
+                          metricPeriod === 'semana'
+                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
+                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                        }`}
+                        title="Generar informe de la semana en curso"
+                      >
+                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
+                        <span className="text-[11px] font-black uppercase tracking-wider">SEMANAL</span>
+                        <span className="text-[9px] opacity-70">Lunes a Domingo</span>
+                      </button>
+
+                      {/* CARD 3: MENSUAL */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMetricPeriod('mes');
+                          setTimeout(() => handleDownloadSencilloPDF('mes'), 70);
+                        }}
+                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
+                          metricPeriod === 'mes'
+                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
+                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                        }`}
+                        title="Generar informe del mes en curso"
+                      >
+                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
+                        <span className="text-[11px] font-black uppercase tracking-wider">MENSUAL</span>
+                        <span className="text-[9px] opacity-70">Mes en Curso</span>
+                      </button>
+
+                      {/* CARD 4: ANUAL */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMetricPeriod('año');
+                          setTimeout(() => handleDownloadSencilloPDF('año'), 70);
+                        }}
+                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
+                          metricPeriod === 'año'
+                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
+                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                        }`}
+                        title="Generar informe del año en curso"
+                      >
+                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
+                        <span className="text-[11px] font-black uppercase tracking-wider">ANUAL</span>
+                        <span className="text-[9px] opacity-70">Año en Curso</span>
+                      </button>
+                    </div>
+
+                    {/* Bottom action panel */}
+                    <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-slate-300">
+                      <div className="space-y-0.5 text-left">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Resumen de Métricas de Trámites Generales</span>
+                        <p className="text-[11px] font-semibold text-slate-200">
+                          Periodo: <span className="text-blue-400 font-mono uppercase">{metricPeriod === 'dia' ? 'Día Actual (Diario)' : metricPeriod === 'semana' ? 'Semanal' : metricPeriod === 'mes' ? 'Mensual' : metricPeriod === 'año' ? 'Anual' : 'Histórico Completo'}</span> | Total de citas encontradas en base: <span className="text-white font-mono font-bold">{roleFilteredCitasForPeriod.length}</span>
+                        </p>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadSencilloPDF(metricPeriod)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider px-5 py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>PDF EXPORT</span>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Calculations */}
-                  {(() => {
-                    const filteredCitasForCard = (type: 'extranjeria' | 'tardia') => {
-                      return citas.filter(c => {
-                        const isExt = c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranj') || c.subServicioId?.startsWith('ext_');
-                        const isTd = c.subServicioId === 'ced_pasados_edad';
-                        
-                        if (type === 'extranjeria' && !isExt) return false;
-                        if (type === 'tardia' && !isTd) return false;
-                        
-                        if (metricPeriod === 'todo') return true;
-                        try {
-                          const now = new Date();
-                          const refDate = new Date(c.fecha + 'T00:00:00');
-                          if (metricPeriod === 'dia') {
-                            const year = now.getFullYear();
-                            const month = String(now.getMonth() + 1).padStart(2, '0');
-                            const day = String(now.getDate()).padStart(2, '0');
-                            return c.fecha === `${year}-${month}-${day}`;
-                          }
-                          if (metricPeriod === 'semana') {
-                            const currentDay = now.getDay();
-                            const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
-                            const monday = new Date(now);
-                            monday.setDate(now.getDate() - distanceToMonday);
-                            monday.setHours(0,0,0,0);
-                            const sunday = new Date(monday);
-                            sunday.setDate(monday.getDate() + 6);
-                            sunday.setHours(23,59,59,999);
-                            return refDate >= monday && refDate <= sunday;
-                          }
-                          if (metricPeriod === 'mes') {
-                            return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
-                          }
-                          if (metricPeriod === 'año') {
-                            return refDate.getFullYear() === now.getFullYear();
-                          }
-                        } catch (e) { return false; }
-                        return false;
-                      });
-                    };
-
-                    const extCitas = filteredCitasForCard('extranjeria');
-                    const tardiaCitas = filteredCitasForCard('tardia');
-                    const totalCitasCarga = extCitas.length + tardiaCitas.length;
-
-                    return (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          
-                          {/* CARD 1: EXTRANJERÍA */}
-                          <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 shadow flex flex-col justify-between">
-                            <div className="space-y-1.5">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest block">Trámites Migratorios</span>
-                                <span className="text-[9px] font-bold bg-amber-950/60 border border-amber-900 text-amber-400 px-2.5 py-0.5 rounded-full uppercase">
-                                  Extranjería
-                                </span>
-                              </div>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-mono font-black text-slate-100">{extCitas.length}</span>
-                                <span className="text-[11px] text-slate-450 font-medium">citas agendadas</span>
-                              </div>
-                              <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
-                                Carga de atención para toma de fotografía, biometría dactilar y validación de resoluciones de migración aprobadas por el SNM.
-                              </p>
-                              
-                              {/* Visual Mini Progress Bar */}
-                              <div className="space-y-1 pt-1">
-                                <div className="flex justify-between text-[9px] text-slate-500 font-extrabold uppercase">
-                                  <span>Proporción de carga</span>
-                                  <span>{totalCitasCarga > 0 ? Math.round((extCitas.length / totalCitasCarga) * 100) : 0}%</span>
-                                </div>
-                                <div className="h-1 bg-slate-950 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-amber-500 transition-all duration-500" 
-                                    style={{ width: `${totalCitasCarga > 0 ? (extCitas.length / totalCitasCarga) * 100 : 0}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 mt-3">
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadMetricsReport('extranjeria')}
-                                className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
-                              >
-                                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                <span>CSV ({extCitas.length})</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadMetricsPDFReport('extranjeria')}
-                                className="bg-slate-950 hover:bg-slate-850 text-amber-500 border border-amber-500/20 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
-                              >
-                                <Download className="w-3.5 h-3.5 shrink-0" />
-                                <span>PDF ({extCitas.length})</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* CARD 2: INSCRIPCIÓN TARDÍA */}
-                          <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 shadow flex flex-col justify-between">
-                            <div className="space-y-1.5">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest block">Registro Civil Especial</span>
-                                <span className="text-[9px] font-bold bg-blue-950/50 border border-blue-900/60 text-blue-400 px-2.5 py-0.5 rounded-full uppercase">
-                                  Inscripción Tardía
-                                </span>
-                              </div>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-mono font-black text-slate-100">{tardiaCitas.length}</span>
-                                <span className="text-[11px] text-slate-450 font-medium">citas agendadas</span>
-                              </div>
-                              <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
-                                Cedulación tardía presencial para ciudadanos panameños mayores de edad (Pasados de Edad) con cupos limitados por resoluciones biométricas.
-                              </p>
-                              
-                              {/* Visual Mini Progress Bar */}
-                              <div className="space-y-1 pt-1">
-                                <div className="flex justify-between text-[9px] text-slate-500 font-extrabold uppercase">
-                                  <span>Proporción de carga</span>
-                                  <span>{totalCitasCarga > 0 ? Math.round((tardiaCitas.length / totalCitasCarga) * 100) : 0}%</span>
-                                </div>
-                                <div className="h-1 bg-slate-950 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-blue-500 transition-all duration-500" 
-                                    style={{ width: `${totalCitasCarga > 0 ? (tardiaCitas.length / totalCitasCarga) * 100 : 0}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 mt-3">
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadMetricsReport('tardia')}
-                                className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
-                              >
-                                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                                <span>CSV ({tardiaCitas.length})</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadMetricsPDFReport('tardia')}
-                                className="bg-slate-950 hover:bg-slate-855 text-blue-400 border border-blue-500/20 px-3 py-2 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition text-center"
-                              >
-                                <Download className="w-3.5 h-3.5 shrink-0" />
-                                <span>PDF ({tardiaCitas.length})</span>
-                              </button>
-                            </div>
-                          </div>
-
-                        </div>
-
-                        {/* General Consolidate downloads */}
-                        <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-900 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-300">
-                          <div className="text-[11px] font-medium">
-                            Se encontraron <strong className="text-white">{totalCitasCarga} citas activas</strong> de tipo Extranjería e Inscripción Tardía para el período <strong className="text-amber-500 uppercase font-mono">{metricPeriod}</strong>.
-                          </div>
-                          
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadMetricsReport('all')}
-                              className="bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded-lg transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Descargar CSV Consolidado</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadMetricsPDFReport('all')}
-                              className="bg-gradient-to-r from-amber-600 to-blue-600 hover:from-amber-700 hover:to-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              <span>Descargar PDF Consolidado</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
+                )}
 
               </div>
             )}
@@ -2930,507 +3174,18 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
             {/* TAB CONTENT: EXTRANJERIA (Carga CSV y Control Estatus Migratorio) */}
             {activeSubTab === 'extranjeria' && (
               <div className="space-y-6 animate-fade-in font-sans">
-                {/* API COMMUNICATOR HOOK-UP COMPONENT */}
                 <ExtranjeriaController currentRole={currentRole} />
               </div>
             )}
 
             {/* TAB CONTENT: PASADO DE EDAD (Generar Seguimiento y Enlace) */}
             {activeSubTab === 'pasado_edad' && (
-              <div className="space-y-6 animate-fade-in font-sans text-slate-200">
-                {/* Intro details */}
-                <div id="pasado-edad-header" className="bg-slate-950 p-5 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
-                      <Shield className="w-5 h-5 text-blue-500" />
-                      <span>Control de Inscripción Tardía (Pasados de Edad)</span>
-                    </h3>
-                    <p className="text-[11.5px] text-slate-405 font-medium leading-relaxed">
-                      Oficialía Especializada: Ingrese la información del ciudadano para habilitarle el número de expediente en el sistema electoral y crear su enlace directo de agendamiento.
-                    </p>
-                  </div>
-                  <span className="text-[10px] bg-blue-950/80 text-blue-405 border border-blue-900/50 font-black uppercase tracking-wider px-2.5 py-1 rounded">
-                    👤 Oficial Administrativo
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Form Column */}
-                  <form onSubmit={handleGenerateExpediente} id="form_generador_exp" className="lg:col-span-5 bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-xl">
-                    <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider border-b border-slate-900 pb-2 flex items-center gap-2">
-                      <Plus className="w-4 h-4 text-blue-500" />
-                      Nuevo Expediente Tardío
-                    </h4>
-
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                          Nombre del Solicitante <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ej: Aurelio Ismael Montenegro"
-                          value={expName}
-                          onChange={(e) => setExpName(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650 font-medium"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                            Documento / ID <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Ej: 8-223-4556"
-                            value={expIdentificacion}
-                            onChange={(e) => setExpIdentificacion(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                            F. Nacimiento <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="date"
-                            required
-                            value={expFechaNacimiento}
-                            onChange={(e) => setExpFechaNacimiento(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 text-white p-1.5 rounded text-xs px-2 focus:outline-none focus:ring-1 focus:ring-blue-650 font-mono"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                            Correo Electrónico <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="email"
-                            required
-                            placeholder="correo@ejemplo.com"
-                            value={expCorreo}
-                            onChange={(e) => setExpCorreo(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                            Teléfono Móvil <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="tel"
-                            required
-                            placeholder="Ej: 6605-4422"
-                            value={expTelefono}
-                            onChange={(e) => setExpTelefono(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                          Observaciones / Notas Internas
-                        </label>
-                        <textarea
-                          placeholder="Notas opcionales del expediente tardío..."
-                          value={expNotes}
-                          rows={2}
-                          onChange={(e) => setExpNotes(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650 resize-none font-medium text-slate-300"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-extrabold text-xs uppercase tracking-wider py-2.5 rounded transition shadow-lg cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Shield className="w-4 h-4 shrink-0" />
-                      Generar Expediente y Enlace
-                    </button>
-                  </form>
-
-                  {/* Results Column */}
-                  <div className="lg:col-span-7 space-y-4">
-                    {generatedExp ? (
-                      <div id="resultado_generado_exp" className="bg-slate-950 p-5 rounded-lg border border-blue-900/60 shadow-2xl relative overflow-hidden space-y-4">
-                        {/* Decorative background badge */}
-                        <div className="absolute right-[-10px] top-[-10px] opacity-10 pointer-events-none">
-                          <Shield className="w-40 h-40 text-blue-500" />
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-blue-900/30 pb-3 gap-2">
-                          <span className="text-xs font-black uppercase text-blue-400 tracking-wider flex items-center gap-2">
-                            <CheckCircle className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
-                            Expediente Creado Exitosamente
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadTrackingPDF(generatedExp)}
-                              className="bg-amber-600 hover:bg-amber-700 text-white text-[10.5px] font-black uppercase tracking-wider px-3.5 py-1 py-1 rounded transition flex items-center gap-1.5 shadow-md cursor-pointer border border-amber-500"
-                            >
-                              <Download className="w-3.5 h-3.5 text-white" />
-                              <span>Descargar PDF</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setGeneratedExp(null)}
-                              className="text-slate-400 hover:text-white text-[10.5px] font-black uppercase px-2.5 py-1 rounded border border-slate-800 hover:border-slate-700 transition cursor-pointer"
-                            >
-                              Limpiar
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <span className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Código de Seguimiento Generado</span>
-                            <div className="flex items-center gap-3 mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">
-                              <span className="text-base font-black text-blue-450 font-mono tracking-widest leading-none">
-                                {generatedExp.number}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(generatedExp.number);
-                                  setCopiedId(generatedExp.number);
-                                  setTimeout(() => setCopiedId(null), 2000);
-                                }}
-                                className="ml-auto bg-slate-800 hover:bg-slate-750 text-slate-350 hover:text-white text-[10px] font-extrabold px-3 py-1 rounded transition flex items-center gap-1 border border-slate-700"
-                              >
-                                {copiedId === generatedExp.number ? (
-                                  <>
-                                    <CheckCircle className="w-3 h-3 text-emerald-500" />
-                                    <span>Copiado</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-3 h-3" />
-                                    <span>Copiar Código</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Enlace Personalizado de Agendamiento</span>
-                            <div className="flex items-center gap-3 mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">
-                              <span className="text-[11px] font-mono text-slate-300 truncate tracking-tight">
-                                {generatedExp.link}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(generatedExp.link);
-                                  setCopiedId(generatedExp.link);
-                                  setTimeout(() => setCopiedId(null), 2000);
-                                }}
-                                className="ml-auto bg-slate-800 hover:bg-slate-755 text-slate-355 hover:text-white text-[10px] font-extrabold px-3 py-1 rounded transition flex items-center gap-1 border border-slate-700 max-w-[120px] shrink-0"
-                              >
-                                {copiedId === generatedExp.link ? (
-                                  <>
-                                    <CheckCircle className="w-3 h-3 text-emerald-500" />
-                                    <span>Copiado</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Link className="w-3 h-3" />
-                                    <span>Copiar Enlace</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] font-black uppercase text-slate-455 tracking-wide block mb-1">Kit de Mensajería para Remitir</span>
-                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-850 space-y-2 relative">
-                              <pre className="text-[10.5px] font-sans text-slate-300 whitespace-pre-wrap leading-relaxed">
-                                {generatedExp.textMessage}
-                              </pre>
-                              <div className="border-t border-slate-800 pt-2.5 flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(generatedExp.textMessage);
-                                    setCopiedId('kit-' + generatedExp.number);
-                                    setTimeout(() => setCopiedId(null), 2000);
-                                  }}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold uppercase tracking-wider px-4 py-1.5 rounded transition flex items-center gap-1.5 shadow"
-                                >
-                                  {copiedId === 'kit-' + generatedExp.number ? (
-                                    <>
-                                      <CheckCircle className="w-3.5 h-3.5 text-white" />
-                                      <span>Kit de Mensaje Copiado</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Share2 className="w-3.5 h-3.5" />
-                                      <span>Copiar Kit Completo</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-slate-950 p-5 rounded-lg border border-slate-850 shadow-inner flex flex-col items-center justify-center text-center py-16 h-full min-h-[300px] text-slate-500">
-                        <Shield className="w-12 h-12 text-slate-700 mb-3 animate-pulse" />
-                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">A la espera de generación</h4>
-                        <p className="text-[11px] text-slate-500 max-w-xs mt-1 leading-relaxed">
-                          Complete el formulario de la izquierda con los datos del ciudadano y presione el botón de generación para habilitar el expediente.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* NUEVO: PANEL DE CONTROL DE HORARIOS Y CUPOS PARA INSCRIPCIÓN TARDÍA */}
-                <div id="tardia_planificacion_control" className="bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-xl">
-                  <div className="border-b border-slate-900 pb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-blue-500" />
-                      <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">
-                        Control de Horarios y Cupos (Inscripción Tardía)
-                      </h4>
-                    </div>
-                    <span className="text-[9px] bg-blue-950 text-blue-400 border border-blue-900/60 px-2 py-0.5 rounded font-bold uppercase">
-                      Planificación Activa: {tardiaCapacidadTotal} Citas por día
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                    Personalice los límites operativos, intervalos de reunión, hora de apertura, hora de cierre de la agenda para trámites de cédulas para ciudadanos Pasados de Edad. Standard: 4 citas por día de 8:00 AM a 11:30 AM con lapso de 30 min.
-                  </p>
-
-                  <form onSubmit={promptSaveTardiaConfig} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end pt-1">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Cupo Máximo Diario (Citas/Día)</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="30"
-                        value={tardiaCapacidadTotal}
-                        onChange={(e) => setTardiaCapacidadTotal(parseInt(e.target.value, 10) || 1)}
-                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Intervalo de Cita (Minutos)</label>
-                      <select
-                        value={tardiaIntervalo}
-                        onChange={(e) => setTardiaIntervalo(parseInt(e.target.value, 10))}
-                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
-                      >
-                        <option value="10">10 minutos</option>
-                        <option value="15">15 minutos</option>
-                        <option value="20">20 minutos</option>
-                        <option value="30">30 minutos</option>
-                        <option value="45">45 minutos</option>
-                        <option value="60">60 minutos</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Hora Apertura (Inicio)</label>
-                      <select
-                        value={tardiaHoraInicio}
-                        onChange={(e) => setTardiaHoraInicio(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
-                      >
-                        {[
-                          '07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM'
-                        ].map(time => (
-                          <option key={`tardia-start-${time}`} value={time}>{time}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-extrabold uppercase text-slate-455 block">Hora Cierre (Límite)</label>
-                      <select
-                        value={tardiaHoraFin}
-                        onChange={(e) => setTardiaHoraFin(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
-                      >
-                        {[
-                          '11:00 AM', '11:35 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'
-                        ].map(time => (
-                          <option key={`tardia-end-${time}`} value={time}>{time}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-4 flex justify-end">
-                      <button
-                        type="submit"
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2 py-5 px-6 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Check className="w-3.5 h-3.5 text-white" />
-                        <span>Guardar Planificación Tardía</span>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                {/* CONFIRMATION DIALOG MODAL FOR INSCRIPCIÓN TARDÍA CONFIG SAVE */}
-                {showConfirmTardiaSave && (
-                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-fade-in font-sans">
-                    <div className="bg-slate-900 border border-blue-500/40 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4 text-slate-100">
-                      <div className="flex items-center gap-3 border-b border-blue-500/20 pb-3 text-blue-400">
-                        <AlertCircle className="w-6 h-6 shrink-0 text-blue-400" />
-                        <h4 className="text-sm font-black uppercase tracking-wider text-slate-100 font-sans">Confirmar Planificación Tardía</h4>
-                      </div>
-                      <p className="text-xs text-slate-300 leading-relaxed font-semibold font-sans">
-                        ¿Está seguro de que desea aplicar estos cambios a la planificación de Inscripción Tardía? 
-                        Los nuevos cupos diarios de **{tardiaCapacidadTotal} citas**, un intervalo de **{tardiaIntervalo} minutos** y el horario laborable regulado de **{tardiaHoraInicio} a {tardiaHoraFin}** se guardarán y entrarán en vigencia inmediatamente.
-                      </p>
-                      <div className="flex items-center justify-end gap-3 pt-2 font-sans font-black">
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmTardiaSave(false)}
-                          className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-350 border border-slate-700 rounded text-xs uppercase tracking-wide cursor-pointer transition"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={executeSaveTardiaConfig}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs uppercase tracking-wider shadow-md cursor-pointer transition"
-                        >
-                          Sí, Confirmar Planificación
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Historical Log */}
-                <div id="historial_expedientes" className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden shadow-xl">
-                  <div className="bg-slate-900/50 p-4 border-b border-slate-800 flex items-center justify-between">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-350 flex items-center gap-2">
-                      <ClipboardList className="w-4 h-4 text-blue-500" />
-                      Historial de Seguimientos Autorizados ({historicalExp.length})
-                    </h4>
-                    {historicalExp.length > 0 && currentRole === 'super' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm('¿Está seguro de limpiar todo el historial local de expedientes autorizados? Esto no borrará las citas registradas.')) {
-                            setHistoricalExp([]);
-                            localStorage.removeItem('te_panama_historical_expedientes');
-                          }
-                        }}
-                        className="text-red-400 hover:text-red-350 text-[10px] font-black uppercase tracking-wider hover:underline"
-                      >
-                        Limpiar Historial
-                      </button>
-                    )}
-                  </div>
-
-                  {historicalExp.length === 0 ? (
-                    <div className="p-10 text-center text-[11px] text-slate-500 font-medium">
-                      No se han generado expedientes tardíos en esta sesión local de oficialía.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left font-sans">
-                        <thead>
-                          <tr className="bg-slate-900 text-[9px] font-black uppercase tracking-widest text-slate-450 border-b border-slate-800">
-                            <th className="p-3 w-16 border-b border-slate-800">Fecha</th>
-                            <th className="p-3 w-40 border-b border-slate-800">N° Seguimiento</th>
-                            <th className="p-3 w-44 border-b border-slate-800">Solicitante</th>
-                            <th className="p-3 w-28 border-b border-slate-800">Documento / ID</th>
-                            <th className="p-3 w-32 border-b border-slate-800">Contacto</th>
-                            <th className="p-3 text-right border-b border-slate-800">Acciones de Remisión</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-850 text-xs text-slate-300">
-                          {historicalExp.map((rec) => (
-                            <tr key={rec.id} className="hover:bg-slate-900/40 border-b border-slate-850/50">
-                              <td className="p-3 text-[10px] font-mono text-slate-450">
-                                {rec.fechaCreacion ? rec.fechaCreacion.substring(0, 10) : '2026-05-25'}
-                              </td>
-                              <td className="p-3">
-                                <span className="font-mono font-black text-blue-450 bg-blue-950/40 px-2 py-0.5 rounded border border-blue-900/30">
-                                  {rec.number}
-                                </span>
-                              </td>
-                              <td className="p-3 font-semibold text-slate-200">
-                                {rec.citizenName}
-                              </td>
-                              <td className="p-3 font-mono text-[11px]">
-                                {rec.identificacion}
-                              </td>
-                              <td className="p-3 font-mono text-[10px] space-y-0.5">
-                                <div className="text-slate-350">{rec.correo}</div>
-                                <div className="text-slate-450">{rec.telefono}</div>
-                              </td>
-                              <td className="p-3 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDownloadTrackingPDF(rec)}
-                                    className="bg-amber-950/40 hover:bg-amber-900/50 text-[10px] font-bold px-2 py-1 rounded transition text-amber-500 hover:text-amber-400 border border-amber-900/40 flex items-center gap-1 cursor-pointer"
-                                    title="Descargar Constancia Oficial en PDF"
-                                  >
-                                    <Download className="w-3 h-3 text-amber-500 shrink-0" />
-                                    <span>PDF</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(rec.directLink);
-                                      setCopiedId('link-' + rec.id);
-                                      setTimeout(() => setCopiedId(null), 2000);
-                                    }}
-                                    className="bg-slate-900 hover:bg-slate-800 text-[10px] font-bold px-2 py-1 rounded transition text-slate-300 border border-slate-750 flex items-center gap-1 cursor-pointer"
-                                    title="Copiar solo el enlace de cita"
-                                  >
-                                    {copiedId === 'link-' + rec.id ? (
-                                      <span className="text-emerald-500 font-extrabold flex items-center gap-0.5"><CheckCircle className="w-3 h-3" /> Enlace!</span>
-                                    ) : (
-                                      <><Link className="w-3 h-3 text-slate-450" /> Enlace</>
-                                    )}
-                                  </button>
-                                  
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(rec.textMessage);
-                                      setCopiedId('kit-' + rec.id);
-                                      setTimeout(() => setCopiedId(null), 2000);
-                                    }}
-                                    className="bg-blue-950/40 hover:bg-blue-900/50 text-[10px] font-bold px-2 py-1 rounded transition text-blue-300 border border-blue-900/40 flex items-center gap-1 cursor-pointer"
-                                    title="Copiar kit de mensaje completo para enviar"
-                                  >
-                                    {copiedId === 'kit-' + rec.id ? (
-                                      <span className="text-emerald-400 font-extrabold flex items-center gap-0.5"><CheckCircle className="w-3 h-3 text-emerald-500" /> Kit!</span>
-                                    ) : (
-                                      <><Share2 className="w-3 h-3 text-blue-400" /> Kit</>
-                                    )}
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <TardiaController 
+                citas={citas} 
+                onUpdateCitas={onUpdateCitas} 
+                currentRole={currentRole}
+                activeUsername={username}
+              />
             )}
 
             {/* TAB CONTENT: GESTIÓN DE USUARIOS (CREAR Y ASIGNAR GESTONES) */}
@@ -3815,12 +3570,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                 </div>
                 <select
                   value={editEstado}
-                  onChange={(e) => setEditEstado(e.target.value as 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire')}
+                  onChange={(e) => setEditEstado(e.target.value as 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire' | 'realizada')}
                   className="bg-slate-900 border border-slate-700 text-white p-1 text-xs px-2 rounded cursor-pointer focus:outline-none"
                 >
                   <option value="confirmada">Confirmada (Reservada)</option>
                   <option value="asistire">✓ Asistencia Confirmada</option>
                   <option value="no_asistire">✗ No Asistirá</option>
+                  <option value="realizada">✓ Realizada (Completada)</option>
                   <option value="cancelada">Cancelada / Liberada</option>
                 </select>
               </div>

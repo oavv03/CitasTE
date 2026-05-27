@@ -55,7 +55,7 @@ export interface Cita {
   hora: string;  // HH:MM
   codigoTransaccion: string;
   fechaCreacion: string;
-  estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire';
+  estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire' | 'realizada';
 }
 
 export interface ExtranjeriaRecord {
