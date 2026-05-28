@@ -779,7 +779,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       setActiveSubTab('pasado_edad' as any);
       setLoginError('');
     } else {
-      setLoginError('Credenciales incorrectas. Para pruebas rápidas use los botones de acceso directo o ingrese las credenciales asignadas o creadas.');
+      setLoginError('Credenciales incorrectas. Verifique sus datos o ingrese con las credenciales asignadas.');
     }
   };
 
@@ -1568,7 +1568,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
             <ShieldAlert className="w-14 h-14 text-blue-500 mx-auto" />
             <h2 className="text-lg font-black uppercase tracking-wider text-slate-100">Acceso Restringido y Seguro</h2>
             <p className="text-xs text-slate-450 leading-relaxed max-w-xs mx-auto">
-              Ingrese credenciales o use los accesos directos de prueba provistos a continuación.
+              Ingrese sus credenciales autorizadas de administración para acceder a la plataforma de gestión.
             </p>
           </div>
 
@@ -1609,49 +1609,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
             </button>
           </form>
 
-          {/* QUICK-ACCESS TEST LOGIN HUBS */}
-          <div className="w-full space-y-3 text-center">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">
-              Accesos Directos para Pruebas de Roles de Extranjería:
-            </span>
-            <div className="grid grid-cols-2 gap-2 text-left">
-              <button
-                type="button"
-                onClick={() => { setUsername('adminte'); setPassword('Value1234'); }}
-                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
-              >
-                <span className="font-extrabold text-blue-400 block text-[10px]">🎯 SUPER ADMIN</span>
-                <span className="text-[9px] text-slate-400 font-mono">adminte / Value1234</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => { setUsername('supermigra'); setPassword('1234'); }}
-                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
-              >
-                <span className="font-extrabold text-amber-400 block text-[10px]">👑 SUPERVISOR EXTR.</span>
-                <span className="text-[9px] text-slate-400 font-mono">supermigra / 1234</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setUsername('atencionmigra'); setPassword('1234'); }}
-                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
-              >
-                <span className="font-extrabold text-teal-400 block text-[10px]">📋 ATENCIÓN ENTRADA</span>
-                <span className="text-[9px] text-slate-400 font-mono">atencionmigra / 1234</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setUsername('cubiculomigra'); setPassword('1234'); }}
-                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
-              >
-                <span className="font-extrabold text-violet-400 block text-[10px]">🖥️ CUBÍCULO (TICKET)</span>
-                <span className="text-[9px] text-slate-400 font-mono">cubiculomigra / 1234</span>
-              </button>
-            </div>
-          </div>
         </div>
       ) : (
         /* MAIN ADMIN INTERFACE */
