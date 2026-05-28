@@ -51,6 +51,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   
   const [currentRole, setCurrentRole] = useState<AdminRole>('sencillo');
   const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites' | 'extranjeria'>('tabla');
+  const [eyeTheme, setEyeTheme] = useState<'slate' | 'warm' | 'sepia' | 'forest'>(() => {
+    try {
+      return (localStorage.getItem('admin_eye_theme') as any) || 'slate';
+    } catch {
+      return 'slate';
+    }
+  });
 
   // Search and Filtering states
   const [searchQuery, setSearchQuery] = useState('');
@@ -1483,7 +1490,181 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   };
 
   return (
-    <div id="admin-panel-container" className="bg-slate-900 text-slate-100 min-h-[600px] rounded-lg border border-slate-700 shadow-2xl flex flex-col overflow-hidden">
+    <div 
+      id="admin-panel-container" 
+      className={`text-slate-100 min-h-[600px] rounded-lg border shadow-2xl flex flex-col overflow-hidden theme-${eyeTheme} ${
+        eyeTheme === 'slate' ? 'bg-slate-900 border-slate-700' : ''
+      }`}
+    >
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Warm Dark Theme Override (Carbón Cálido) */
+        #admin-panel-container.theme-warm {
+          background-color: #1a1615 !important;
+          color: #f7ebe6 !important;
+          border-color: #3b312f !important;
+        }
+        #admin-panel-container.theme-warm .bg-slate-950 {
+          background-color: #120e0e !important;
+        }
+        #admin-panel-container.theme-warm .bg-slate-900 {
+          background-color: #1a1615 !important;
+        }
+        #admin-panel-container.theme-warm .bg-slate-900\\/60 {
+          background-color: rgba(26, 22, 21, 0.6) !important;
+        }
+        #admin-panel-container.theme-warm .bg-slate-850 {
+          background-color: #241e1d !important;
+        }
+        #admin-panel-container.theme-warm .bg-slate-800 {
+          background-color: #2d2624 !important;
+        }
+        #admin-panel-container.theme-warm .border-slate-800,
+        #admin-panel-container.theme-warm .border-slate-700,
+        #admin-panel-container.theme-warm .border-slate-850,
+        #admin-panel-container.theme-warm .border-slate-900 {
+          border-color: #3b312f !important;
+        }
+        #admin-panel-container.theme-warm .text-slate-400 {
+          color: #b09f9a !important;
+        }
+        #admin-panel-container.theme-warm .text-slate-450 {
+          color: #a08e89 !important;
+        }
+        #admin-panel-container.theme-warm .text-slate-300 {
+          color: #dfcfca !important;
+        }
+        #admin-panel-container.theme-warm .text-slate-100 {
+          color: #f7ebe6 !important;
+        }
+        #admin-panel-container.theme-warm .text-blue-400,
+        #admin-panel-container.theme-warm .text-blue-300,
+        #admin-panel-container.theme-warm .text-blue-500 {
+          color: #f59e0b !important;
+        }
+        #admin-panel-container.theme-warm .bg-blue-600 {
+          background-color: #d97706 !important;
+        }
+        #admin-panel-container.theme-warm .hover\\:bg-blue-700:hover,
+        #admin-panel-container.theme-warm .bg-blue-700 {
+          background-color: #b45309 !important;
+        }
+
+        /* Forest Green Dark Override (Descanso Visual) */
+        #admin-panel-container.theme-forest {
+          background-color: #0b150f !important;
+          color: #e6f3eb !important;
+          border-color: #223f2d !important;
+        }
+        #admin-panel-container.theme-forest .bg-slate-950 {
+          background-color: #060d09 !important;
+        }
+        #admin-panel-container.theme-forest .bg-slate-900 {
+          background-color: #0b150f !important;
+        }
+        #admin-panel-container.theme-forest .bg-slate-900\\/60 {
+          background-color: rgba(11, 21, 15, 0.6) !important;
+        }
+        #admin-panel-container.theme-forest .bg-slate-850 {
+          background-color: #112217 !important;
+        }
+        #admin-panel-container.theme-forest .bg-slate-800 {
+          background-color: #172d1f !important;
+        }
+        #admin-panel-container.theme-forest .border-slate-800,
+        #admin-panel-container.theme-forest .border-slate-700,
+        #admin-panel-container.theme-forest .border-slate-850,
+        #admin-panel-container.theme-forest .border-slate-900 {
+          border-color: #223f2d !important;
+        }
+        #admin-panel-container.theme-forest .text-slate-400 {
+          color: #98bfa7 !important;
+        }
+        #admin-panel-container.theme-forest .text-slate-450 {
+          color: #83b194 !important;
+        }
+        #admin-panel-container.theme-forest .text-slate-300 {
+          color: #c0decb !important;
+        }
+        #admin-panel-container.theme-forest .text-slate-100 {
+          color: #e6f3eb !important;
+        }
+        #admin-panel-container.theme-forest .text-blue-400,
+        #admin-panel-container.theme-forest .text-blue-300,
+        #admin-panel-container.theme-forest .text-blue-500 {
+          color: #10b981 !important;
+        }
+        #admin-panel-container.theme-forest .bg-blue-600 {
+          background-color: #059669 !important;
+        }
+        #admin-panel-container.theme-forest .hover\\:bg-blue-700:hover,
+        #admin-panel-container.theme-forest .bg-blue-700 {
+          background-color: #047857 !important;
+        }
+
+        /* Sepia Soothing Warm (Filtro de Lectura Electrónica) */
+        #admin-panel-container.theme-sepia {
+          background-color: #f7ecd5 !important;
+          color: #3b2f1e !important;
+          border-color: #caa778 !important;
+        }
+        #admin-panel-container.theme-sepia .bg-slate-950 {
+          background-color: #eadbb9 !important;
+        }
+        #admin-panel-container.theme-sepia .bg-slate-900 {
+          background-color: #f7ecd5 !important;
+        }
+        #admin-panel-container.theme-sepia .bg-slate-900\\/60 {
+          background-color: rgba(247, 236, 213, 0.6) !important;
+        }
+        #admin-panel-container.theme-sepia .bg-slate-850 {
+          background-color: #e3d2ac !important;
+        }
+        #admin-panel-container.theme-sepia .bg-slate-800 {
+          background-color: #dbc99f !important;
+        }
+        #admin-panel-container.theme-sepia .border-slate-800,
+        #admin-panel-container.theme-sepia .border-slate-700,
+        #admin-panel-container.theme-sepia .border-slate-850,
+        #admin-panel-container.theme-sepia .border-slate-900 {
+          border-color: #cda77d !important;
+        }
+        #admin-panel-container.theme-sepia .text-slate-400 {
+          color: #7a634a !important;
+        }
+        #admin-panel-container.theme-sepia .text-slate-450 {
+          color: #6a533a !important;
+        }
+        #admin-panel-container.theme-sepia .text-slate-305,
+        #admin-panel-container.theme-sepia .text-slate-300 {
+          color: #4b3a26 !important;
+        }
+        #admin-panel-container.theme-sepia .text-slate-100,
+        #admin-panel-container.theme-sepia .text-slate-200,
+        #admin-panel-container.theme-sepia .text-white {
+          color: #2d2112 !important;
+        }
+        #admin-panel-container.theme-sepia .text-blue-400,
+        #admin-panel-container.theme-sepia .text-blue-300,
+        #admin-panel-container.theme-sepia .text-blue-500 {
+          color: #8c5210 !important;
+        }
+        #admin-panel-container.theme-sepia .bg-blue-600 {
+          background-color: #b75e14 !important;
+          color: #ffffff !important;
+        }
+        #admin-panel-container.theme-sepia .hover\\:bg-blue-700:hover,
+        #admin-panel-container.theme-sepia .bg-blue-700 {
+          background-color: #924300 !important;
+          color: #ffffff !important;
+        }
+        #admin-panel-container.theme-sepia select,
+        #admin-panel-container.theme-sepia input,
+        #admin-panel-container.theme-sepia textarea {
+          background-color: #fcf6eb !important;
+          color: #2d2112 !important;
+          border-color: #caa778 !important;
+        }
+      ` }} />
       
       {/* HEADER BAR */}
       <div className="bg-slate-950 p-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2633,6 +2814,81 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                       <div className="text-[9.5px] text-blue-400 bg-blue-950/20 p-2 rounded border border-blue-900/10 font-mono leading-relaxed">
                         <span className="font-extrabold text-blue-300 block uppercase mb-0.5">Enlace Resultante de Ejemplo:</span>
                         {pasadoEdadLinkBase.trim().endsWith('/') ? pasadoEdadLinkBase.trim().slice(0, -1) : pasadoEdadLinkBase.trim()}/?tramite=ced_pasados_edad&seguimiento=EXP-2026-TE-123456
+                      </div>
+                    </div>
+
+                    {/* COLOR THEME PERSONALIZATION FOR EYE PROTECTION */}
+                    <div className="flex flex-col gap-3 bg-slate-900/60 p-4 rounded-lg border border-slate-800">
+                      <div>
+                        <span className="text-[11px] font-extrabold uppercase text-slate-250 block">Personalización de Tema (Protección de Vista)</span>
+                        <span className="text-[10.5px] text-slate-450">Seleccione un espectro de color optimizado para reducir la fatiga ocular y proteger su vista durante largas jornadas de trabajo</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEyeTheme('slate');
+                            try { localStorage.setItem('admin_eye_theme', 'slate'); } catch(e){}
+                          }}
+                          className={`p-3 rounded border text-left cursor-pointer transition flex flex-col justify-between ${
+                            eyeTheme === 'slate'
+                              ? 'bg-blue-950/40 border-blue-500 text-blue-400'
+                              : 'bg-slate-950 border-slate-800 hover:border-slate-750 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <span className="text-[10px] font-black block uppercase tracking-wide">Azul Slate</span>
+                          <span className="text-[9px] text-slate-500 block pt-1.5 leading-relaxed">Predeterminado Institucional</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEyeTheme('warm');
+                            try { localStorage.setItem('admin_eye_theme', 'warm'); } catch(e){}
+                          }}
+                          className={`p-3 rounded border text-left cursor-pointer transition flex flex-col justify-between ${
+                            eyeTheme === 'warm'
+                              ? 'bg-amber-950/20 border-amber-500 text-amber-500'
+                              : 'bg-slate-950 border-slate-800 hover:border-slate-750 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <span className="text-[10px] font-black block uppercase tracking-wide">Filtro Cálido</span>
+                          <span className="text-[9px] text-slate-500 block pt-1.5 leading-relaxed">Carbón Cálido sin Luz Azul</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEyeTheme('forest');
+                            try { localStorage.setItem('admin_eye_theme', 'forest'); } catch(e){}
+                          }}
+                          className={`p-3 rounded border text-left cursor-pointer transition flex flex-col justify-between ${
+                            eyeTheme === 'forest'
+                              ? 'bg-emerald-950/30 border-emerald-500 text-emerald-400'
+                              : 'bg-slate-950 border-slate-800 hover:border-slate-750 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <span className="text-[10px] font-black block uppercase tracking-wide">Bosque Eco</span>
+                          <span className="text-[9px] text-slate-500 block pt-1.5 leading-relaxed">Verdes Médicos Descanso Visual</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEyeTheme('sepia');
+                            try { localStorage.setItem('admin_eye_theme', 'sepia'); } catch(e){}
+                          }}
+                          className={`p-3 rounded border text-left cursor-pointer transition flex flex-col justify-between ${
+                            eyeTheme === 'sepia'
+                              ? 'border-yellow-600/60 text-yellow-800'
+                              : 'bg-slate-950 border-slate-800 hover:border-slate-750 text-slate-400 hover:text-slate-200'
+                          }`}
+                          style={eyeTheme === 'sepia' ? { backgroundColor: '#fdf3dd' } : {}}
+                        >
+                          <span className="text-[10px] font-black block uppercase tracking-wide">Sepia Confort</span>
+                          <span className="text-[9px] text-slate-600 block pt-1.5 leading-relaxed">Lectura de Papel Reciclado</span>
+                        </button>
                       </div>
                     </div>
 
