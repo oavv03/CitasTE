@@ -66,7 +66,7 @@ export interface ExtranjeriaRecord {
   motivo: string;
 }
 
-export type AdminRole = 'sencillo' | 'super' | 'extranjeria' | 'pasado_edad';
+export type AdminRole = 'sencillo' | 'super' | 'extranjeria' | 'pasado_edad' | 'extranjeria_supervisor' | 'extranjeria_atencion' | 'extranjeria_cubiculo' | 'pasado_edad_supervisor' | 'pasado_edad_admin';
 
 export interface AdminUser {
   username: string;

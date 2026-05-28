@@ -86,6 +86,17 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
     return (localStorage.getItem('extranjeria_sub_role') as ExtranjeriaSubRole) || 'supervisor';
   });
 
+  // Synchronize subRole dynamically if a specific Extranjería user logs in
+  React.useEffect(() => {
+    if (currentRole === 'extranjeria_supervisor') {
+      setSubRole('supervisor');
+    } else if (currentRole === 'extranjeria_atencion') {
+      setSubRole('atencion');
+    } else if (currentRole === 'extranjeria_cubiculo') {
+      setSubRole('cubiculo');
+    }
+  }, [currentRole]);
+
   // Selected Cubicle in the "Cubículo" view
   const [selectedCubiculo, setSelectedCubiculo] = useState<number>(() => {
     return parseInt(localStorage.getItem('extranjeria_selected_cubiculo') || '1', 10);
@@ -227,8 +238,8 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
   // Save timing config handler
   const promptSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentRole === 'sencillo') {
-      showStatus('Operación denegada. Solo personal de Inmigración/Admin puede configurar la capacidad.', 'error');
+    if (currentRole !== 'super') {
+      showStatus('Operación denegada. Solo el Super Administrador puede configurar la capacidad y horarios.', 'error');
       return;
     }
     setShowConfirmSave(true);
@@ -715,56 +726,83 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
       `}} />
 
       {/* Profile simulation switcher at the top */}
-      <div className="bg-slate-900 border border-slate-850 p-1.5 rounded-xl flex flex-wrap gap-2 items-center justify-between shadow-xl">
-        <div className="flex items-center gap-2.5 px-3 py-1.5">
-          <Boxes className="w-5 h-5 text-amber-500" />
-          <div className="text-left">
-            <span className="text-[9px] font-black tracking-widest text-slate-500 uppercase block">Simulador de Roles de Extranjería</span>
-            <span className="text-xs font-bold text-slate-200">Haga clic abajo para intercambiar el perfil activo:</span>
+      {(currentRole === 'super' || currentRole === 'extranjeria') ? (
+        <div className="bg-slate-900 border border-slate-850 p-1.5 rounded-xl flex flex-wrap gap-2 items-center justify-between shadow-xl">
+          <div className="flex items-center gap-2.5 px-3 py-1.5">
+            <Boxes className="w-5 h-5 text-amber-500" />
+            <div className="text-left">
+              <span className="text-[9px] font-black tracking-widest text-slate-500 uppercase block">Simulador de Roles de Extranjería</span>
+              <span className="text-xs font-bold text-slate-200">Haga clic abajo para intercambiar el perfil activo:</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => { setSubRole('supervisor'); setSelectedAppForCheck(null); }}
+              className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                subRole === 'supervisor'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Supervisor 👑</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSubRole('atencion'); setSelectedAppForCheck(null); }}
+              className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                subRole === 'atencion'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              <CheckSquare className="w-4 h-4" />
+              <span>Atención (Entrada) 📋</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSubRole('cubiculo'); setSelectedAppForCheck(null); }}
+              className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                subRole === 'cubiculo'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Cubículo (Ticket) 🖥️</span>
+            </button>
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={() => { setSubRole('supervisor'); setSelectedAppForCheck(null); }}
-            className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
-              subRole === 'supervisor'
-                ? 'bg-amber-600 text-white shadow-md'
-                : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Supervisor 👑</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setSubRole('atencion'); setSelectedAppForCheck(null); }}
-            className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
-              subRole === 'atencion'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <CheckSquare className="w-4 h-4" />
-            <span>Atención (Entrada) 📋</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setSubRole('cubiculo'); setSelectedAppForCheck(null); }}
-            className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
-              subRole === 'cubiculo'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Cubículo (Ticket) 🖥️</span>
-          </button>
+      ) : (
+        <div className="bg-gradient-to-r from-amber-600/10 via-amber-700/10 to-amber-900/10 border border-amber-500/20 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-600/20 text-amber-400 rounded-lg">
+              {currentRole === 'extranjeria_supervisor' ? (
+                <Users className="w-5 h-5 text-amber-400" />
+              ) : currentRole === 'extranjeria_atencion' ? (
+                <CheckSquare className="w-5 h-5 text-amber-400" />
+              ) : (
+                <Building2 className="w-5 h-5 text-amber-400" />
+              )}
+            </div>
+            <div className="text-left">
+              <p className="text-[11px] font-black leading-none text-white uppercase tracking-wider select-none">
+                {currentRole === 'extranjeria_supervisor' ? 'SALA DE SUPERVISIÓN DE EXTRANJERÍA (FIJO)' : currentRole === 'extranjeria_atencion' ? 'ESTACIÓN DE ATENCIÓN DE EXTRANJERÍA - ENTRADA (FIJO)' : 'MÓDULO DE ATENCIÓN EN CUBÍCULO - EMISIÓN DE TICKETS (FIJO)'}
+              </p>
+              <p className="text-xs text-slate-405 leading-normal max-w-xl mt-1 text-slate-400">
+                Su usuario ha sido configurado con permisos estrictos de acceso. Toda la actividad de emisión, registros de firmas, habilitación de casilleros y descargas de reportes se asocia con su clave de estación de forma segura.
+              </p>
+            </div>
+          </div>
+          <div className="bg-amber-500/20 px-3 py-1.5 border border-amber-500/30 rounded-lg text-amber-400 font-mono text-[10px] uppercase font-bold tracking-wider select-none shrink-0 self-start md:self-auto">
+            🔴 Estación Activa
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Banner de Estado de Procedimientos */}
       {statusMessage.text && (
@@ -872,80 +910,82 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
               </div>
 
               {/* TIMING CONFIGURATOR */}
-              <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-amber-500" />
-                  <span>Control Horarios & Cupos</span>
-                </h4>
-                <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                  Modifique los cupos por slot y el intervalo hábil oficial para trámites migratorios.
-                </p>
+              {currentRole === 'super' && (
+                <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <span>Control Horarios & Cupos</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                    Modifique los cupos por slot y el intervalo hábil oficial para trámites migratorios.
+                  </p>
 
-                <form onSubmit={promptSaveConfig} className="space-y-4 pt-1">
-                  <div className="space-y-1 text-left">
-                    <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Capacidad por Intervalo (Slots)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={capacidad}
-                      onChange={(e) => setCapacidad(parseInt(e.target.value, 10) || 1)}
-                      className="w-full bg-slate-900 border border-slate-750 text-white p-2.5 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono font-bold"
-                    />
-                  </div>
+                  <form onSubmit={promptSaveConfig} className="space-y-4 pt-1">
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Capacidad por Intervalo (Slots)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={capacidad}
+                        onChange={(e) => setCapacidad(parseInt(e.target.value, 10) || 1)}
+                        className="w-full bg-slate-900 border border-slate-750 text-white p-2.5 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono font-bold"
+                      />
+                    </div>
 
-                  <div className="space-y-1 text-left">
-                    <label className="text-[9px] font-extrabold uppercase text-slate-440 block">Intervalo de Duración</label>
-                    <select
-                      value={intervalo}
-                      onChange={(e) => setIntervalo(parseInt(e.target.value, 10))}
-                      className="w-full bg-slate-900 border border-slate-755 text-white p-2.5 rounded text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-extrabold uppercase text-slate-440 block">Intervalo de Duración</label>
+                      <select
+                        value={intervalo}
+                        onChange={(e) => setIntervalo(parseInt(e.target.value, 10))}
+                        className="w-full bg-slate-900 border border-slate-755 text-white p-2.5 rounded text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                      >
+                        <option value="10">10 minutos</option>
+                        <option value="15">15 minutos</option>
+                        <option value="20">20 minutos</option>
+                        <option value="30">30 minutos</option>
+                        <option value="60">60 minutos</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3.5">
+                      <div className="space-y-1 text-left">
+                        <label className="text-[9px] font-extrabold uppercase text-slate-440 block">Apertura</label>
+                        <select
+                          value={horaInicio}
+                          onChange={(e) => setHoraInicio(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
+                        >
+                          {SELECT_TIMES_OPTIONS.map(time => (
+                            <option key={`start-${time}`} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1 text-left">
+                        <label className="text-[9px] font-extrabold uppercase text-slate-440 block">Cierre</label>
+                        <select
+                          value={horaFin}
+                          onChange={(e) => setHoraFin(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
+                        >
+                          {SELECT_TIMES_OPTIONS.map(time => (
+                            <option key={`end-${time}`} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2.5 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <option value="10">10 minutos</option>
-                      <option value="15">15 minutos</option>
-                      <option value="20">20 minutos</option>
-                      <option value="30">30 minutos</option>
-                      <option value="60">60 minutos</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <div className="space-y-1 text-left">
-                      <label className="text-[9px] font-extrabold uppercase text-slate-440 block">Apertura</label>
-                      <select
-                        value={horaInicio}
-                        onChange={(e) => setHoraInicio(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
-                      >
-                        {SELECT_TIMES_OPTIONS.map(time => (
-                          <option key={`start-${time}`} value={time}>{time}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1 text-left">
-                      <label className="text-[9px] font-extrabold uppercase text-slate-440 block">Cierre</label>
-                      <select
-                        value={horaFin}
-                        onChange={(e) => setHoraFin(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-750 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium"
-                      >
-                        {SELECT_TIMES_OPTIONS.map(time => (
-                          <option key={`end-${time}`} value={time}>{time}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2.5 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5 text-white" />
-                    <span>Aplicar Programación</span>
-                  </button>
-                </form>
-              </div>
+                      <Check className="w-3.5 h-3.5 text-white" />
+                      <span>Aplicar Programación</span>
+                    </button>
+                  </form>
+                </div>
+              )}
 
             </div>
 
@@ -1277,80 +1317,84 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in text-left">
           
           {/* Left panel: Cubicle selection and status indicator */}
-          <div className="lg:col-span-4 space-y-5">
-            <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
-              <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-900">
-                <Building2 className="w-4 h-4 text-indigo-500" />
-                <span>Puesto de Trabajo</span>
-              </h4>
+          {currentRole !== 'extranjeria_cubiculo' && (
+            <div className="lg:col-span-4 space-y-5">
+              <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
+                <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-900">
+                  <Building2 className="w-4 h-4 text-indigo-500" />
+                  <span>Puesto de Trabajo</span>
+                </h4>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Seleccione el Cubículo a Operar:</label>
-                <select
-                  value={selectedCubiculo}
-                  onChange={(e) => setSelectedCubiculo(parseInt(e.target.value, 10))}
-                  className="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded text-xs p-3.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-black cursor-pointer"
-                >
-                  {booths.map(b => (
-                    <option key={`cubiculo-view-opt-${b.id}`} value={b.id}>
-                      {b.name} {b.active ? ' (ACTIVO)' : ' (INACTIVO)'} - {b.staff}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Seleccione el Cubículo a Operar:</label>
+                  <select
+                    value={selectedCubiculo}
+                    onChange={(e) => setSelectedCubiculo(parseInt(e.target.value, 10))}
+                    className="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded text-xs p-3.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-black cursor-pointer"
+                  >
+                    {booths.map(b => (
+                      <option key={`cubiculo-view-opt-${b.id}`} value={b.id}>
+                        {b.name} {b.active ? ' (ACTIVO)' : ' (INACTIVO)'} - {b.staff}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status display for booth */}
+                {(() => {
+                  const b = booths.find(x => x.id === selectedCubiculo);
+                  return (
+                    <div className="bg-slate-900 p-3.5 rounded border border-slate-850 space-y-2.5">
+                      <span className="text-[9.5px] font-black text-slate-450 uppercase block tracking-widest font-mono">Estado del Casillero</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-white uppercase">{b?.name}</span>
+                        <span className={`text-[8.5px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                          b?.active 
+                            ? 'bg-emerald-950/80 border-emerald-900 text-emerald-400' 
+                            : 'bg-slate-950 border-slate-800 text-slate-500'
+                        }`}>
+                          {b?.active ? 'Estación Activa' : 'Estación Cerrada'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                        Operador asignado: <strong className="text-slate-200">{b?.staff}</strong>
+                        {!b?.active && (
+                          <p className="text-[9px] text-amber-500 mt-2 font-bold leading-normal">
+                            ⚠️ ATENCIÓN: Este casillero figura desactivado por el Supervisor. Cámbiese de cubículo o pida al Supervisor que lo active.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* Status display for booth */}
-              {(() => {
-                const b = booths.find(x => x.id === selectedCubiculo);
-                return (
-                  <div className="bg-slate-900 p-3.5 rounded border border-slate-850 space-y-2.5">
-                    <span className="text-[9.5px] font-black text-slate-450 uppercase block tracking-widest font-mono">Estado del Casillero</span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-white uppercase">{b?.name}</span>
-                      <span className={`text-[8.5px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
-                        b?.active 
-                          ? 'bg-emerald-950/80 border-emerald-900 text-emerald-400' 
-                          : 'bg-slate-950 border-slate-800 text-slate-500'
-                      }`}>
-                        {b?.active ? 'Estación Activa' : 'Estación Cerrada'}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 leading-relaxed font-semibold">
-                      Operador asignado: <strong className="text-slate-200">{b?.staff}</strong>
-                      {!b?.active && (
-                        <p className="text-[9px] text-amber-500 mt-2 font-bold leading-normal">
-                          ⚠️ ATENCIÓN: Este casillero figura desactivado por el Supervisor. Cámbiese de cubículo o pida al Supervisor que lo active.
-                        </p>
-                      )}
-                    </div>
+              {/* QUICK STATS FOR ACTIVE CUBICLE */}
+              <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-3.5 shadow-xl">
+                <span className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Eficiencia del Operador</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-900 p-3 rounded border border-slate-850 text-center">
+                    <span className="text-[8px] text-slate-450 uppercase font-black block">Atendidos Hoy</span>
+                    <span className="text-xl font-mono font-black text-indigo-400">
+                      {appointments.filter(app => {
+                        const meta = appMetadata[app.id];
+                        return meta && meta.assignedCubiculo === selectedCubiculo && meta.estadoTicket === 'realizada';
+                      }).length}
+                    </span>
                   </div>
-                );
-              })()}
-            </div>
-
-            {/* QUICK STATS FOR ACTIVE CUBICLE */}
-            <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-3.5 shadow-xl">
-              <span className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Eficiencia del Operador</span>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-900 p-3 rounded border border-slate-850 text-center">
-                  <span className="text-[8px] text-slate-450 uppercase font-black block">Atendidos Hoy</span>
-                  <span className="text-xl font-mono font-black text-indigo-400">
-                    {appointments.filter(app => {
-                      const meta = appMetadata[app.id];
-                      return meta && meta.assignedCubiculo === selectedCubiculo && meta.estadoTicket === 'realizada';
-                    }).length}
-                  </span>
-                </div>
-                <div className="bg-slate-900 p-3 rounded border border-slate-850 text-center">
-                  <span className="text-[8px] text-slate-450 uppercase font-black block">Tránsito</span>
-                  <span className="text-xl font-mono font-black text-white">Normal</span>
+                  <div className="bg-slate-900 p-3 rounded border border-slate-850 text-center">
+                    <span className="text-[8px] text-slate-450 uppercase font-black block">Tránsito</span>
+                    <span className="text-xl font-mono font-black text-white">Normal</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Right panel: queuing and ticket execution */}
-          <div className="lg:col-span-8 bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-5 shadow-xl">
+          <div className={`${
+            currentRole === 'extranjeria_cubiculo' ? 'lg:col-span-12' : 'lg:col-span-8'
+          } bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-5 shadow-xl`}>
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2 pb-3 border-b border-slate-900">
               <span>Ciudadanos Asignados - Cola de Atención de {booths.find(b => b.id === selectedCubiculo)?.name}</span>
               <span className="bg-slate-900 border border-slate-750 text-slate-450 px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono">

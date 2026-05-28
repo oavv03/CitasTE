@@ -729,9 +729,9 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     setCurrentRole(role);
     setIsAdminLoggedIn(true);
     setLoginError('');
-    if (role === 'extranjeria') {
+    if (role.startsWith('extranjeria')) {
       setActiveSubTab('extranjeria');
-    } else if (role === 'pasado_edad') {
+    } else if (role.startsWith('pasado_edad')) {
       setActiveSubTab('pasado_edad' as any);
     } else {
       setActiveSubTab('tabla');
@@ -748,9 +748,9 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       setCurrentRole(foundUser.role);
       setIsAdminLoggedIn(true);
       setLoginError('');
-      if (foundUser.role === 'extranjeria') {
+      if (foundUser.role.startsWith('extranjeria')) {
         setActiveSubTab('extranjeria');
-      } else if (foundUser.role === 'pasado_edad') {
+      } else if (foundUser.role.startsWith('pasado_edad')) {
         setActiveSubTab('pasado_edad' as any);
       } else {
         setActiveSubTab('tabla');
@@ -814,14 +814,14 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
         (cita.servicioCategoria === 'cedulacion' && cita.subServicioId !== 'ced_pasados_edad')
       );
     }
-    if (currentRole === 'extranjeria') {
+    if (currentRole.startsWith('extranjeria')) {
       return citas.filter(cita => 
         cita.servicioCategoria === 'extranjeria' || 
         cita.subServicioId?.includes('extranj') || 
         cita.subServicioId?.startsWith('ext_')
       );
     }
-    if (currentRole === 'pasado_edad') {
+    if (currentRole.startsWith('pasado_edad')) {
       return citas.filter(cita => cita.subServicioId === 'ced_pasados_edad');
     }
     return citas;
@@ -1503,25 +1503,34 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border shadow-sm ${
                currentRole === 'super' 
                  ? 'bg-red-950 text-red-100 border-red-800' 
-                 : currentRole === 'extranjeria'
-                   ? 'bg-amber-955 text-amber-100 border-amber-800'
-                   : currentRole === 'pasado_edad'
+                 : currentRole.startsWith('extranjeria')
+                   ? 'bg-amber-950 text-amber-100 border-amber-800'
+                   : currentRole.startsWith('pasado_edad')
                      ? 'bg-blue-950 text-blue-100 border-blue-800'
                      : 'bg-emerald-950 text-emerald-100 border-emerald-800'
              }`}>
-               Perfil: {currentRole === 'super' ? '⚡ SUPER ADMIN' : currentRole === 'extranjeria' ? '🛂 ADMIN EXTRANJERÍA' : currentRole === 'pasado_edad' ? '🛡️ SEGUIMIENTO PE' : '👤 ADMIN SENCILLO'}
+               Perfil: {
+                 currentRole === 'super' ? '⚡ SUPER ADMIN' : 
+                 currentRole === 'extranjeria_supervisor' ? '👑 SUPERVISOR EXTRANJERÍA' : 
+                 currentRole === 'extranjeria_atencion' ? '📋 ATENCIÓN (ENTRADA) EXTRANJERÍA' : 
+                 currentRole === 'extranjeria_cubiculo' ? '🖥️ CUBÍCULO (TICKET) EXTRANJERÍA' : 
+                 currentRole === 'extranjeria' ? '🛂 ADMIN EXTRANJERÍA' : 
+                 currentRole === 'pasado_edad_supervisor' ? '👑 SUPERVISOR SEGUIMIENTO PE' : 
+                 currentRole === 'pasado_edad_admin' ? '📋 ADMINISTRADOR SEGUIMIENTO PE' : 
+                 currentRole === 'pasado_edad' ? '🛡️ SEGUIMIENTO PE' : '👤 ADMIN SENCILLO'
+               }
              </span>
  
              {/* Quick switcher during simulation */}
              <button
                onClick={() => {
-                 const roles: AdminRole[] = ['sencillo', 'super', 'extranjeria', 'pasado_edad'];
+                 const roles: AdminRole[] = ['sencillo', 'super', 'extranjeria_supervisor', 'extranjeria_atencion', 'extranjeria_cubiculo', 'extranjeria', 'pasado_edad_supervisor', 'pasado_edad_admin', 'pasado_edad'];
                  const nextRole = roles[(roles.indexOf(currentRole) + 1) % roles.length];
                  setCurrentRole(nextRole);
                  setEditingCita(null); // Clear editing to prevent profile mismatch
-                 if (nextRole === 'extranjeria') {
+                 if (nextRole.startsWith('extranjeria')) {
                    setActiveSubTab('extranjeria');
-                 } else if (nextRole === 'pasado_edad') {
+                 } else if (nextRole.startsWith('pasado_edad')) {
                    setActiveSubTab('pasado_edad' as any);
                  } else {
                    setActiveSubTab('tabla');
@@ -1606,7 +1615,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
           
           {/* SIDEBAR TABS */}
           <div className="w-full md:w-52 bg-slate-950 border-r border-slate-800 p-3 flex flex-row md:flex-col gap-1.5 overflow-x-auto md:overflow-x-visible">
-            {currentRole !== 'extranjeria' && currentRole !== 'pasado_edad' && (
+            {!currentRole.startsWith('extranjeria') && !currentRole.startsWith('pasado_edad') && (
               <>
                 <button
                   onClick={() => setActiveSubTab('tabla')}
@@ -1620,33 +1629,37 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                   <span>Gestión de Citas</span>
                 </button>
 
-                <button
-                  onClick={() => setActiveSubTab('horarios')}
-                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                    activeSubTab === 'horarios'
-                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                      : 'text-slate-400 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <Clock className="w-4 h-4 shrink-0" />
-                  <span>Horarios Regionales</span>
-                </button>
+                {currentRole !== 'sencillo' && (
+                  <>
+                    <button
+                      onClick={() => setActiveSubTab('horarios')}
+                      className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                        activeSubTab === 'horarios'
+                          ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                          : 'text-slate-400 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <Clock className="w-4 h-4 shrink-0" />
+                      <span>Horarios Regionales</span>
+                    </button>
 
-                <button
-                  onClick={() => setActiveSubTab('tramites')}
-                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                    activeSubTab === 'tramites'
-                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                      : 'text-slate-400 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <Briefcase className="w-4 h-4 shrink-0" />
-                  <span>Gestión de Trámites</span>
-                </button>
+                    <button
+                      onClick={() => setActiveSubTab('tramites')}
+                      className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                        activeSubTab === 'tramites'
+                          ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
+                          : 'text-slate-400 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <Briefcase className="w-4 h-4 shrink-0" />
+                      <span>Gestión de Trámites</span>
+                    </button>
+                  </>
+                )}
               </>
             )}
 
-            {currentRole !== 'pasado_edad' && (
+            {!currentRole.startsWith('pasado_edad') && currentRole !== 'sencillo' && (
               <button
                 onClick={() => setActiveSubTab('extranjeria')}
                 className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
@@ -1663,7 +1676,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               </button>
             )}
 
-            {(currentRole === 'pasado_edad' || currentRole === 'super') && (
+            {(currentRole.startsWith('pasado_edad') || currentRole === 'super') && (
               <button
                 onClick={() => setActiveSubTab('pasado_edad' as any)}
                 className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
@@ -1677,7 +1690,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               </button>
             )}
 
-            {currentRole !== 'extranjeria' && currentRole !== 'pasado_edad' && (
+            {!currentRole.startsWith('extranjeria') && !currentRole.startsWith('pasado_edad') && (
               <>
                 <button
                   onClick={() => setActiveSubTab('stats')}
@@ -1719,7 +1732,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               </>
             )}
             
-            {currentRole !== 'extranjeria' && currentRole !== 'pasado_edad' && (
+            {!currentRole.startsWith('extranjeria') && !currentRole.startsWith('pasado_edad') && (
               <div className="hidden md:block mt-auto border-t border-slate-800 pt-3">
                 <div className="bg-slate-900 border border-slate-800 p-2.5 rounded text-[10px] text-slate-400 font-mono leading-relaxed space-y-1">
                   <div role="presentation" className="text-slate-350 font-bold border-b border-slate-850 pb-1 flex items-center gap-1.5 uppercase">
@@ -3280,10 +3293,22 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                           onChange={(e) => setUserFormRole(e.target.value as AdminRole)}
                           className="w-full bg-slate-900 border border-slate-750 text-sm text-slate-300 p-2.5 rounded focus:outline-none focus:ring-1 focus:ring-purple-600 cursor-pointer font-bold"
                         >
-                          <option value="extranjeria">🛂 Gestión de Extranjería / Inmigración</option>
-                          <option value="pasado_edad">🛡️ Gestión de Inscripciones Tardías (Pasados de Edad)</option>
-                          <option value="sencillo">👤 Administrador Sencillo (Solo Citas Generales)</option>
+                          {/* 1. Super admin */}
                           <option value="super">⚡ Super Administrador (Control Total del Tribunal)</option>
+                          
+                          {/* 2. Admin sencillo */}
+                          <option value="sencillo">👤 Administrador Sencillo (Solo Citas Generales)</option>
+                          
+                          {/* 3. Extranjerías */}
+                          <option value="extranjeria_supervisor">👑 Supervisor de Extranjería / Inmigración</option>
+                          <option value="extranjeria_atencion">📋 Usuario Extranjería Atención (Entrada)</option>
+                          <option value="extranjeria_cubiculo">🖥️ Usuario Extranjería Cubículo (Ticket)</option>
+                          <option value="extranjeria">🛂 Gestión de Extranjería General</option>
+                          
+                          {/* 4. Inscripciones tardías */}
+                          <option value="pasado_edad_supervisor">👑 Supervisor de Inscripciones Tardías (Pasados de Edad)</option>
+                          <option value="pasado_edad_admin">📋 Corresponsal/Operador de Inscripciones Tardías (Seguimiento PE)</option>
+                          <option value="pasado_edad">🛡️ Gestión de Inscripciones Tardías General</option>
                         </select>
                         <p className="text-[10px] text-slate-500 font-medium leading-normal pt-1">
                           El usuario ingresará con estas credenciales y tendrá restringidas o asignadas las pestañas correspondientes en base a su rol de gestión.
@@ -3359,19 +3384,29 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                                   <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded border ${
                                     u.role === 'super'
                                       ? 'bg-red-950/80 text-red-400 border-red-900/50'
-                                      : u.role === 'extranjeria'
+                                      : u.role === 'extranjeria' || u.role === 'extranjeria_supervisor' || u.role === 'extranjeria_atencion' || u.role === 'extranjeria_cubiculo'
                                         ? 'bg-amber-950/80 text-amber-400 border-amber-900/50'
-                                        : u.role === 'pasado_edad'
+                                        : u.role === 'pasado_edad' || u.role === 'pasado_edad_supervisor' || u.role === 'pasado_edad_admin'
                                           ? 'bg-blue-950/80 text-blue-400 border-blue-900/50'
                                           : 'bg-emerald-950/80 text-emerald-400 border-emerald-900/50'
                                   }`}>
                                     {u.role === 'super' 
                                       ? '⚡ Super Admin' 
-                                      : u.role === 'extranjeria' 
-                                        ? 'Inmigración / Extranjería' 
-                                        : u.role === 'pasado_edad' 
-                                          ? '🛡️ Inscripción Pasado Edad' 
-                                          : '👤 Administrador Sencillo'}
+                                      : u.role === 'extranjeria_supervisor'
+                                        ? '👑 Supervisor Extranjería'
+                                        : u.role === 'extranjeria_atencion'
+                                          ? '📋 Atención Extranjería (Entrada)'
+                                          : u.role === 'extranjeria_cubiculo'
+                                            ? '🖥️ Cubículo Extranjería (Ticket)'
+                                            : u.role === 'extranjeria' 
+                                              ? 'Inmigración / Extranjería' 
+                                              : u.role === 'pasado_edad_supervisor'
+                                                ? '👑 Supervisor Inscripciones Tardías'
+                                                : u.role === 'pasado_edad_admin'
+                                                  ? '📋 Administrador Inscripciones Tardías'
+                                                  : u.role === 'pasado_edad' 
+                                                    ? '🛡️ Inscripción Pasado Edad' 
+                                                    : '👤 Administrador Sencillo'}
                                   </span>
                                 </td>
                                 <td className="p-3.5">

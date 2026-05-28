@@ -46,20 +46,26 @@ export default function TardiaController({
   const isSuperAdmin = currentRole === 'super';
   
   const [activePersona, setActivePersona] = useState<'superit' | 'adminpedad'>(() => {
+    if (currentRole === 'pasado_edad_supervisor') return 'superit';
+    if (currentRole === 'pasado_edad_admin') return 'adminpedad';
     if (luser === 'superit') return 'superit';
     if (luser === 'adminpedad') return 'adminpedad';
     // Fallback or Super Admin select
     return 'superit';
   });
 
-  // Sync activePersona in case activeUsername changes
+  // Sync activePersona in case activeUsername or currentRole changes
   useEffect(() => {
-    if (luser === 'superit') {
+    if (currentRole === 'pasado_edad_supervisor') {
+      setActivePersona('superit');
+    } else if (currentRole === 'pasado_edad_admin') {
+      setActivePersona('adminpedad');
+    } else if (luser === 'superit') {
       setActivePersona('superit');
     } else if (luser === 'adminpedad') {
       setActivePersona('adminpedad');
     }
-  }, [luser]);
+  }, [luser, currentRole]);
 
   // STATES FOR REGISTRATION FORM (adminpedad)
   const [expName, setExpName] = useState('');
@@ -629,8 +635,8 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
         </div>
 
         {/* Dynamic simulator trigger for testing and admin users */}
-        {(isSuperAdmin || luser === 'superit' || luser === 'adminpedad') && (
-          <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800 self-stretch sm:self-auto justify-between">
+        {(currentRole === 'super' || currentRole === 'pasado_edad') ? (
+          <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800 self-stretch sm:self-auto justify-between shadow">
             <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider px-2 block">
               Persona Activa:
             </span>
@@ -641,7 +647,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                 className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded transition cursor-pointer flex items-center gap-1.5 ${
                   activePersona === 'superit'
                     ? 'bg-emerald-600 text-white font-extrabold shadow'
-                    : 'text-slate-405 hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <TrendingUp className="w-3.5 h-3.5" />
@@ -653,13 +659,26 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                 className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded transition cursor-pointer flex items-center gap-1.5 ${
                   activePersona === 'adminpedad'
                     ? 'bg-blue-600 text-white font-extrabold shadow'
-                    : 'text-slate-405 hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>adminpedad (Usuario)</span>
               </button>
             </div>
+          </div>
+        ) : (
+          <div className="bg-blue-950/40 px-3.5 py-2 border border-blue-900/50 rounded-lg flex items-center gap-2 text-xs text-blue-400 self-stretch sm:self-auto font-medium select-none shadow">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            </span>
+            <span>
+              Estación Activa: 
+              <strong className="font-extrabold text-blue-300 uppercase tracking-wide ml-1">
+                {currentRole === 'pasado_edad_supervisor' ? '👑 Supervisor General' : '📋 Administrador / Operador'}
+              </strong>
+            </span>
           </div>
         )}
       </div>
@@ -1251,88 +1270,90 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
           </div>
 
           {/* SCHEDULE MANAGEMENT FORM */}
-          <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-xl">
-            <div className="border-b border-slate-900 pb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-500" />
-                <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">
-                  Control de Horarios y Cupos (Inscripción Tardía)
-                </h4>
+          {currentRole === 'super' && (
+            <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-xl">
+              <div className="border-b border-slate-900 pb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-500" />
+                  <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">
+                    Control de Horarios y Cupos (Inscripción Tardía)
+                  </h4>
+                </div>
+                <span className="text-[9px] bg-blue-950 text-blue-400 border border-blue-900/60 px-2 py-0.5 rounded font-bold uppercase">
+                  Planificación Activa: {tardiaCapacidadTotal} Citas por día
+                </span>
               </div>
-              <span className="text-[9px] bg-blue-950 text-blue-400 border border-blue-900/60 px-2 py-0.5 rounded font-bold uppercase">
-                Planificación Activa: {tardiaCapacidadTotal} Citas por día
-              </span>
+              <p className="text-[11px] text-slate-400 font-medium leading-relaxed font-sans">
+                Personalice los límites operativos, intervalos de reunión, hora de apertura, hora de cierre de la agenda para trámites de cédulas para ciudadanos Pasados de Edad. Standard: 4 citas por día de 8:00 AM a 11:30 AM con lapso de 30 min.
+              </p>
+
+              <form onSubmit={promptSaveTardiaConfig} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end pt-1">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Cupo Máximo Diario (Citas/Día)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={tardiaCapacidadTotal}
+                    onChange={(e) => setTardiaCapacidadTotal(parseInt(e.target.value, 10) || 1)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Intervalo de Cita (Minutos)</label>
+                  <select
+                    value={tardiaIntervalo}
+                    onChange={(e) => setTardiaIntervalo(parseInt(e.target.value, 10))}
+                    className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-semibold"
+                  >
+                    <option value="10">10 minutos</option>
+                    <option value="15">15 minutos</option>
+                    <option value="20">20 minutos</option>
+                    <option value="30">30 minutos</option>
+                    <option value="45">45 minutos</option>
+                    <option value="60">60 minutos</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Hora Apertura (Inicio)</label>
+                  <select
+                    value={tardiaHoraInicio}
+                    onChange={(e) => setTardiaHoraInicio(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium text-slate-200 font-mono"
+                  >
+                    {['07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM'].map(time => (
+                      <option key={`tardia-start-${time}`} value={time}>{time}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-455 block">Hora Cierre (Límite)</label>
+                  <select
+                    value={tardiaHoraFin}
+                    onChange={(e) => setTardiaHoraFin(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium text-slate-201 font-mono"
+                  >
+                    {['11:00 AM', '11:15 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'].map(time => (
+                      <option key={`tardia-end-${time}`} value={time}>{time}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-4 flex justify-end">
+                  <button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2 py-5 px-6 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5 text-white" />
+                    <span>Guardar Planificación Tardía</span>
+                  </button>
+                </div>
+              </form>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium leading-relaxed font-sans">
-              Personalice los límites operativos, intervalos de reunión, hora de apertura, hora de cierre de la agenda para trámites de cédulas para ciudadanos Pasados de Edad. Standard: 4 citas por día de 8:00 AM a 11:30 AM con lapso de 30 min.
-            </p>
-
-            <form onSubmit={promptSaveTardiaConfig} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end pt-1">
-              <div className="space-y-1">
-                <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Cupo Máximo Diario (Citas/Día)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={tardiaCapacidadTotal}
-                  onChange={(e) => setTardiaCapacidadTotal(parseInt(e.target.value, 10) || 1)}
-                  className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Intervalo de Cita (Minutos)</label>
-                <select
-                  value={tardiaIntervalo}
-                  onChange={(e) => setTardiaIntervalo(parseInt(e.target.value, 10))}
-                  className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-semibold"
-                >
-                  <option value="10">10 minutos</option>
-                  <option value="15">15 minutos</option>
-                  <option value="20">20 minutos</option>
-                  <option value="30">30 minutos</option>
-                  <option value="45">45 minutos</option>
-                  <option value="60">60 minutos</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-extrabold uppercase text-slate-450 block">Hora Apertura (Inicio)</label>
-                <select
-                  value={tardiaHoraInicio}
-                  onChange={(e) => setTardiaHoraInicio(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium text-slate-200 font-mono"
-                >
-                  {['07:00 AM', '07:30 AM', '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM'].map(time => (
-                    <option key={`tardia-start-${time}`} value={time}>{time}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-extrabold uppercase text-slate-455 block">Hora Cierre (Límite)</label>
-                <select
-                  value={tardiaHoraFin}
-                  onChange={(e) => setTardiaHoraFin(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded text-xs cursor-pointer focus:outline-none font-medium text-slate-201 font-mono"
-                >
-                  {['11:00 AM', '11:15 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'].map(time => (
-                    <option key={`tardia-end-${time}`} value={time}>{time}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sm:col-span-4 flex justify-end">
-                <button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2 py-5 px-6 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Check className="w-3.5 h-3.5 text-white" />
-                  <span>Guardar Planificación Tardía</span>
-                </button>
-              </div>
-            </form>
-          </div>
+          )}
 
           {/* CONFIRMATION TIMING MODAL */}
           {showConfirmTardiaSave && (
