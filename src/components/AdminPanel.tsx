@@ -1515,9 +1515,9 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                  currentRole === 'extranjeria_atencion' ? '📋 ATENCIÓN (ENTRADA) EXTRANJERÍA' : 
                  currentRole === 'extranjeria_cubiculo' ? '🖥️ CUBÍCULO (TICKET) EXTRANJERÍA' : 
                  currentRole === 'extranjeria' ? '🛂 ADMIN EXTRANJERÍA' : 
-                 currentRole === 'pasado_edad_supervisor' ? '👑 SUPERVISOR SEGUIMIENTO PE' : 
-                 currentRole === 'pasado_edad_admin' ? '📋 ADMINISTRADOR SEGUIMIENTO PE' : 
-                 currentRole === 'pasado_edad' ? '🛡️ SEGUIMIENTO PE' : '👤 ADMIN SENCILLO'
+                 currentRole === 'pasado_edad_supervisor' ? '👑 SUPERVISOR SEGUIMIENTO IT' : 
+                 currentRole === 'pasado_edad_admin' ? '📋 OPERADOR SEGUIMIENTO IT' : 
+                 currentRole === 'pasado_edad' ? '🛡️ ADMINISTRADOR IT' : '👤 ADMIN SENCILLO'
                }
              </span>
  
@@ -1608,6 +1608,50 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               Iniciar sesión institucional
             </button>
           </form>
+
+          {/* QUICK-ACCESS TEST LOGIN HUBS */}
+          <div className="w-full space-y-3 text-center">
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">
+              Accesos Directos para Pruebas de Roles de Extranjería:
+            </span>
+            <div className="grid grid-cols-2 gap-2 text-left">
+              <button
+                type="button"
+                onClick={() => { setUsername('adminte'); setPassword('Value1234'); }}
+                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
+              >
+                <span className="font-extrabold text-blue-400 block text-[10px]">🎯 SUPER ADMIN</span>
+                <span className="text-[9px] text-slate-400 font-mono">adminte / Value1234</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setUsername('supermigra'); setPassword('1234'); }}
+                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
+              >
+                <span className="font-extrabold text-amber-400 block text-[10px]">👑 SUPERVISOR EXTR.</span>
+                <span className="text-[9px] text-slate-400 font-mono">supermigra / 1234</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setUsername('atencionmigra'); setPassword('1234'); }}
+                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
+              >
+                <span className="font-extrabold text-teal-400 block text-[10px]">📋 ATENCIÓN ENTRADA</span>
+                <span className="text-[9px] text-slate-400 font-mono">atencionmigra / 1234</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setUsername('cubiculomigra'); setPassword('1234'); }}
+                className="bg-slate-950 hover:bg-slate-900 border border-slate-850 p-2.5 rounded text-xs transition text-left cursor-pointer flex flex-col justify-between"
+              >
+                <span className="font-extrabold text-violet-400 block text-[10px]">🖥️ CUBÍCULO (TICKET)</span>
+                <span className="text-[9px] text-slate-400 font-mono">cubiculomigra / 1234</span>
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         /* MAIN ADMIN INTERFACE */
@@ -1715,21 +1759,22 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                   <Settings className="w-4 h-4 shrink-0" />
                   <span>Configuración</span>
                 </button>
-
-                {currentRole === 'super' && (
-                  <button
-                    onClick={() => setActiveSubTab('usuarios' as any)}
-                    className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                      activeSubTab === ('usuarios' as any)
-                        ? 'bg-purple-600/15 text-purple-400 border border-purple-500/30'
-                        : 'text-slate-400 hover:text-white border border-transparent'
-                    }`}
-                  >
-                    <Users className="w-4 h-4 shrink-0 text-purple-400" />
-                    <span>Gestión Usuarios</span>
-                  </button>
-                )}
               </>
+            )}
+
+            {currentRole === 'super' && (
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('usuarios' as any)}
+                className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                  activeSubTab === ('usuarios' as any)
+                    ? 'bg-purple-600/15 text-purple-400 border border-purple-500/30'
+                    : 'text-slate-400 hover:text-white border border-transparent'
+                }`}
+              >
+                <Users className="w-4 h-4 shrink-0 text-purple-400" />
+                <span>Gestión Usuarios</span>
+              </button>
             )}
             
             {!currentRole.startsWith('extranjeria') && !currentRole.startsWith('pasado_edad') && (
@@ -3307,8 +3352,8 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                           
                           {/* 4. Inscripciones tardías */}
                           <option value="pasado_edad_supervisor">👑 Supervisor de Inscripciones Tardías (Pasados de Edad)</option>
-                          <option value="pasado_edad_admin">📋 Corresponsal/Operador de Inscripciones Tardías (Seguimiento PE)</option>
-                          <option value="pasado_edad">🛡️ Gestión de Inscripciones Tardías General</option>
+                          <option value="pasado_edad_admin">📋 Operador Seguimiento IT</option>
+                          <option value="pasado_edad">🛡️ Administrador IT</option>
                         </select>
                         <p className="text-[10px] text-slate-500 font-medium leading-normal pt-1">
                           El usuario ingresará con estas credenciales y tendrá restringidas o asignadas las pestañas correspondientes en base a su rol de gestión.
@@ -3403,9 +3448,9 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                                               : u.role === 'pasado_edad_supervisor'
                                                 ? '👑 Supervisor Inscripciones Tardías'
                                                 : u.role === 'pasado_edad_admin'
-                                                  ? '📋 Administrador Inscripciones Tardías'
+                                                  ? '📋 Operador Seguimiento IT'
                                                   : u.role === 'pasado_edad' 
-                                                    ? '🛡️ Inscripción Pasado Edad' 
+                                                    ? '🛡️ Administrador IT' 
                                                     : '👤 Administrador Sencillo'}
                                   </span>
                                 </td>

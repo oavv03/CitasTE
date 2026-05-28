@@ -17,7 +17,7 @@ const USERS_DB_PATH = path.join(process.cwd(), "users-db.json");
 interface ServerUser {
   username: string;
   password?: string;
-  role: 'sencillo' | 'super' | 'extranjeria' | 'pasado_edad';
+  role: 'sencillo' | 'super' | 'extranjeria' | 'pasado_edad' | 'extranjeria_supervisor' | 'extranjeria_atencion' | 'extranjeria_cubiculo' | 'pasado_edad_supervisor' | 'pasado_edad_admin';
   nombre: string;
   fechaCreacion: string;
 }
@@ -57,6 +57,27 @@ const DEFAULT_USERS: ServerUser[] = [
     "role": "pasado_edad",
     "nombre": "SuperIT - Supervisor Inscripción Tardía",
     "fechaCreacion": "2026-05-27T19:27:00Z"
+  },
+  {
+    "username": "supermigra",
+    "password": "1234",
+    "role": "extranjeria_supervisor",
+    "nombre": "Supervisor de Extranjería",
+    "fechaCreacion": "2026-05-28T18:13:00Z"
+  },
+  {
+    "username": "atencionmigra",
+    "password": "1234",
+    "role": "extranjeria_atencion",
+    "nombre": "Atendimiento Entrada Extranjería",
+    "fechaCreacion": "2026-05-28T18:13:00Z"
+  },
+  {
+    "username": "cubiculomigra",
+    "password": "1234",
+    "role": "extranjeria_cubiculo",
+    "nombre": "Cubículo Ticket Extranjería",
+    "fechaCreacion": "2026-05-28T18:13:00Z"
   }
 ];
 
@@ -67,7 +88,19 @@ function getUsers(): ServerUser[] {
       return DEFAULT_USERS;
     }
     const data = fs.readFileSync(USERS_DB_PATH, "utf8");
-    return JSON.parse(data);
+    const currentUsers = JSON.parse(data);
+    let mutated = false;
+    DEFAULT_USERS.forEach((defUser) => {
+      const exists = currentUsers.some((u: any) => u.username.toLowerCase() === defUser.username.toLowerCase());
+      if (!exists) {
+        currentUsers.push(defUser);
+        mutated = true;
+      }
+    });
+    if (mutated) {
+      fs.writeFileSync(USERS_DB_PATH, JSON.stringify(currentUsers, null, 2), "utf8");
+    }
+    return currentUsers;
   } catch (error) {
     console.error("Error reading users DB:", error);
   }

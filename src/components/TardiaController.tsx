@@ -676,7 +676,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
             <span>
               Estación Activa: 
               <strong className="font-extrabold text-blue-300 uppercase tracking-wide ml-1">
-                {currentRole === 'pasado_edad_supervisor' ? '👑 Supervisor General' : '📋 Administrador / Operador'}
+                {currentRole === 'pasado_edad_supervisor' ? '👑 Supervisor General' : currentRole === 'pasado_edad_admin' ? '📋 Operador Seguimiento IT' : '🛡️ Administrador IT'}
               </strong>
             </span>
           </div>

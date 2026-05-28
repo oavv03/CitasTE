@@ -33,5 +33,26 @@
     "role": "pasado_edad",
     "nombre": "SuperIT - Supervisor Inscripción Tardía",
     "fechaCreacion": "2026-05-27T19:27:00Z"
+  },
+  {
+    "username": "supermigra",
+    "password": "1234",
+    "role": "extranjeria_supervisor",
+    "nombre": "Supervisor de Extranjería",
+    "fechaCreacion": "2026-05-28T18:13:00Z"
+  },
+  {
+    "username": "atencionmigra",
+    "password": "1234",
+    "role": "extranjeria_atencion",
+    "nombre": "Atendimiento Entrada Extranjería",
+    "fechaCreacion": "2026-05-28T18:13:00Z"
+  },
+  {
+    "username": "cubiculomigra",
+    "password": "1234",
+    "role": "extranjeria_cubiculo",
+    "nombre": "Cubículo Ticket Extranjería",
+    "fechaCreacion": "2026-05-28T18:13:00Z"
   }
 ]
