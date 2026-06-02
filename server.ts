@@ -53,16 +53,25 @@ async function sendOutlookEmail(to: string, subject: string, html: string) {
     throw new Error("Outlook no está configurado (falta OUTLOOK_USER o OUTLOOK_PASS)");
   }
 
+  const host = process.env.OUTLOOK_HOST || "smtp.office365.com";
+  const port = parseInt(process.env.OUTLOOK_PORT || "587");
+  const isSecure = port === 465;
+
   const transporter = nodemailer.createTransport({
-    host: process.env.OUTLOOK_HOST || "smtp.office365.com",
-    port: parseInt(process.env.OUTLOOK_PORT || "587"),
-    secure: false, // Port 587 is STARTTLS, meaning secure should be false initially
+    host: host,
+    port: port,
+    secure: isSecure, // true only for port 465, false for 587/all others
     auth: {
       user: outlookUser,
       pass: outlookPass
     },
+    connectionTimeout: 10000, // 10s connection timeout for fast failover diagnostics on port blocks
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+    requireTLS: port === 587, // enforce STARTTLS upgrades for standard Outlook TLS ports
     tls: {
-      ciphers: "SSLv3",
+      // Modern Node.js versions (such as 18/20 on Vercel) deprecate and disable SSLv3 entirely inside OpenSSL.
+      // Removing 'ciphers: "SSLv3"' ensures modern TLS protocol negotiation (TLS 1.2/1.3) works seamlessly.
       rejectUnauthorized: false
     }
   });
@@ -1430,9 +1439,30 @@ async function startServer() {
           });
         } catch (error: any) {
           console.error("[Email Service] Outlook sending error:", error);
+          
+          let diagnosticMessage = `Error al enviar correo por Outlook: ${error.message || error}. Asegúrese de que su usuario y contraseña o clave de aplicación de Outlook sean válidos.`;
+          
+          const errMsg = (error.message || "").toString();
+          const errCode = (error.code || "").toString();
+          
+          if (errMsg.includes("535") || errCode === "EAUTH" || errMsg.toLowerCase().includes("authentication unsuccessful") || errMsg.toLowerCase().includes("login") || errMsg.toLowerCase().includes("username and password not accepted")) {
+            diagnosticMessage = `Error de Autenticación SMTP (Código 535) con el servidor de Outlook.\n\n` +
+              `Razones comunes y cómo resolverlo:\n` +
+              `1. Verificación en Dos Pasos (MFA / 2FA): Si su correo de Outlook tiene activada la autenticación multifactor, NO puede utilizar su contraseña normal. Debe ingresar a su panel de seguridad de Microsoft y crear una "Contraseña de aplicación" (App Password) de 16 caracteres, y configurar esa clave especial en la variable OUTLOOK_PASS en Vercel.\n` +
+              `2. Registro de SMTP AUTH Deshabilitado en Office 365: Microsoft inhabilita "SMTP AUTH" por defecto en cuentas de Office 365 de empresas/colegios debido a políticas de seguridad modernas. Debe solicitar al administrador de su sistema que habilite "SMTP Autenticado" (SMTP AUTH) en la configuración de Correo de su usuario específico dentro del Centro de administración de Microsoft 365 (Usuarios -> Usuarios Activos -> Haga clic en su usuario -> Pestaña Correo -> Administrar aplicaciones de correo electrónico -> Active "SMTP Autenticado").`;
+          } else if (errCode === "ETIMEDOUT" || errCode === "ECONNREFUSED" || errCode === "ENOTFOUND" || errMsg.toLowerCase().includes("timeout") || errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("socket")) {
+            const currentHost = process.env.OUTLOOK_HOST || "smtp.office365.com";
+            const currentPort = process.env.OUTLOOK_PORT || "587";
+            diagnosticMessage = `Error de Conexión de Red SMTP (Timeout o Conexión Rechazada) al intentar conectar con ${currentHost}:${currentPort}.\n\n` +
+              `Los proveedores de host cloud (como Vercel, AWS Lambda, Heroku, etc.) bloquean por completo las conexiones salientes por puerto 587 o 25 para evitar el spam de correo.\n\n` +
+              `Soluciones recomendadas:\n` +
+              `1. Pruebe cambiando el puerto a 465 (SMTPS) y configure la variable OUTLOOK_PORT = 465 en Vercel, lo que iniciará una conexión segura desde un puerto que a veces no está bloqueado.\n` +
+              `2. Se recomienda encarecidamente utilizar servicios de email por API HTTP (como Resend, SendGrid o Mailgun) que transmiten los correos de manera confiable en plataformas serverless sin usar el protocolo de puertos SMTP tradicionales.`;
+          }
+
           return res.status(400).json({ 
             success: false, 
-            error: `Error al enviar correo por Outlook: ${error.message || error}. Asegúrese de que su usuario y contraseña o clave de aplicación de Outlook sean válidos.`,
+            error: diagnosticMessage,
             errorType: "smtp_error",
             simulated: false,
             htmlPreview: htmlContent

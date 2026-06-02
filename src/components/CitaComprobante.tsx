@@ -537,7 +537,7 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
             {isSimulated && (
               <>
                 <p className="font-bold text-[10px] text-amber-700 leading-normal pl-5 uppercase">
-                  (Nota: El servidor está operando en Modo Demostración sin claves. Para efectuar entregas reales a cualquier bandeja, configure la variable RESEND_API_KEY en los secretos).
+                  (Nota: El servidor está operando en Modo Demostración sin claves. Para efectuar entregas reales a cualquier bandeja, configure las variables OUTLOOK_USER y OUTLOOK_PASS en los secretos).
                 </p>
                 {confHtmlPreview && (
                   <div className="mt-3.5 pt-3.5 border-t border-emerald-200/50 space-y-3">
@@ -579,7 +579,7 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
                 <AlertCircle className="w-4 h-4 text-red-600" />
                 <span>No se pudo procesar el correo</span>
               </p>
-              <p className="font-medium text-[11.5px] leading-normal text-red-700 pl-5">
+              <p className="font-medium text-[11.5px] leading-normal text-red-700 pl-5 whitespace-pre-line">
                 {emailMessage}
               </p>
             </div>
