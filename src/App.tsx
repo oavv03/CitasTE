@@ -322,71 +322,19 @@ export default function App() {
         <div className="flex-1 bg-white"></div>
       </div>
 
-      {/* Main Corporate Header navbar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm print:hidden">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Logo Oficial del Tribunal Electoral de Panamá */}
-            <div className="flex items-center select-none">
-              <img
-                src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/AGENDATE-01.png"
-                alt="Tribunal Electoral de Panamá"
-                className="h-14 md:h-16 w-auto object-contain"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          </div>
-
-          {/* Core Applet Navigation tabs */}
-          <nav className="flex bg-slate-100 p-1 rounded border border-slate-200" aria-label="Navegación principal">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('agendar');
-                if (currentStep === 4) {
-                  resetFlow();
-                }
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black uppercase tracking-wider transition cursor-pointer ${
-                activeTab === 'agendar'
-                  ? 'bg-white text-blue-950 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <CalendarCheck2 className="w-3.5 h-3.5 text-blue-700" />
-              <span className="hidden sm:inline">Agendar Cita</span>
-              <span className="inline sm:hidden">Agendar</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('mis-citas')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black uppercase tracking-wider transition cursor-pointer ${
-                activeTab === 'mis-citas'
-                  ? 'bg-white text-blue-950 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5 text-blue-700" />
-              <span className="hidden sm:inline">Mis Citas</span>
-              <span className="inline sm:hidden">Mis Citas</span>
-              {citasList.length > 0 && (
-                <span className="bg-red-600 text-white rounded-full text-[10px] w-4 h-4 flex items-center justify-center font-bold">
-                  {citasList.filter(c => c.estado === 'confirmada').length}
-                </span>
-              )}
-            </button>
-          </nav>
-        </div>
-      </header>
-
       {/* Hero Announcement (Brief Context Panel) */}
-      <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-8 px-4 text-center space-y-2 print:hidden">
-        <h2 className="text-xl md:text-2xl font-extrabold tracking-tight uppercase">
-          Portal de Citas Tecnológicas
-        </h2>
-        <p className="text-xs md:text-sm text-blue-100 max-w-xl mx-auto font-semibold leading-relaxed">
-          Evite filas y programe su atención presencial obligatoria para servicios de Cédula, Registro Civil, Extranjería y Organización Electoral de manera transparente.
-        </p>
+      <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-12 px-6 print:hidden">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 text-center md:text-left">
+          <img
+            src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/Logo-TE-aniversario-256x256px-blanco-02.png"
+            alt="Tribunal Electoral de Panamá"
+            className="h-40 md:h-52 w-auto object-contain shrink-0"
+            referrerPolicy="no-referrer"
+          />
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight max-w-xl leading-tight">
+            Bienvenido a el Portal de citas del Tribunal Electoral
+          </h2>
+        </div>
       </section>
 
       {/* Main content body with Side informational columns or Full-width Admin Panel */}
