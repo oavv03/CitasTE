@@ -822,7 +822,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
               id="num_seg_id"
               value={numeroSeguimiento}
               onChange={(e) => setNumeroSeguimiento(e.target.value)}
-              placeholder="Ej: EXP-2026-TE-84729"
+              placeholder="Ej: Nº26-847-293"
               className={`h-11 w-full bg-slate-50 border ${
                 errors.numeroSeguimiento ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
               } rounded px-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition font-mono`}

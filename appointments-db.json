@@ -1,0 +1,62 @@
+[
+  {
+    "id": "TE-1780061308550",
+    "correo": "oscargave3003@gmail.com",
+    "codigoTransaccion": "2605-VNEM5E",
+    "categoriaNombre": "extranjeria",
+    "subServicioNombre": "ext_primera_vez",
+    "subServicioId": "ext_primera_vez",
+    "fecha": "2026-05-29",
+    "hora": "07:00 AM",
+    "sucursalNombre": "anc_main",
+    "sucursalDireccion": "",
+    "identificacion": "PA123456",
+    "telefono": "N/A",
+    "requisitos": [],
+    "estado": "confirmada",
+    "fechaCreacion": "2026-05-29T13:28:28.550Z",
+    "nombre": "Carlos Mendoza",
+    "datosPersonales": {
+      "tipoIdentificacion": "Pasaporte",
+      "identificacion": "PA123456",
+      "fechaNacimiento": "1994-08-12",
+      "telefono": "N/A",
+      "correo": "oscargave3003@gmail.com",
+      "nombreCompleto": "Carlos Mendoza",
+      "primerNombre": "Carlos",
+      "primerApellido": "Mendoza",
+      "pasaporte": "PA123456",
+      "nacionalidad": "Venezolana"
+    }
+  },
+  {
+    "id": "TE-1780061352735",
+    "correo": "oscargave3003@gmail.com",
+    "codigoTransaccion": "2606-5JLTAF",
+    "categoriaNombre": "extranjeria",
+    "subServicioNombre": "ext_primera_vez",
+    "subServicioId": "ext_primera_vez",
+    "fecha": "2026-06-01",
+    "hora": "07:15 AM",
+    "sucursalNombre": "anc_main",
+    "sucursalDireccion": "",
+    "identificacion": "PA123456",
+    "telefono": "N/A",
+    "requisitos": [],
+    "estado": "confirmada",
+    "fechaCreacion": "2026-05-29T13:29:12.735Z",
+    "nombre": "Mariana Rodríguez",
+    "datosPersonales": {
+      "tipoIdentificacion": "Pasaporte",
+      "identificacion": "PA123456",
+      "fechaNacimiento": "1995-11-20",
+      "telefono": "N/A",
+      "correo": "oscargave3003@gmail.com",
+      "nombreCompleto": "Mariana Rodríguez",
+      "primerNombre": "Mariana",
+      "primerApellido": "Rodríguez",
+      "pasaporte": "PA123456",
+      "nacionalidad": "Colombiana"
+    }
+  }
+]

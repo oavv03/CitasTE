@@ -153,7 +153,10 @@ export default function TardiaController({
       return;
     }
 
-    const uniqueNumber = `EXP-2026-TE-${Math.floor(100000 + Math.random() * 900000)}`;
+    const part1 = Math.floor(10 + Math.random() * 90);
+    const part2 = Math.floor(100 + Math.random() * 900);
+    const part3 = Math.floor(100 + Math.random() * 900);
+    const uniqueNumber = `Nº${part1}-${part2}-${part3}`;
     
     let base = pasadoEdadLinkBase.trim();
     if (base.endsWith('/')) {
@@ -161,7 +164,7 @@ export default function TardiaController({
     }
     const directLink = `${base}/?tramite=ced_pasados_edad&seguimiento=${uniqueNumber}`;
 
-    const textMessage = `Estimado(a) ${expName.trim()}, el Tribunal Electoral le informa que su expediente de inscripción tardía (Pasado de Edad) ha sido procesado con éxito.
+    const textMessage = `Estimado(a) ${expName.trim()}, el Tribunal Electoral le informa que su expediente de pasados de edad ha sido procesado con éxito.
 
 Su Número de Seguimiento Obligatorio es: *${uniqueNumber}*
 
@@ -242,13 +245,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text('CONSTANCIA OFICIAL PARA CITAS DE INSCRIPCIÓN TARDÍA (PASADO DE EDAD)', 20, currentY);
+    doc.text('CONSTANCIA OFICIAL PARA CITAS DE PASADOS DE EDAD', 20, currentY);
     
     currentY += 9;
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9.5);
     doc.setTextColor(71, 85, 105);
-    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación e inscripción tardía presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: 170 });
+    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación de pasados de edad presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: 170 });
 
     currentY += 15;
 
@@ -314,7 +317,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text('TRIBUNAL ELECTORAL DE PANAMÁ - CONTROL TARDÍAS', 20, currentY);
+    doc.text('TRIBUNAL ELECTORAL DE PANAMÁ - CONTROL PASADOS DE EDAD', 20, currentY);
     doc.text('SISTEMA DE ASIGNACIÓN Y SEGUIMIENTO AUTOMATIZADO - VIGENCIA 2026', 100, currentY);
 
     doc.save(`Tracking_${exp.number || exp.id}.pdf`);
@@ -347,7 +350,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       });
       const data = await res.json();
       if (data && data.success) {
-        alert('¡Éxito! Configuración de citas para Inscripción Tardía actualizada y sincronizada en el servidor.');
+        alert('¡Éxito! Configuración de citas para pasados de edad (VID) actualizada y sincronizada en el servidor.');
       } else {
         alert('Configuración guardada localmente, pero falló la sincronización con el servidor.');
       }
@@ -391,8 +394,8 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     });
   }, [allTardiaCitas, searchQuery, statusFilter]);
 
-  // DATE PERIOD CONSOLDIATOR ROUTINES FOR DOWNLOADING "REALIZADAS"
-  // Filter helper for exact period of "realizadas" appointments
+  // DATE PERIOD CONSOLDIATOR ROUTINES FOR DOWNLOADING "REALIZADAS" Y "CONFIRMADAS"
+  // Filter helper for exact period of realized or confirmed appointments
   const getCompletedCitasForPeriod = (period: 'dia' | 'semana' | 'mes' | 'año') => {
     const now = new Date();
     // In our system base environment, let's treat the date 2026-05-27 as "today"
@@ -400,8 +403,8 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     const todayDate = new Date(todayStr + 'T12:00:00');
 
     return allTardiaCitas.filter(c => {
-      // Must be marked as realized (completed)
-      if (c.estado !== 'realizada') return false;
+      // Must be marked as realized (completed) or confirmed (pending/active)
+      if (c.estado !== 'realizada' && c.estado !== 'confirmada' && c.estado !== 'asistire') return false;
 
       try {
         const appointmentDate = new Date(c.fecha + 'T00:00:00');
@@ -466,12 +469,12 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.setFontSize(8.5);
       doc.setFont('Helvetica', 'normal');
       doc.setTextColor(203, 213, 225); // slate-300
-      doc.text('DIRECCIÓN DE CEDULACIÓN — OFICIALÍA ESPECIALIZADA EN INSCRIPCIONES TARDÍAS', 20, 22);
+      doc.text('DIRECCIÓN DE CEDULACIÓN — OFICIALÍA ESPECIALIZADA DE PASADOS DE EDAD (VID)', 20, 22);
 
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(15);
       doc.setTextColor(255, 255, 255);
-      doc.text('REPORTE OFICIAL DE CITAS REALIZADAS', 20, 34);
+      doc.text('REPORTE OFICIAL DE CITAS AUDITADAS (VID)', 20, 34);
 
       let currentY = 58;
 
@@ -485,7 +488,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(71, 85, 105);
-      doc.text(`Constancia firmada para auditar las citas presenciales de inscripción tardía (Pasados de Edad) que han sido marcadas como "Realizadas" con atención cumplida.`, 20, currentY, { maxWidth: 170 });
+      doc.text(`Constancia firmada para auditar las citas presenciales de pasados de edad que han sido marcadas como "Realizadas" o "Confirmadas" en el sistema.`, 20, currentY, { maxWidth: 170 });
 
       currentY += 12;
 
@@ -498,7 +501,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.setTextColor(15, 23, 42);
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(10);
-      doc.text(`CANTIDAD TOTAL DE CITAS REALIZADAS ENCONTRADAS: `, 26, currentY + 10);
+      doc.text(`CANTIDAD TOTAL DE CITAS ENCONTRADAS (VID): `, 26, currentY + 10);
       doc.setFontSize(11);
       doc.setTextColor(5, 150, 105); // emerald-600
       doc.text(`${records.length} Citas`, 160, currentY + 10);
@@ -549,8 +552,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
           doc.text(sTruncated, 137, currentY + 6);
           
           doc.setFont('Helvetica', 'bold');
-          doc.setTextColor(5, 150, 105);
-          doc.text('REALIZADA', 172, currentY + 6);
+          if (rec.estado === 'realizada') {
+            doc.setTextColor(5, 150, 105);
+            doc.text('REALIZADA', 172, currentY + 6);
+          } else {
+            doc.setTextColor(29, 78, 216); // Blue
+            doc.text('CONFIRMADA', 172, currentY + 6);
+          }
           doc.setTextColor(51, 65, 85);
           
           currentY += 9;
@@ -574,7 +582,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.text(`Id Auditoría: SEGUIMIENTO-PE-2026`, 22, currentY + 9);
       doc.text(`Fecha Impresión: ${new Date().toISOString()}`, 122, currentY + 9);
 
-      doc.save(`Citas_Realizadas_Tardia_${period}.pdf`);
+      doc.save(`Reporte_Citas_VID_${period}.pdf`);
       setExportLoading(null);
     }, 600);
   };
@@ -606,7 +614,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Citas_Realizadas_Tardia_${period}.csv`);
+    link.setAttribute("download", `Reporte_Citas_VID_${period}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -623,7 +631,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
           </div>
           <div>
             <h3 className="text-white text-sm font-black uppercase tracking-wider flex items-center gap-2">
-              <span>Módulo Inscripción Tardía</span>
+              <span>Módulo Verificación de Identidad (VID)</span>
               <span className="bg-blue-600/20 text-blue-300 border border-blue-700 text-[9px] px-2 py-0.5 rounded-full font-extrabold uppercase">
                 Pasados De Edad
               </span>
@@ -691,7 +699,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             
             <div className="bg-slate-950/80 p-5 rounded-lg border border-slate-850 shadow-lg flex flex-col justify-between">
-              <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-450 block">Inscritos Totales</span>
+              <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-450 block">Total de citas</span>
               <div className="flex items-end justify-between mt-2.5">
                 <span className="text-2xl font-black font-mono tracking-tight text-white">{stats.total}</span>
                 <span className="text-[9px] text-blue-400 bg-blue-950/50 px-1.5 py-0.5 rounded border border-blue-900/40">Citas</span>
@@ -724,17 +732,17 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
 
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          <div className="flex flex-col gap-6">
             
             {/* LEFT: DOWNLOAD REPORTS FOR COMPLETED CITAS BY PERIOD */}
-            <div className="xl:col-span-5 bg-slate-950 p-5 rounded-xl border border-slate-850 shadow-xl space-y-4">
+            <div className="w-full bg-slate-950 p-5 rounded-xl border border-slate-850 shadow-xl space-y-4 order-2">
               <div className="border-b border-slate-900 pb-3">
                 <h4 className="text-xs font-black uppercase text-slate-350 tracking-wider flex items-center gap-2">
                   <Download className="w-4 h-4 text-emerald-500" />
                   Consolidado de Descargas (Citas Realizadas)
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  Consulte y descargue instantáneamente las citas de Inscripción Tardía realizadas. Los reportes están disponibles en formato PDF oficial firmado o CSV estructurado.
+                  Consulte y descargue instantáneamente las citas de pasados de edad realizadas y confirmadas. Los reportes están disponibles en formato PDF oficial firmado o CSV estructurado.
                 </p>
               </div>
 
@@ -870,13 +878,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
             </div>
 
             {/* RIGHT: COMPREHENSIVE VIEW & SUPERVISORY LIST SEARCH */}
-            <div className="xl:col-span-7 bg-slate-950 rounded-xl border border-slate-850 overflow-hidden shadow-xl space-y-4 p-5">
+            <div className="w-full bg-slate-950 rounded-xl border border-slate-850 overflow-hidden shadow-xl space-y-4 p-5 order-1">
               
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-900 pb-3">
                 <div className="space-y-1">
                   <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
                     <Calendar className="w-4.5 h-4.5 text-blue-500" />
-                    Listado de Citas (Inscripción Tardía)
+                    Listado de Citas (Pasados de Edad)
                   </h4>
                   <span className="text-[10.5px] text-slate-500 block leading-none font-medium">
                     Gestione estados presenciales de solicitantes Pasados de Edad.
@@ -914,7 +922,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               {filteredTardiaCitas.length === 0 ? (
                 <div className="bg-slate-900/30 border border-dashed border-slate-800 p-16 rounded-lg text-center text-[11px] text-slate-500">
                   <Calendar className="w-10 h-10 text-slate-800 mx-auto mb-2" />
-                  <span>No se encontraron citas de Inscripción Tardía con los criterios seleccionados.</span>
+                  <span>No se encontraron citas de pasados de edad con los criterios seleccionados.</span>
                 </div>
               ) : (
                 <div className="overflow-x-auto border border-slate-900 rounded-lg">
@@ -1030,7 +1038,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
             <form onSubmit={handleGenerateExpediente} className="lg:col-span-5 bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-xl">
               <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider border-b border-slate-900 pb-2 flex items-center gap-2">
                 <Plus className="w-4 h-4 text-blue-500" />
-                Nuevo Expediente Tardío
+                Nuevo Expediente VID (Pasados de Edad)
               </h4>
 
               <div className="space-y-3">
@@ -1110,7 +1118,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                     Observaciones / Notas Internas
                   </label>
                   <textarea
-                    placeholder="Notas opcionales del expediente tardío..."
+                    placeholder="Notas opcionales del expediente (Pasados de Edad)..."
                     value={expNotes}
                     rows={2}
                     onChange={(e) => setExpNotes(e.target.value)}
@@ -1276,7 +1284,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-blue-500" />
                   <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">
-                    Control de Horarios y Cupos (Inscripción Tardía)
+                    Control de Horarios y Cupos (Pasados de Edad)
                   </h4>
                 </div>
                 <span className="text-[9px] bg-blue-950 text-blue-400 border border-blue-900/60 px-2 py-0.5 rounded font-bold uppercase">
@@ -1312,7 +1320,9 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                     <option value="20">20 minutos</option>
                     <option value="30">30 minutos</option>
                     <option value="45">45 minutos</option>
+                    <option value="50">50 minutos</option>
                     <option value="60">60 minutos</option>
+                    <option value="150">150 minutos (2:30 horas)</option>
                   </select>
                 </div>
 
@@ -1348,7 +1358,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                     className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-2 py-5 px-6 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Check className="w-3.5 h-3.5 text-white" />
-                    <span>Guardar Planificación Tardía</span>
+                    <span>Guardar Planificación VID (Pasados de Edad)</span>
                   </button>
                 </div>
               </form>
@@ -1361,10 +1371,10 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               <div className="bg-slate-900 border border-blue-500/40 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4 text-slate-100">
                 <div className="flex items-center gap-3 border-b border-blue-500/20 pb-3 text-blue-400">
                   <AlertCircle className="w-6 h-6 shrink-0 text-blue-400" />
-                  <h4 className="text-sm font-black uppercase tracking-wider text-slate-100">Confirmar Planificación Tardía</h4>
+                  <h4 className="text-sm font-black uppercase tracking-wider text-slate-100">Confirmar Planificación VID (Pasados de Edad)</h4>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-                  ¿Está seguro de que desea aplicar estos cambos a la planificación de Inscripción Tardía? 
+                  ¿Está seguro de que desea aplicar estos cambios a la planificación de Pasados de Edad (VID)? 
                   Los nuevos cupos diarios de **{tardiaCapacidadTotal} citas**, un intervalo de **{tardiaIntervalo} minutos** y el horario laborable regulado de **{tardiaHoraInicio} a {tardiaHoraFin}** se guardarán y entrarán en vigencia inmediatamente.
                 </p>
                 <div className="flex items-center justify-end gap-3 pt-2 font-black">
@@ -1412,7 +1422,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
 
             {historicalExp.length === 0 ? (
               <div className="p-10 text-center text-[11px] text-slate-500 font-medium">
-                No se han generado expedientes tardíos en esta sesión local de oficialía.
+                No se han generado expedientes de pasados de edad (VID) en esta sesión local de oficialía.
               </div>
             ) : (
               <div className="overflow-x-auto">

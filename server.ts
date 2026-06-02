@@ -160,7 +160,7 @@ interface TardiaConfig {
 
 const DEFAULT_TARDIA_CONFIG: TardiaConfig = {
   capacidadTotalDia: 4,
-  intervalo: 30,
+  intervalo: 50,
   horaInicio: "08:00 AM",
   horaFin: "11:30 AM"
 };
@@ -263,9 +263,11 @@ interface ServerCita {
   identificacion: string;
   telefono: string;
   requisitos: string[];
-  estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire';
+  estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire' | 'realizada';
   fechaCreacion: string;
   numeroSeguimiento?: string;
+  datosPersonales?: any;
+  nombre?: string;
 }
 
 function getAppointments(): ServerCita[] {
@@ -537,7 +539,9 @@ async function startServer() {
           requisitos: requisitos || [],
           estado: existingIdx >= 0 ? appointments[existingIdx].estado : 'confirmada',
           fechaCreacion: existingIdx >= 0 ? appointments[existingIdx].fechaCreacion : new Date().toISOString(),
-          numeroSeguimiento: numeroSeguimiento || undefined
+          numeroSeguimiento: numeroSeguimiento || undefined,
+          datosPersonales: req.body.datosPersonales || undefined,
+          nombre: req.body.nombre || (req.body.datosPersonales?.nombreCompleto) || ""
         };
 
         if (existingIdx >= 0) {
@@ -1176,7 +1180,9 @@ async function startServer() {
         requisitos: requisitos || [],
         estado: estado || "confirmada",
         fechaCreacion: fechaCreacion || new Date().toISOString(),
-        numeroSeguimiento: datosPersonales?.numeroSeguimiento || req.body.numeroSeguimiento || undefined
+        numeroSeguimiento: datosPersonales?.numeroSeguimiento || req.body.numeroSeguimiento || undefined,
+        datosPersonales: datosPersonales || undefined,
+        nombre: datosPersonales?.nombreCompleto || req.body.nombre || ""
       };
 
       if (existingIdx >= 0) {
@@ -1419,7 +1425,9 @@ async function startServer() {
         requisitos: requisitos || [],
         estado: existingIdx >= 0 ? appointments[existingIdx].estado : 'confirmada',
         fechaCreacion: existingIdx >= 0 ? appointments[existingIdx].fechaCreacion : new Date().toISOString(),
-        numeroSeguimiento: numeroSeguimiento || undefined
+        numeroSeguimiento: numeroSeguimiento || undefined,
+        datosPersonales: req.body.datosPersonales || undefined,
+        nombre: req.body.nombre || (req.body.datosPersonales?.nombreCompleto) || ""
       };
 
       if (existingIdx >= 0) {

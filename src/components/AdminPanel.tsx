@@ -30,7 +30,8 @@ import {
   ExternalLink,
   Share2,
   Link,
-  Check
+  Check,
+  Tv
 } from 'lucide-react';
 import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio, ExtranjeriaRecord, AdminRole, AdminUser } from '../types';
 import { SUCURSALES_TE, SERVICIOS_TRIBUNAL, saveTramiteMutation, saveSucursalMutation } from '../data';
@@ -50,8 +51,8 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const [loginError, setLoginError] = useState('');
   
   const [currentRole, setCurrentRole] = useState<AdminRole>('sencillo');
-  const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites' | 'extranjeria'>('tabla');
-  const [eyeTheme, setEyeTheme] = useState<'slate' | 'warm' | 'sepia' | 'forest'>(() => {
+  const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites' | 'extranjeria' | 'pantalla' | 'usuarios'>('tabla');
+  const [eyeTheme, setEyeTheme] = useState<'slate' | 'warm' | 'sepia' | 'forest' | 'light'>(() => {
     try {
       return (localStorage.getItem('admin_eye_theme') as any) || 'slate';
     } catch {
@@ -64,6 +65,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const [filterCategoria, setFilterCategoria] = useState<string>('Todos');
   const [filterSucursal, setFilterSucursal] = useState<string>('Todos');
   const [filterEstado, setFilterEstado] = useState<string>('Todos');
+  const [showStatsInManagement, setShowStatsInManagement] = useState<boolean>(true);
 
   // Selected item to edit details
   const [editingCita, setEditingCita] = useState<Cita | null>(null);
@@ -244,25 +246,35 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
   const [metricPeriod, setMetricPeriod] = useState<'dia' | 'semana' | 'mes' | 'año' | 'todo'>('mes');
 
-  const handleDownloadMetricsPDFReport = (type: 'extranjeria' | 'tardia' | 'all') => {
+  const handleDownloadMetricsPDFReport = (
+    type: 'extranjeria' | 'tardia' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil' | 'all',
+    overridePeriod?: 'dia' | 'semana' | 'mes' | 'año' | 'todo'
+  ) => {
+    const selectedPeriod = overridePeriod || metricPeriod;
     const filtered = citas.filter(cita => {
       const isExtranjeria = cita.servicioCategoria === 'extranjeria' || 
                             cita.subServicioId?.includes('extranj') || 
                             cita.subServicioId?.startsWith('ext_');
       
       const isTardia = cita.subServicioId === 'ced_pasados_edad';
+      const isOE = cita.servicioCategoria === 'organizacion_electoral';
+      const isRC = cita.servicioCategoria === 'registro_civil';
+      const isCed = cita.servicioCategoria === 'cedulacion' && cita.subServicioId !== 'ced_pasados_edad';
       
       if (type === 'extranjeria' && !isExtranjeria) return false;
       if (type === 'tardia' && !isTardia) return false;
-      if (type === 'all' && !isExtranjeria && !isTardia) return false;
+      if (type === 'organizacion_electoral' && !isOE) return false;
+      if (type === 'cedulacion' && !isCed) return false;
+      if (type === 'registro_civil' && !isRC) return false;
+      // 'all' includes any of the above categories, which means everything
       
-      if (metricPeriod === 'todo') return true;
+      if (selectedPeriod === 'todo') return true;
       
       try {
         const now = new Date();
         const refDate = new Date(cita.fecha + 'T00:00:00');
         
-        if (metricPeriod === 'dia') {
+        if (selectedPeriod === 'dia') {
           const year = now.getFullYear();
           const month = String(now.getMonth() + 1).padStart(2, '0');
           const day = String(now.getDate()).padStart(2, '0');
@@ -270,7 +282,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
           return cita.fecha === todayStr;
         }
         
-        if (metricPeriod === 'semana') {
+        if (selectedPeriod === 'semana') {
           const currentDay = now.getDay();
           const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
           const monday = new Date(now);
@@ -284,11 +296,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
           return refDate >= monday && refDate <= sunday;
         }
         
-        if (metricPeriod === 'mes') {
+        if (selectedPeriod === 'mes') {
           return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
         }
         
-        if (metricPeriod === 'año') {
+        if (selectedPeriod === 'año') {
           return refDate.getFullYear() === now.getFullYear();
         }
       } catch (e) {
@@ -298,7 +310,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     });
 
     if (filtered.length === 0) {
-      alert('No hay citas registradas en el período seleccionado para descargar en PDF.');
+      alert(`No hay citas registradas en el período (${selectedPeriod === 'dia' ? 'diario' : selectedPeriod === 'semana' ? 'semanal' : selectedPeriod === 'mes' ? 'mensual' : selectedPeriod === 'año' ? 'anual' : 'histórico'}) seleccionado para descargar en PDF.`);
       return;
     }
 
@@ -309,7 +321,15 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     });
 
     const primaryColor = [15, 23, 42]; // Slate 900
-    const accentColor = type === 'tardia' ? [37, 99, 235] : [217, 119, 6]; // Blue or Amber
+    
+    // Choose accent color based on category
+    const accentColor = 
+      type === 'tardia' ? [37, 99, 235] : // Blue (VID)
+      type === 'cedulacion' ? [29, 78, 216] : // Deep Blue (Cedulación)
+      type === 'extranjeria' ? [217, 119, 6] : // Amber (Extranjería)
+      type === 'organizacion_electoral' ? [147, 51, 234] : // Purple (OE)
+      type === 'registro_civil' ? [16, 185, 129] : // Emerald (Registro Civil)
+      [79, 70, 229]; // Indigo (Consolidado)
 
     let currentY = 15;
 
@@ -335,16 +355,18 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       doc.setFontSize(9);
       doc.setTextColor(100, 116, 139);
       
-      const categoryLabel = type === 'all' 
-        ? 'Consolidado General (Extranjería e Inscripción Tardía)' 
-        : type === 'extranjeria' 
-          ? 'Trámites de Extranjería (Resolución Migratoria)' 
-          : 'Inscripción Tardía (Ciudadanos Pasados de Edad)';
+      const categoryLabel = 
+        type === 'all' ? 'Consolidado General (Todos los Trámites y Servicios)' :
+        type === 'extranjeria' ? 'Trámites de Extranjería (Resolución Migratoria)' :
+        type === 'tardia' ? 'Verificación de Identidad - VID (Ciudadanos Pasados de Edad)' :
+        type === 'organizacion_electoral' ? 'Trámites de Organización Electoral' :
+        type === 'cedulacion' ? 'Trámites de Cedulación (Excluye Pasados de Edad)' :
+        type === 'registro_civil' ? 'Trámites de Registro Civil' : 'Otros Trámites';
           
       doc.text(`Servicio regulado: ${categoryLabel}`, 10, currentY);
 
       currentY += 5;
-      const periodLabel = metricPeriod === 'dia' ? 'Hoy' : metricPeriod === 'semana' ? 'Esta Semana' : metricPeriod === 'mes' ? 'Este Mes' : metricPeriod === 'año' ? 'Este Año' : 'Histórico Completo';
+      const periodLabel = selectedPeriod === 'dia' ? 'Hoy' : selectedPeriod === 'semana' ? 'Esta Semana' : selectedPeriod === 'mes' ? 'Este Mes' : selectedPeriod === 'año' ? 'Este Año' : 'Histórico Completo';
       doc.text(`Período analizado: ${periodLabel.toUpperCase()}  |  Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}`, 10, currentY);
 
       // Accent divider line
@@ -499,13 +521,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text('CONSTANCIA OFICIAL PARA CITAS DE INSCRIPCIÓN TARDÍA (PASADO DE EDAD)', 20, currentY);
+    doc.text('CONSTANCIA OFICIAL PARA CITAS DE PASADOS DE EDAD', 20, currentY);
     
     currentY += 9;
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9.5);
     doc.setTextColor(71, 85, 105);
-    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación e inscripción tardía presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: 170 });
+    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación de pasados de edad presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: 170 });
 
     currentY += 15;
 
@@ -696,11 +718,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
         ? `${c.datosPersonales.primerNombre || ''} ${c.datosPersonales.primerApellido || ''}`.trim()
         : (c.datosPersonales.nombreCompleto || '');
       
-      const subservice = c.subServicioId === 'ced_pasados_edad' ? 'Inscripcion Tardia (PE)' : c.subServicioId;
+      const subservice = c.subServicioId === 'ced_pasados_edad' ? 'Pasados de Edad (VID)' : c.subServicioId;
       
       return [
         c.codigoTransaccion,
-        c.servicioCategoria === 'extranjeria' ? 'Extranjeria' : 'Inscripcion Tardia',
+        c.servicioCategoria === 'extranjeria' ? 'Extranjeria' : 'Pasados de Edad (VID)',
         subservice,
         c.fecha,
         c.hora,
@@ -1158,7 +1180,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                      editingCita.subServicioNombre?.toLowerCase().includes('tardía');
 
     if (isExtranjeria || isTardia) {
-      const typeStr = isExtranjeria ? 'Extranjería' : 'Inscripción Tardía';
+      const typeStr = isExtranjeria ? 'Extranjería' : 'Pasados de Edad (VID)';
       if (!window.confirm(`¿Está seguro de los cambios para esta cita de ${typeStr}?`)) {
         return;
       }
@@ -1664,6 +1686,77 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
           color: #2d2112 !important;
           border-color: #caa778 !important;
         }
+
+        /* Light Theme Override (Tema Claro de Alta Claridad) */
+        #admin-panel-container.theme-light {
+          background-color: #f8fafc !important; /* slate-50 */
+          color: #0f172a !important; /* slate-900 */
+          border-color: #cbd5e1 !important; /* slate-300 */
+        }
+        #admin-panel-container.theme-light .bg-slate-950 {
+          background-color: #e2e8f0 !important; /* slate-200 */
+        }
+        #admin-panel-container.theme-light .bg-slate-900 {
+          background-color: #f1f5f9 !important; /* slate-100 */
+        }
+        #admin-panel-container.theme-light .bg-slate-900\\/60 {
+          background-color: rgba(241, 245, 249, 0.6) !important;
+        }
+        #admin-panel-container.theme-light .bg-slate-850 {
+          background-color: #e2e8f0 !important;
+        }
+        #admin-panel-container.theme-light .bg-slate-800 {
+          background-color: #cbd5e1 !important;
+        }
+        #admin-panel-container.theme-light .border-slate-800,
+        #admin-panel-container.theme-light .border-slate-700,
+        #admin-panel-container.theme-light .border-slate-850,
+        #admin-panel-container.theme-light .border-slate-900 {
+          border-color: #cbd5e1 !important;
+        }
+        #admin-panel-container.theme-light .text-slate-400 {
+          color: #475569 !important; /* slate-600 */
+        }
+        #admin-panel-container.theme-light .text-slate-450 {
+          color: #64748b !important; /* slate-500 */
+        }
+        #admin-panel-container.theme-light .text-slate-305,
+        #admin-panel-container.theme-light .text-slate-300 {
+          color: #334155 !important; /* slate-700 */
+        }
+        #admin-panel-container.theme-light .text-slate-100,
+        #admin-panel-container.theme-light .text-slate-200,
+        #admin-panel-container.theme-light .text-white {
+          color: #0f172a !important; /* slate-900 */
+        }
+        #admin-panel-container.theme-light .text-blue-400,
+        #admin-panel-container.theme-light .text-blue-300,
+        #admin-panel-container.theme-light .text-blue-500 {
+          color: #1d4ed8 !important; /* blue-700 */
+        }
+        #admin-panel-container.theme-light .bg-blue-600 {
+          background-color: #2563eb !important;
+          color: #ffffff !important;
+        }
+        #admin-panel-container.theme-light .hover\\:bg-blue-700:hover,
+        #admin-panel-container.theme-light .bg-blue-700 {
+          background-color: #1d4ed8 !important;
+          color: #ffffff !important;
+        }
+        #admin-panel-container.theme-light select,
+        #admin-panel-container.theme-light input,
+        #admin-panel-container.theme-light textarea {
+          background-color: #ffffff !important;
+          color: #0f172a !important;
+          border-color: #cbd5e1 !important;
+        }
+        #admin-panel-container.theme-light .bg-slate-950 select,
+        #admin-panel-container.theme-light .bg-slate-950 input,
+        #admin-panel-container.theme-light .bg-slate-950 textarea {
+          background-color: #ffffff !important;
+          color: #0f172a !important;
+          border-color: #cbd5e1 !important;
+        }
       ` }} />
       
       {/* HEADER BAR */}
@@ -1876,18 +1969,6 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
             {!currentRole.startsWith('extranjeria') && !currentRole.startsWith('pasado_edad') && (
               <>
                 <button
-                  onClick={() => setActiveSubTab('stats')}
-                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                    activeSubTab === 'stats'
-                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30'
-                      : 'text-slate-400 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <BarChart3 className="w-4 h-4 shrink-0" />
-                  <span>Estadísticas</span>
-                </button>
-
-                <button
                   onClick={() => setActiveSubTab('config')}
                   className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
                     activeSubTab === 'config'
@@ -1902,18 +1983,33 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
             )}
 
             {currentRole === 'super' && (
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('usuarios' as any)}
-                className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
-                  activeSubTab === ('usuarios' as any)
-                    ? 'bg-purple-600/15 text-purple-400 border border-purple-500/30'
-                    : 'text-slate-400 hover:text-white border border-transparent'
-                }`}
-              >
-                <Users className="w-4 h-4 shrink-0 text-purple-400" />
-                <span>Gestión Usuarios</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('usuarios')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'usuarios'
+                      ? 'bg-purple-600/15 text-purple-400 border border-purple-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Users className="w-4 h-4 shrink-0 text-purple-400" />
+                  <span>Gestión Usuarios</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('pantalla')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'pantalla'
+                      ? 'bg-amber-600/15 text-amber-500 border border-amber-500/30 shadow-inner'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Tv className="w-4 h-4 shrink-0 text-amber-500" />
+                  <span>Pantalla de Turnos</span>
+                </button>
+              </>
             )}
             
             {!currentRole.startsWith('extranjeria') && !currentRole.startsWith('pasado_edad') && (
@@ -1938,6 +2034,424 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
             {activeSubTab === 'tabla' && (
               <div className="space-y-4">
                 
+                {/* UNIFIED METRICS DASHBOARD & LOAD CONTROLLER */}
+                <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 space-y-4 shadow-lg">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-900 pb-3">
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                        <BarChart3 className="w-4.5 h-4.5 text-blue-400" />
+                        <span>Centro de Monitoreo de Carga y Reportes Operativos</span>
+                      </h3>
+                      <p className="text-[10px] text-slate-400 font-medium">Análisis en tiempo real del flujo de ciudadanos por trámites, sucursales y generación de informes de carga en PDF</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowStatsInManagement(!showStatsInManagement)}
+                      className="bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-800 px-3 py-1.5 rounded text-[10.5px] font-extrabold uppercase tracking-wide flex items-center gap-1.5 cursor-pointer transition shadow"
+                    >
+                      {showStatsInManagement ? (
+                        <>
+                          <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                          <span>Ocultar Métricas</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-block w-2 h-2 rounded-full bg-slate-500"></span>
+                          <span>Mostrar Métricas</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {showStatsInManagement && (
+                    <div className="space-y-5">
+                      {/* BENTO STATS CARDS */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 animate-fade-in">
+                        <div className="bg-slate-900/60 border border-slate-850 p-3.5 rounded-lg flex items-center justify-between shadow">
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] font-black text-slate-450 uppercase tracking-widest block">Citas Totales</span>
+                            <span className="text-2xl font-black font-mono tracking-tight text-white">{stats.total}</span>
+                          </div>
+                          <div className="bg-slate-950 p-2 rounded border border-slate-850">
+                            <ClipboardList className="w-4 h-4 text-blue-400" />
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-900/60 border border-slate-850 p-3.5 rounded-lg flex items-center justify-between shadow">
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] font-black text-slate-450 uppercase tracking-widest block">Activas Confirmadas</span>
+                            <span className="text-2xl font-black font-mono tracking-tight text-emerald-400">{stats.confirmadas}</span>
+                          </div>
+                          <div className="bg-slate-950 p-2 rounded border border-slate-850">
+                            <CheckCircle className="w-4 h-4 text-emerald-400" />
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-900/60 border border-slate-850 p-3.5 rounded-lg flex items-center justify-between shadow">
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] font-black text-slate-450 uppercase tracking-widest block">No Atendidas / Canceladas</span>
+                            <span className="text-2xl font-black font-mono tracking-tight text-amber-500">{stats.canceladas}</span>
+                          </div>
+                          <div className="bg-slate-950 p-2 rounded border border-slate-850">
+                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PDF REPORTS DOWNLOAD CENTER */}
+                      <div className="space-y-3 pt-1 border-t border-slate-900">
+                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-350 tracking-wider">
+                          <Download className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Descarga de Informes de Gestión y Carga por Trámite (Formato PDF)</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* 1. MIGRACIÓN / EXTRANJERÍA CARD */}
+                          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-850 flex flex-col justify-between space-y-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-amber-400 font-mono">Trámites Extranjería</span>
+                                <span className="text-[8px] font-extrabold uppercase bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20">MIGRACIÓN</span>
+                              </div>
+                              <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">Citas biométricas, toma de fotografía dactilar y validación de resoluciones de migración del SNM.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('extranjeria', 'dia')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-amber-400 border border-slate-800 hover:border-amber-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>📄 Diario</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('extranjeria', 'semana')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-amber-400 border border-slate-800 hover:border-amber-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>📅 Semanal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('extranjeria', 'mes')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-amber-400 border border-slate-800 hover:border-amber-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>📊 Mensual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('extranjeria', 'año')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-amber-400 border border-slate-800 hover:border-amber-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>🏛️ Anual</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 2. REGISTRO CIVIL - PASADOS DE EDAD / VID */}
+                          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-855 flex flex-col justify-between space-y-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-blue-400 font-mono">Verificación VID / Pasados</span>
+                                <span className="text-[8px] font-extrabold uppercase bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">REGISTRO CIVIL</span>
+                              </div>
+                              <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">Citas para verificación de identidad biométrica presencial de ciudadanos panameños mayores de edad.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('tardia', 'dia')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-blue-400 border border-slate-800 hover:border-blue-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-blue-500 shrink-0" />
+                                <span>📄 Diario</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('tardia', 'semana')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-blue-400 border border-slate-800 hover:border-blue-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-blue-500 shrink-0" />
+                                <span>📅 Semanal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('tardia', 'mes')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-blue-400 border border-slate-800 hover:border-blue-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-blue-500 shrink-0" />
+                                <span>📊 Mensual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('tardia', 'año')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-blue-400 border border-slate-800 hover:border-blue-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-blue-500 shrink-0" />
+                                <span>🏛️ Anual</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 3. ORGANIZACIÓN ELECTORAL */}
+                          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-850 flex flex-col justify-between space-y-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-purple-400 font-mono">Org. Electoral</span>
+                                <span className="text-[8px] font-extrabold uppercase bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded border border-purple-500/20">ELEGIBLE</span>
+                              </div>
+                              <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">Cédulas de identidad, cambio de residencia electoral, registro de partidos, postulación y padrón electoral.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('organizacion_electoral', 'dia')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-purple-400 border border-slate-800 hover:border-purple-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-purple-500 shrink-0" />
+                                <span>📄 Diario</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('organizacion_electoral', 'semana')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-purple-400 border border-slate-800 hover:border-purple-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-purple-500 shrink-0" />
+                                <span>📅 Semanal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('organizacion_electoral', 'mes')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-purple-400 border border-slate-800 hover:border-purple-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-purple-500 shrink-0" />
+                                <span>📊 Mensual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('organizacion_electoral', 'año')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-purple-400 border border-slate-800 hover:border-purple-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-purple-500 shrink-0" />
+                                <span>🏛️ Anual</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 4. CEDULACIÓN CARD */}
+                          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-850 flex flex-col justify-between space-y-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-sky-400 font-mono">Cedulación ordinaria</span>
+                                <span className="text-[8px] font-extrabold uppercase bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">CEDULACIÓN</span>
+                              </div>
+                              <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">Duplicados ordinarios presenciales, renovaciones por caducidad de vigencia ordinaria y cedulación juvenil.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('cedulacion', 'dia')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-sky-400 border border-slate-800 hover:border-sky-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-sky-550 shrink-0" />
+                                <span>📄 Diario</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('cedulacion', 'semana')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-sky-400 border border-slate-800 hover:border-sky-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-sky-550 shrink-0" />
+                                <span>📅 Semanal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('cedulacion', 'mes')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-sky-400 border border-slate-800 hover:border-sky-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-sky-550 shrink-0" />
+                                <span>📊 Mensual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('cedulacion', 'año')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-sky-400 border border-slate-800 hover:border-sky-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-sky-550 shrink-0" />
+                                <span>🏛️ Anual</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 5. REGISTRO CIVIL CIVIL REGISTRY */}
+                          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-850 flex flex-col justify-between space-y-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-emerald-400 font-mono">Registro Civil Ordinario</span>
+                                <span className="text-[8px] font-extrabold uppercase bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">REGISTRO CIVIL</span>
+                              </div>
+                              <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">Inscripciones y certificaciones de nacimientos, matrimonios ordinarios, defunciones, y cartas de soltería.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('registro_civil', 'dia')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <span>📄 Diario</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('registro_civil', 'semana')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <span>📅 Semanal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('registro_civil', 'mes')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <span>📊 Mensual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('registro_civil', 'año')}
+                                className="bg-slate-950 hover:bg-slate-850 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/20 text-slate-300 py-1.5 px-2 rounded text-[9.5px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <span>🏛️ Anual</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 6. CONSOLIDADO UNIFICADO */}
+                          <div className="bg-gradient-to-br from-slate-900/85 to-indigo-950/20 p-4 rounded-lg border border-slate-850 flex flex-col justify-between space-y-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black uppercase text-indigo-400 font-mono">Consolidado general</span>
+                                <span className="text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20">UNIFICADO</span>
+                              </div>
+                              <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">Integración general compilada con la totalidad de flujos, demanda y carga de todos los servicios del TE.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('all', 'dia')}
+                                className="bg-slate-950 hover:bg-slate-800 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/50 py-1.5 px-2 rounded text-[9.5px] font-black transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Download className="w-3 h-3 text-indigo-400 shrink-0" />
+                                <span>📄 Diario</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('all', 'semana')}
+                                className="bg-slate-950 hover:bg-slate-800 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/50 py-1.5 px-2 rounded text-[9.5px] font-black transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Download className="w-3 h-3 text-indigo-400 shrink-0" />
+                                <span>📅 Semanal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('all', 'mes')}
+                                className="bg-slate-950 hover:bg-slate-800 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/50 py-1.5 px-2 rounded text-[9.5px] font-black transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Download className="w-3 h-3 text-indigo-400 shrink-0" />
+                                <span>📊 Mensual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadMetricsPDFReport('all', 'año')}
+                                className="bg-slate-950 hover:bg-slate-800 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/50 py-1.5 px-2 rounded text-[9.5px] font-black transition flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Download className="w-3 h-3 text-indigo-400 shrink-0" />
+                                <span>🏛️ Anual</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* DISTRIBUTION CHARTS */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 border-t border-slate-900">
+                        {/* Categories */}
+                        <div className="bg-slate-900/35 border border-slate-850 p-4 rounded-lg space-y-3">
+                          <span className="text-[10px] font-black text-slate-350 uppercase tracking-wider flex items-center gap-1.5">
+                            <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+                            Demanda por Categoría del Servicio
+                          </span>
+                          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                            {mutableServicios.map(cat => {
+                              const count = stats.porCategoria[cat.id] || 0;
+                              const percentage = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0;
+                              return (
+                                <div key={cat.id} className="space-y-0.5">
+                                  <div className="flex justify-between text-[10px] text-slate-300 font-bold uppercase">
+                                    <span>{cat.nombre}</span>
+                                    <span className="font-mono text-slate-400">{percentage}% ({count})</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-900/60">
+                                    <div 
+                                      className="h-full bg-blue-500 transition-all duration-500" 
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Branches */}
+                        <div className="bg-slate-900/35 border border-slate-850 p-4 rounded-lg space-y-3">
+                          <span className="text-[10px] font-black text-slate-350 uppercase tracking-wider flex items-center gap-1.5">
+                            <Building className="w-3.5 h-3.5 text-blue-400" />
+                            Carga de Atención por Sede Regional
+                          </span>
+                          <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
+                            {mutableSucursales.map(suc => {
+                              const count = stats.porSucursal[suc.id] || 0;
+                              const percentage = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0;
+                              if (count === 0) return null;
+                              return (
+                                <div key={suc.id} className="space-y-0.5 border-b border-slate-900 pb-1.5 last:border-b-0">
+                                  <div className="flex justify-between text-[10px] text-slate-200">
+                                    <span className="font-bold">{suc.nombre} ({suc.provincia})</span>
+                                    <span className="font-mono text-emerald-400 font-extrabold">{percentage}% ({count})</span>
+                                  </div>
+                                  <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-emerald-500 transition-all duration-500" 
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {Object.keys(stats.porSucursal).length === 0 && (
+                              <p className="text-[10px] italic text-slate-500 text-center py-4">Sin datos geográficos agendados por el momento.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
                 {/* ADVANCED FILTERING SECTION */}
                 <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3 shadow">
                   <div className="flex items-center justify-between border-b border-slate-900 pb-2">
@@ -2239,8 +2753,8 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
               </div>
             )}
 
-            {/* TAB CONTENT: STATS (Estadísticas y Métricas del sistema) */}
-            {activeSubTab === 'stats' && (
+            {/* TAB CONTENT: STATS (REDUNDANTE - Unificado en pestaña Gestión de Citas) */}
+            {false && (
               <div className="space-y-6">
                 
                 {/* METRICS ROW BENTO BOX - HIGHLY STYLISH */}
@@ -2357,14 +2871,14 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
                 </div>
 
-                {/* PANEL DE ANÁLISIS DE CARGA DE EXTRANJERÍA E INSCRIPCIÓN TARDÍA (Solo para Super, Extranjería y Pasado de Edad) */}
+                {/* PANEL DE ANÁLISIS DE CARGA DE EXTRANJERÍA E VID - PASADOS DE EDAD (Solo para Super, Extranjería y Pasado de Edad) */}
                 {currentRole !== 'sencillo' && (
                   <div id="analisis_carga_especial" className="bg-slate-950 rounded-lg border border-slate-800 p-5 mt-6 shadow-xl space-y-5">
                     <div className="border-b border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="space-y-0.5">
                         <h3 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
                           <Clock className="w-4 h-4 text-amber-500" />
-                          <span>Métricas de Carga: Extranjería e Inscripción Tardía</span>
+                          <span>Métricas de Carga: Extranjería y Verificación de Identidad (VID)</span>
                         </h3>
                         <p className="text-[10px] text-slate-400 font-medium">Análisis detallado de demanda operativa regulada con descarga de reportes oficiales</p>
                       </div>
@@ -2494,13 +3008,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                               </div>
                             </div>
 
-                            {/* CARD 2: INSCRIPCIÓN TARDÍA */}
+                            {/* CARD 2: VID - PASADOS DE EDAD */}
                             <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 shadow flex flex-col justify-between">
                               <div className="space-y-1.5">
                                 <div className="flex justify-between items-center">
                                   <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest block">Registro Civil Especial</span>
                                   <span className="text-[9px] font-bold bg-blue-950/50 border border-blue-900/60 text-blue-400 px-2.5 py-0.5 rounded-full uppercase">
-                                    Inscripción Tardía
+                                    Pasados de Edad (VID)
                                   </span>
                                 </div>
                                 <div className="flex items-baseline gap-2">
@@ -2508,7 +3022,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                                   <span className="text-[11px] text-slate-455 font-medium">citas agendadas</span>
                                 </div>
                                 <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
-                                  Cedulación tardía presencial para ciudadanos panameños mayores de edad (Pasados de Edad) con cupos limitados por resoluciones biométricas.
+                                  Verificación de identidad presencial para ciudadanos panameños mayores de edad (Pasados de Edad) con cupos limitados por resoluciones biométricas.
                                 </p>
                                 
                                 {/* Visual Mini Progress Bar */}
@@ -2551,7 +3065,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                           {/* General Consolidate downloads */}
                           <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-900 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-300">
                             <div className="text-[11px] font-medium">
-                              Se encontraron <strong className="text-white">{totalCitasCarga} citas activas</strong> de tipo Extranjería e Inscripción Tardía para el período <strong className="text-amber-500 uppercase font-mono">{metricPeriod}</strong>.
+                              Se encontraron <strong className="text-white">{totalCitasCarga} citas activas</strong> de tipo Extranjería y Verificación de Identidad (VID) para el período <strong className="text-amber-500 uppercase font-mono">{metricPeriod}</strong>.
                             </div>
                             
                             <div className="flex flex-wrap items-center gap-2">
@@ -2813,7 +3327,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                       </div>
                       <div className="text-[9.5px] text-blue-400 bg-blue-950/20 p-2 rounded border border-blue-900/10 font-mono leading-relaxed">
                         <span className="font-extrabold text-blue-300 block uppercase mb-0.5">Enlace Resultante de Ejemplo:</span>
-                        {pasadoEdadLinkBase.trim().endsWith('/') ? pasadoEdadLinkBase.trim().slice(0, -1) : pasadoEdadLinkBase.trim()}/?tramite=ced_pasados_edad&seguimiento=EXP-2026-TE-123456
+                        {pasadoEdadLinkBase.trim().endsWith('/') ? pasadoEdadLinkBase.trim().slice(0, -1) : pasadoEdadLinkBase.trim()}/?tramite=ced_pasados_edad&seguimiento=Nº26-123-456
                       </div>
                     </div>
 
@@ -2824,7 +3338,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                         <span className="text-[10.5px] text-slate-450">Seleccione un espectro de color optimizado para reducir la fatiga ocular y proteger su vista durante largas jornadas de trabajo</span>
                       </div>
                       
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -2888,6 +3402,23 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                         >
                           <span className="text-[10px] font-black block uppercase tracking-wide">Sepia Confort</span>
                           <span className="text-[9px] text-slate-600 block pt-1.5 leading-relaxed">Lectura de Papel Reciclado</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEyeTheme('light');
+                            try { localStorage.setItem('admin_eye_theme', 'light'); } catch(e){}
+                          }}
+                          className={`p-3 rounded border text-left cursor-pointer transition flex flex-col justify-between ${
+                            eyeTheme === 'light'
+                              ? 'border-slate-400 text-slate-900 font-extrabold'
+                              : 'bg-slate-950 border-slate-800 hover:border-slate-750 text-slate-400 hover:text-slate-200'
+                          }`}
+                          style={eyeTheme === 'light' ? { backgroundColor: '#f1f5f9' } : {}}
+                        >
+                          <span className="text-[10px] font-black block uppercase tracking-wide">Tema Claro</span>
+                          <span className="text-[9px] text-slate-605 block pt-1.5 leading-relaxed">Alta Claridad y Contraste Clásico</span>
                         </button>
                       </div>
                     </div>
@@ -3461,7 +3992,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
             )}
 
             {/* TAB CONTENT: GESTIÓN DE USUARIOS (CREAR Y ASIGNAR GESTONES) */}
-            {activeSubTab === ('usuarios' as any) && currentRole === 'super' && (
+            {activeSubTab === 'usuarios' && currentRole === 'super' && (
               <div className="space-y-6 animate-fade-in font-sans text-slate-200">
                 {/* Intro details */}
                 <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
@@ -3564,10 +4095,10 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                           <option value="extranjeria_cubiculo">🖥️ Usuario Extranjería Cubículo (Ticket)</option>
                           <option value="extranjeria">🛂 Gestión de Extranjería General</option>
                           
-                          {/* 4. Inscripciones tardías */}
-                          <option value="pasado_edad_supervisor">👑 Supervisor de Inscripciones Tardías (Pasados de Edad)</option>
-                          <option value="pasado_edad_admin">📋 Operador Seguimiento IT</option>
-                          <option value="pasado_edad">🛡️ Administrador IT</option>
+                          {/* 4. Verificación de Identidad (VID) */}
+                          <option value="pasado_edad_supervisor">👑 Supervisor VID (Pasados de Edad)</option>
+                          <option value="pasado_edad_admin">📋 Operador Seguimiento VID</option>
+                          <option value="pasado_edad">🛡️ Administrador VID</option>
                         </select>
                         <p className="text-[10px] text-slate-500 font-medium leading-normal pt-1">
                           El usuario ingresará con estas credenciales y tendrá restringidas o asignadas las pestañas correspondientes en base a su rol de gestión.
@@ -3660,11 +4191,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                                             : u.role === 'extranjeria' 
                                               ? 'Inmigración / Extranjería' 
                                               : u.role === 'pasado_edad_supervisor'
-                                                ? '👑 Supervisor Inscripciones Tardías'
+                                                ? '👑 Supervisor VID (Pasados de Edad)'
                                                 : u.role === 'pasado_edad_admin'
-                                                  ? '📋 Operador Seguimiento IT'
+                                                  ? '📋 Operador Seguimiento VID'
                                                   : u.role === 'pasado_edad' 
-                                                    ? '🛡️ Administrador IT' 
+                                                    ? '🛡️ Administrador VID' 
                                                     : '👤 Administrador Sencillo'}
                                   </span>
                                 </td>
@@ -3704,6 +4235,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: PANTALLA DE TURNOS COMPLETA */}
+            {activeSubTab === 'pantalla' && (
+              <div className="space-y-6 animate-fade-in font-sans">
+                <ExtranjeriaController currentRole="super" forceSubRole="pantalla" />
               </div>
             )}
 

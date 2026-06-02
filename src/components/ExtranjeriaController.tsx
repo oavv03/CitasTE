@@ -25,7 +25,13 @@ import {
   Boxes,
   HelpCircle,
   FileSpreadsheet,
-  Inbox
+  Inbox,
+  ArrowLeft,
+  ArrowRight,
+  Volume2,
+  Tv,
+  Maximize,
+  Minimize
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { AdminRole } from '../types';
@@ -49,10 +55,11 @@ const REQUISITOS_EXTRANJERIA = [
 
 interface ExtranjeriaControllerProps {
   currentRole: AdminRole;
+  forceSubRole?: ExtranjeriaSubRole;
 }
 
 // Extranjeria specific sub-profiles within Extranjeria view
-type ExtranjeriaSubRole = 'supervisor' | 'atencion' | 'cubiculo';
+type ExtranjeriaSubRole = 'supervisor' | 'atencion' | 'cubiculo' | 'pantalla';
 
 interface Booth {
   id: number;
@@ -72,7 +79,7 @@ interface AppointmentMetadata {
   staffResponsable?: string;
 }
 
-export default function ExtranjeriaController({ currentRole }: ExtranjeriaControllerProps) {
+export default function ExtranjeriaController({ currentRole, forceSubRole }: ExtranjeriaControllerProps) {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,13 +88,29 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' | null }>({ text: '', type: null });
   const [showConfirmSave, setShowConfirmSave] = useState(false);
 
+  // Return the first name and first last name if available, otherwise fallback
+  const getExtranjeriaCitizenName = (app: any) => {
+    if (!app) return 'N/D';
+    const first = app.datosPersonales?.primerNombre || '';
+    const last = app.datosPersonales?.primerApellido || '';
+    if (first || last) {
+      return `${first} ${last}`.trim();
+    }
+    return app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
+  };
+
   // Profile Simulator selection
   const [subRole, setSubRole] = useState<ExtranjeriaSubRole>(() => {
+    if (forceSubRole) return forceSubRole;
     return (localStorage.getItem('extranjeria_sub_role') as ExtranjeriaSubRole) || 'supervisor';
   });
 
-  // Synchronize subRole dynamically if a specific Extranjería user logs in
+  // Synchronize subRole dynamically if a specific Extranjería user logs in or if forceSubRole changes
   React.useEffect(() => {
+    if (forceSubRole) {
+      setSubRole(forceSubRole);
+      return;
+    }
     if (currentRole === 'extranjeria_supervisor') {
       setSubRole('supervisor');
     } else if (currentRole === 'extranjeria_atencion') {
@@ -95,7 +118,7 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
     } else if (currentRole === 'extranjeria_cubiculo') {
       setSubRole('cubiculo');
     }
-  }, [currentRole]);
+  }, [currentRole, forceSubRole]);
 
   // Selected Cubicle in the "Cubículo" view
   const [selectedCubiculo, setSelectedCubiculo] = useState<number>(() => {
@@ -107,6 +130,10 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
 
   // Document checklist in the "Atención" verification
   const [tempCheckedDocs, setTempCheckedDocs] = useState<string[]>([]);
+
+  // Selected appointment for supervisor validation
+  const [selectedAppForSupervisor, setSelectedAppForSupervisor] = useState<any | null>(null);
+  const [supervisorCheckedDocs, setSupervisorCheckedDocs] = useState<string[]>([]);
 
   // Capacity / Schedule setups
   const [capacidad, setCapacidad] = useState<number>(() => {
@@ -121,6 +148,32 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
   const [horaFin, setHoraFin] = useState<string>(() => {
     return localStorage.getItem('extranjeria_hora_fin') || '02:00 AM';
   });
+
+  const screenContainerRef = React.useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!screenContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      screenContainerRef.current.requestFullscreen().catch((err: any) => {
+        console.error("Error going fullscreen:", err);
+      });
+    } else {
+      document.exitFullscreen().catch((err: any) => {
+        console.error("Error exiting fullscreen:", err);
+      });
+    }
+  };
 
   // Booth / Cubiculos state (4 enabled with staff, 4 reserve empty)
   const [booths, setBooths] = useState<Booth[]>(() => {
@@ -173,6 +226,73 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
   useEffect(() => {
     localStorage.setItem('extranjeria_appointment_metadata', JSON.stringify(appMetadata));
   }, [appMetadata]);
+
+  // Live clock state for Pantalla de Turnos
+  const [liveTime, setLiveTime] = useState<Date>(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Synthesis-based sound alert for public display chimes
+  const playChimeSound = (announcementText?: string) => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) {
+        if (announcementText && 'speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(announcementText);
+          utterance.lang = 'es-PA';
+          utterance.rate = 0.95;
+          window.speechSynthesis.speak(utterance);
+        }
+        return;
+      }
+      const ctx = new AudioContext();
+      
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      osc1.connect(gainNode);
+      osc2.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc1.type = 'sine';
+      
+      osc2.frequency.setValueAtTime(880.00, ctx.currentTime + 0.12); // A5
+      osc2.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+      
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.35);
+      
+      osc2.start(ctx.currentTime + 0.12);
+      osc2.stop(ctx.currentTime + 0.7);
+
+      if (announcementText && 'speechSynthesis' in window) {
+        setTimeout(() => {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(announcementText);
+          utterance.lang = 'es-PA';
+          utterance.rate = 0.95;
+          window.speechSynthesis.speak(utterance);
+        }, 805);
+      }
+    } catch (e) {
+      console.log('Audio error:', e);
+      if (announcementText && 'speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(announcementText);
+        utterance.lang = 'es-PA';
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  };
 
   // Helper helper to fetch appointments from server and filter extranjería
   const fetchAppointments = async () => {
@@ -300,6 +420,13 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
     );
   };
 
+  // Handle checking of single document in second control (supervisor)
+  const handleToggleSupervisorDocCheck = (docId: string) => {
+    setSupervisorCheckedDocs(prev => 
+      prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
+    );
+  };
+
   // Submit verified documents and forward to supervisor
   const handleSubmitVerification = (appId: string) => {
     const meta = appMetadata[appId] || {
@@ -310,14 +437,14 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
       estadoTicket: 'ninguno'
     };
 
-    const hasAll = tempCheckedDocs.length === REQUISITOS_EXTRANJERIA.length;
+    const allDocs = REQUISITOS_EXTRANJERIA.map(r => r.id);
 
     setAppMetadata(prev => ({
       ...prev,
       [appId]: {
         ...meta,
-        hasDocuments: hasAll,
-        checkedDocs: tempCheckedDocs,
+        hasDocuments: true,
+        checkedDocs: allDocs,
         passedToSupervisor: true
       }
     }));
@@ -345,8 +472,78 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
       }
     }));
 
+    const app = appointments.find(a => a.id === appId);
+    const codePart = appId.slice(-4).toUpperCase();
+    const cleanCitizenName = getExtranjeriaCitizenName(app);
     const boothName = booths.find(b => b.id === cubiculoId)?.name || `Cubículo ${cubiculoId}`;
+    
+    // Spelling out "E-" for Speech Synthesis to sound natural
+    const codeSpelled = `E ${codePart.split('').join(' ')}`;
+    const announcementText = `Turno E, ${codeSpelled}. ${cleanCitizenName}. Favor dirigirse al ${boothName}.`;
+
+    // Trigger audible chime for public display updates with voice
+    playChimeSound(announcementText);
+
     showStatus(`Cita asignada exitosamente al ${boothName}. El operador a cargo ya puede atender al ciudadano.`, 'success');
+  };
+
+  // Recall a citizen aloud from a cubicle
+  const handleRecallCitizen = (appId: string) => {
+    const app = appointments.find(a => a.id === appId);
+    if (!app) return;
+    const meta = appMetadata[appId];
+    const cubiculoId = meta?.assignedCubiculo || selectedCubiculo;
+    const codePart = appId.slice(-4).toUpperCase();
+    const cleanCitizenName = getExtranjeriaCitizenName(app);
+    const boothName = booths.find(b => b.id === cubiculoId)?.name || `Cubículo ${cubiculoId}`;
+
+    const codeSpelled = `E ${codePart.split('').join(' ')}`;
+    const announcementText = meta?.estadoTicket === 'pagado_en_caja'
+      ? `Turno E, ${codeSpelled}. ${cleanCitizenName}. Favor dirigirse a la caja de pago.`
+      : `Turno E, ${codeSpelled}. ${cleanCitizenName}. Favor dirigirse al ${boothName}.`;
+
+    playChimeSound(announcementText);
+    showStatus(`Re-llamando a ciudadano: ${cleanCitizenName} (E-${codePart})`, 'info');
+  };
+
+  // Automatically assign appointment to the active booth with the least load (load balancing)
+  const handleAutoAssignToCubiculo = (appId: string) => {
+    const activeBooths = booths.filter(b => b.active);
+    if (activeBooths.length === 0) {
+      showStatus("Error: No hay cubículos activos en este momento.", "error");
+      return null;
+    }
+
+    // Count currently active appointments assigned to each active booth
+    const counts: Record<number, number> = {};
+    activeBooths.forEach(b => {
+      counts[b.id] = 0;
+    });
+
+    Object.keys(appMetadata).forEach(id => {
+      const meta = appMetadata[id];
+      if (meta && meta.assignedCubiculo && meta.estadoTicket !== 'realizada') {
+        if (counts[meta.assignedCubiculo] !== undefined) {
+          counts[meta.assignedCubiculo]++;
+        }
+      }
+    });
+
+    // Find active booth with minimum load
+    let bestBooth = activeBooths[0];
+    let minCount = counts[bestBooth.id] ?? 0;
+
+    for (let i = 1; i < activeBooths.length; i++) {
+      const b = activeBooths[i];
+      const cnt = counts[b.id] ?? 0;
+      if (cnt < minCount) {
+        minCount = cnt;
+        bestBooth = b;
+      }
+    }
+
+    handleAssignToCubiculo(appId, bestBooth.id);
+    return bestBooth;
   };
 
   // Trigger Ticket Call and Send to Cashier (Caja) for Payment
@@ -361,6 +558,19 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
         estadoTicket: 'pagado_en_caja'
       }
     }));
+
+    const app = appointments.find(a => a.id === appId);
+    const codePart = appId.slice(-4).toUpperCase();
+    const cleanCitizenName = getExtranjeriaCitizenName(app);
+    const cubiculoId = meta.assignedCubiculo;
+    const boothName = booths.find(b => b.id === cubiculoId)?.name || `Cubículo ${cubiculoId || ''}`;
+    
+    // Spelling out "E-"
+    const codeSpelled = `E ${codePart.split('').join(' ')}`;
+    const announcementText = `Turno E, ${codeSpelled}. ${cleanCitizenName}. Favor dirigirse a la caja de pago.`;
+
+    // Play chime sound and speak
+    playChimeSound(announcementText);
 
     showStatus(`Llamada de ticket generada. Ciudadano enviado a la Caja de Pago (https://sistema-de-ticket.vercel.app/).`, 'info');
   };
@@ -434,6 +644,39 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
       return meta && meta.passedToSupervisor && meta.assignedCubiculo === null;
     });
   }, [appointments, appMetadata]);
+
+  // Recommended booth based on load balancing
+  const recommendedBooth = useMemo(() => {
+    const activeBooths = booths.filter(b => b.active);
+    if (activeBooths.length === 0) return null;
+    
+    const counts: Record<number, number> = {};
+    activeBooths.forEach(b => {
+      counts[b.id] = 0;
+    });
+
+    Object.keys(appMetadata).forEach(id => {
+      const meta = appMetadata[id];
+      if (meta && meta.assignedCubiculo && meta.estadoTicket !== 'realizada') {
+        if (counts[meta.assignedCubiculo] !== undefined) {
+          counts[meta.assignedCubiculo]++;
+        }
+      }
+    });
+
+    let bestBooth = activeBooths[0];
+    let minCount = counts[bestBooth.id] ?? 0;
+
+    for (let i = 1; i < activeBooths.length; i++) {
+      const b = activeBooths[i];
+      const cnt = counts[b.id] ?? 0;
+      if (cnt < minCount) {
+        minCount = cnt;
+        bestBooth = b;
+      }
+    }
+    return bestBooth;
+  }, [booths, appMetadata]);
 
   // 4. Cubículo View: appointments assigned to the currently selected cubicle
   const queueCubiculoAssigned = useMemo(() => {
@@ -739,7 +982,7 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
           <div className="flex flex-wrap gap-1">
             <button
               type="button"
-              onClick={() => { setSubRole('supervisor'); setSelectedAppForCheck(null); }}
+              onClick={() => { setSubRole('supervisor'); setSelectedAppForCheck(null); setSelectedAppForSupervisor(null); }}
               className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
                 subRole === 'supervisor'
                   ? 'bg-amber-600 text-white shadow-md'
@@ -752,7 +995,7 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
 
             <button
               type="button"
-              onClick={() => { setSubRole('atencion'); setSelectedAppForCheck(null); }}
+              onClick={() => { setSubRole('atencion'); setSelectedAppForCheck(null); setSelectedAppForSupervisor(null); }}
               className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
                 subRole === 'atencion'
                   ? 'bg-blue-600 text-white shadow-md'
@@ -765,7 +1008,7 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
 
             <button
               type="button"
-              onClick={() => { setSubRole('cubiculo'); setSelectedAppForCheck(null); }}
+              onClick={() => { setSubRole('cubiculo'); setSelectedAppForCheck(null); setSelectedAppForSupervisor(null); }}
               className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
                 subRole === 'cubiculo'
                   ? 'bg-indigo-600 text-white shadow-md'
@@ -774,6 +1017,19 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
             >
               <Building2 className="w-4 h-4" />
               <span>Cubículo (Ticket) 🖥️</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSubRole('pantalla'); setSelectedAppForCheck(null); setSelectedAppForSupervisor(null); }}
+              className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                subRole === 'pantalla'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              <Tv className="w-4 h-4" />
+              <span>Pantalla de Turnos 📺</span>
             </button>
           </div>
         </div>
@@ -798,8 +1054,26 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
               </p>
             </div>
           </div>
-          <div className="bg-amber-500/20 px-3 py-1.5 border border-amber-500/30 rounded-lg text-amber-400 font-mono text-[10px] uppercase font-bold tracking-wider select-none shrink-0 self-start md:self-auto">
-            🔴 Estación Activa
+          <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (subRole === 'pantalla') {
+                  if (currentRole === 'extranjeria_supervisor') setSubRole('supervisor');
+                  else if (currentRole === 'extranjeria_atencion') setSubRole('atencion');
+                  else setSubRole('cubiculo');
+                } else {
+                  setSubRole('pantalla');
+                }
+              }}
+              className="bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-400 font-black text-[10px] uppercase py-1.5 px-3 rounded-lg transition cursor-pointer select-none flex items-center gap-1.5"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>{subRole === 'pantalla' ? 'Regresar a Consola' : 'Ver Pantalla de Turnos 📺'}</span>
+            </button>
+            <div className="bg-amber-500/20 px-3 py-1.5 border border-amber-500/30 rounded-lg text-amber-400 font-mono text-[10px] uppercase font-bold tracking-wider select-none">
+              🔴 Estación Activa
+            </div>
           </div>
         </div>
       )}
@@ -1007,7 +1281,109 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
                   </span>
                 </div>
 
-                {queueSupervisorPending.length === 0 ? (
+                {selectedAppForSupervisor ? (
+                  <div className="space-y-4 animate-fade-in text-left">
+                    {/* Header snapshot with back button */}
+                    <div className="flex items-center justify-between bg-slate-900/85 p-3.5 rounded-lg border border-slate-800">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block font-mono">Segundo Chequeo Activo</span>
+                        <div className="text-[11px] font-mono font-black text-white">{selectedAppForSupervisor.id}</div>
+                        <div className="text-xs font-bold text-slate-150 uppercase">
+                          {getExtranjeriaCitizenName(selectedAppForSupervisor)}
+                        </div>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedAppForSupervisor(null);
+                          setSupervisorCheckedDocs([]);
+                        }}
+                        className="bg-slate-950 hover:bg-slate-900 text-slate-350 hover:text-white border border-slate-800 text-[10px] font-bold uppercase px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Volver</span>
+                      </button>
+                    </div>
+
+                    {/* Alert */}
+                    <div className="bg-amber-950/20 border border-amber-500/20 p-3.5 rounded-lg text-[10px] text-amber-400 leading-relaxed font-semibold flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                      <span>
+                        <strong>Control Cruzado de Seguridad:</strong> El Supervisor de Extranjería debe certificar individualmente que el ciudadano presenta cada uno de los requisitos antes de habilitar su despacho a ventanilla.
+                      </span>
+                    </div>
+
+                    {/* Checkboxes of REQUISITOS_EXTRANJERIA */}
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-450 block">Re-Verificación Obligatoria (2do Control)</span>
+                      {REQUISITOS_EXTRANJERIA.map(req => {
+                        const isChecked = supervisorCheckedDocs.includes(req.id);
+                        return (
+                          <button
+                            key={`sup-doc-check-${req.id}`}
+                            type="button"
+                            onClick={() => handleToggleSupervisorDocCheck(req.id)}
+                            className={`w-full p-3 rounded-lg border text-left flex items-center justify-between gap-3 transition cursor-pointer ${
+                              isChecked 
+                                ? 'bg-amber-950/25 border-amber-500/40 text-amber-300' 
+                                : 'bg-slate-900/40 border-slate-850 text-slate-400 hover:border-slate-800'
+                            }`}
+                          >
+                            <span className="text-[10.5px] font-semibold leading-relaxed">{req.name}</span>
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                              isChecked ? 'bg-amber-600 border-amber-500 text-white' : 'border-slate-700'
+                            }`}>
+                              {isChecked && <Check className="w-3 h-3 text-white stroke-[3px]" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Assignment part */}
+                    <div className="pt-2 border-t border-slate-850 space-y-3">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-450 block">Despacho de Turno a Cubículo</span>
+                      
+                      {supervisorCheckedDocs.length < REQUISITOS_EXTRANJERIA.length ? (
+                        <div className="p-3 bg-slate-900/80 rounded border border-slate-850 text-[10px] text-slate-450 font-bold uppercase text-center">
+                          🔒 Marque los 4 requisitos arriba para habilitar la asignación automática
+                        </div>
+                      ) : (
+                        <div className="space-y-3.5 animate-fade-in bg-slate-950/80 p-4 rounded-lg border border-slate-800">
+                          <div className="text-[10px] text-emerald-400 font-bold uppercase flex items-center gap-1.5 justify-center">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            <span>Control completado con éxito</span>
+                          </div>
+
+                          {recommendedBooth ? (
+                            <div className="space-y-2 text-center bg-slate-900/60 p-3 rounded border border-slate-800">
+                              <span className="text-[9px] font-black text-slate-450 block uppercase tracking-wider">Siguiente Cubículo Disponible (Por Balance de Carga)</span>
+                              <div className="text-sm font-black text-white">{recommendedBooth.name}</div>
+                              <div className="text-[10.5px] text-slate-400 font-medium">Operador: <strong className="text-amber-500">{recommendedBooth.staff}</strong></div>
+                              
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleAutoAssignToCubiculo(selectedAppForSupervisor.id);
+                                  setSelectedAppForSupervisor(null);
+                                  setSupervisorCheckedDocs([]);
+                                }}
+                                className="w-full mt-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-[10.5px] tracking-wider uppercase py-3 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <span>Firmar y Despachar Turno Automáticamente ⚡</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="p-3 text-[10.5px] text-red-400 font-bold text-center">
+                              ⚠️ No hay cubículos activos habilitados. Active uno abajo en la consola del supervisor de extranjería.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : queueSupervisorPending.length === 0 ? (
                   <div className="p-10 border border-dashed border-slate-850 rounded-lg text-center space-y-2 text-slate-450">
                     <Inbox className="w-8 h-8 mx-auto text-slate-600" />
                     <span className="text-[11px] font-bold uppercase tracking-wider block text-slate-350">Bandeja Vacía</span>
@@ -1016,45 +1392,37 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
                     </p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-850 max-h-[400px] overflow-y-auto pr-1">
+                  <div className="divide-y divide-slate-850/60 max-h-[400px] overflow-y-auto pr-1">
                     {queueSupervisorPending.map(app => {
-                      const meta = appMetadata[app.id];
                       const name = app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
                       const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
                       
                       return (
-                        <div key={app.id} className="py-3 px-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                          <div className="space-y-1 text-left">
+                        <button
+                          key={app.id} 
+                          type="button"
+                          onClick={() => {
+                            setSelectedAppForSupervisor(app);
+                            setSupervisorCheckedDocs([]);
+                          }}
+                          className="w-full py-3.5 px-3 text-left transition hover:bg-slate-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-850/30 last:border-0 rounded-lg cursor-pointer"
+                        >
+                          <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold font-mono text-amber-400">{app.id}</span>
-                              <span className="text-[9.5px] bg-slate-900 border border-slate-800 text-emerald-400 uppercase font-black px-2 py-0.2 rounded">
-                                Docs Ok ✓
+                              <span className="text-[8.5px] bg-amber-950/20 border border-amber-500/30 text-amber-400 uppercase font-bold px-1.5 py-0.2 rounded font-mono">
+                                Pre-verificado (Atención)
                               </span>
                             </div>
                             <span className="text-xs font-bold text-slate-200 block uppercase">{name}</span>
-                            <span className="text-[10px] font-mono text-slate-450 block font-semibold">PAS: {passport} | Fecha: {app.fecha} ({app.hora})</span>
+                            <span className="text-[9.5px] font-mono text-slate-450 block font-semibold">PAS: {passport} | Fecha: {app.fecha} ({app.hora})</span>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            {/* Fast select of active booths only */}
-                            <select
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  handleAssignToCubiculo(app.id, parseInt(e.target.value, 10));
-                                  e.target.value = ''; // Reset
-                                }
-                              }}
-                              className="bg-slate-900 border border-slate-800 text-[11px] font-bold text-slate-200 py-2 px-3 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                            >
-                              <option value="">-- Seleccionar Cubículo Activo --</option>
-                              {booths.filter(b => b.active).map(b => (
-                                <option key={`booth-select-${b.id}`} value={b.id}>
-                                  {b.name} - {b.staff}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="flex items-center gap-1.5 text-slate-400 hover:text-white transition font-black uppercase text-[9.5px] tracking-wider shrink-0 bg-slate-900 border border-slate-800 px-3 py-2 rounded-md">
+                            <span>Verificar Requisitos</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1153,7 +1521,7 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
             ) : (
               <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
                 {queueAtencionIn.map(app => {
-                  const name = app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
+                  const name = getExtranjeriaCitizenName(app);
                   const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
                   const isSelected = selectedAppForCheck?.id === app.id;
 
@@ -1217,7 +1585,7 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
                 <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-850 space-y-1.5">
                   <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest block font-mono">Cita para Validación</span>
                   <div className="text-xs font-mono font-black text-white">{selectedAppForCheck.id}</div>
-                  <div className="text-sm font-bold text-slate-100 uppercase">{selectedAppForCheck.datosPersonales?.nombreCompleto || selectedAppForCheck.nombre}</div>
+                  <div className="text-sm font-bold text-slate-100 uppercase">{getExtranjeriaCitizenName(selectedAppForCheck)}</div>
                   <div className="text-[10px] text-slate-450 leading-relaxed font-semibold">
                     Pasaporte: {selectedAppForCheck.datosPersonales?.pasaporte || selectedAppForCheck.identificacion} <br />
                     Trámite: {selectedAppForCheck.subServicioNombre || 'Servicio de Cedulación Extranjera'}
@@ -1225,48 +1593,33 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
                 </div>
 
                 {/* Checklist form */}
-                <div className="space-y-2.5">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-450 block">Requisitos Obligatorios</span>
-                  
-                  {REQUISITOS_EXTRANJERIA.map(req => {
-                    const isChecked = tempCheckedDocs.includes(req.id);
-                    return (
-                      <button
-                        key={`doc-check-${req.id}`}
-                        type="button"
-                        onClick={() => handleToggleDocCheck(req.id)}
-                        className={`w-full p-3 rounded-lg border text-left flex items-center justify-between gap-3 transition cursor-pointer ${
-                          isChecked 
-                            ? 'bg-blue-950/20 border-blue-500/50 text-blue-300' 
-                            : 'bg-slate-900/40 border-slate-850 text-slate-400 hover:border-slate-800'
-                        }`}
-                      >
-                        <span className="text-[10.5px] font-semibold leading-relaxed">{req.name}</span>
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                          isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700'
-                        }`}>
-                          {isChecked && <Check className="w-3 h-3 text-white stroke-[3px]" />}
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="space-y-3 bg-slate-900/40 p-4 rounded-lg border border-slate-900 text-left">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-450 block">Documentación a Validar</span>
+                  <ul className="space-y-2 text-slate-300">
+                    {REQUISITOS_EXTRANJERIA.map(req => (
+                      <li key={`req-item-${req.id}`} className="text-[10.5px] font-semibold leading-relaxed flex items-start gap-2">
+                        <span className="text-blue-500 font-bold shrink-0">•</span>
+                        <span>{req.name}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
                 {/* Summary checklist alert */}
                 <div className="bg-slate-900/50 p-3 rounded border border-slate-900 text-[10px] text-slate-400 leading-relaxed font-semibold">
-                  Tenga en cuenta que el ciudadano debe presentar <strong className="text-white">todo el listado original</strong>. En caso de cumplir con los requisitos, se habilitará para su envío con el Supervisor de Extranjería.
+                  Al confirmar, se asumirá que se ha validado toda la documentación física original presentada. El expediente se enviará de inmediato al Supervisor de Extranjería para la asignación de cubículo de atención.
                 </div>
 
                 {/* Actions */}
                 <div className="pt-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => handleSubmitVerification(selectedAppForCheck.id)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] tracking-wider uppercase py-3 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Confirmar Docs & Enviar a Supervisor</span>
-                  </button>
+                   <button
+                     type="button"
+                     onClick={() => handleSubmitVerification(selectedAppForCheck.id)}
+                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] tracking-wider uppercase py-3 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                   >
+                     <Send className="w-3.5 h-3.5" />
+                     <span>Confirmar Docs & Enviar a Supervisor</span>
+                   </button>
                 </div>
 
               </div>
@@ -1414,7 +1767,7 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
               <div className="space-y-4">
                 {queueCubiculoAssigned.map(app => {
                   const meta = appMetadata[app.id];
-                  const name = app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
+                  const name = getExtranjeriaCitizenName(app);
                   const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
                   const needsCashierPay = meta?.estadoTicket === 'ninguno' || meta?.estadoTicket === 'en_proceso';
                   const isPaid = meta?.estadoTicket === 'pagado_en_caja';
@@ -1473,25 +1826,37 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
                           <div className="text-left">
                             <span className="text-[8px] text-slate-500 uppercase font-black block">Detalles de Emisión de Ticket de Cobro:</span>
                             <span className="text-[11px] font-bold text-slate-300">
-                              Llamar Turno: <strong className="text-yellow-500 font-mono font-bold">EXT-{app.id.slice(-4)}</strong> en Cubículo {selectedCubiculo}
+                              Llamar Turno: <strong className="text-yellow-500 font-mono font-bold">E-{app.id.slice(-4).toUpperCase()}</strong> en Cubículo {selectedCubiculo}
                             </span>
                           </div>
 
-                          {needsCashierPay ? (
+                          <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => handleSendToCaja(app.id)}
-                              className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                              onClick={() => handleRecallCitizen(app.id)}
+                              className="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-yellow-400 font-extrabold text-[10px] uppercase tracking-wider px-3.5 py-2 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                              title="Volver a anunciar al ciudadano por los altavoces"
                             >
-                              <Play className="w-3.5 h-3.5" />
-                              <span>Llamar y Enviar a Caja de Pago</span>
+                              <Volume2 className="w-3.5 h-3.5 text-yellow-500" />
+                              <span>Volver a Llamar 🔊</span>
                             </button>
-                          ) : (
-                            <span className="text-[10px] text-emerald-400 font-black flex items-center gap-1.5">
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              <span>Enviado a Caja Correctamente</span>
-                            </span>
-                          )}
+
+                            {needsCashierPay ? (
+                              <button
+                                type="button"
+                                onClick={() => handleSendToCaja(app.id)}
+                                className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                                <span>Llamar y Enviar a Caja de Pago</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-emerald-400 font-black flex items-center gap-1.5">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                <span>Enviado a Caja Correctamente</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1518,9 +1883,318 @@ export default function ExtranjeriaController({ currentRole }: ExtranjeriaContro
               </div>
             )}
           </div>
-
         </div>
       )}
+
+      {/* ======================================================== */}
+      {/* PROFILE 4: PANTALLA DE TURNOS EN VIVO */}
+      {/* ======================================================== */}
+      {subRole === 'pantalla' && (() => {
+        // Find all active booths with people assigned
+        const activePeople = appointments.filter(app => {
+          const meta = appMetadata[app.id];
+          return meta && meta.assignedCubiculo !== null && meta.estadoTicket !== 'realizada';
+        });
+
+        // Get the most recently called citizen (or first active serving) for the spotlight
+        const featuredApp = activePeople[0];
+        const featuredBooth = featuredApp ? booths.find(b => b.id === appMetadata[featuredApp.id]?.assignedCubiculo) : null;
+
+        const formattedDay = liveTime.toLocaleDateString('es-PA', { weekday: 'long' });
+        const formattedDate = liveTime.toLocaleDateString('es-PA', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        const formattedTime = liveTime.toLocaleTimeString('es-PA', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        });
+
+        return (
+          <div ref={screenContainerRef} className={`space-y-6 animate-fade-in text-left ${isFullscreen ? 'bg-slate-950 p-8 lg:p-12 min-h-screen w-full overflow-y-auto' : ''}`}>
+            {/* Header Area styled with Tribunal logo and Real-time clock */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800/80 shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-5">
+              {/* Tribunal Electoral Logo & Title Badge */}
+              <div className="flex items-center gap-4 w-full lg:w-auto">
+                <div className="relative shrink-0">
+                  <div className="absolute -inset-1 bg-amber-500/10 rounded-xl blur" />
+                  <img
+                    src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/04/WhatsApp-Image-2026-04-30-at-09.45.35.png"
+                    alt="Tribunal Electoral Logo"
+                    className="w-16 h-16 object-contain rounded-xl bg-white p-1.5 border border-amber-500/30 relative z-10"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      // Silently fall back if blocking happens
+                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=120&q=80";
+                    }}
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[10px] font-black tracking-widest text-[#d9a74a] uppercase font-mono block">
+                    REPÚBLICA DE PANAMÁ ● TRIBUNAL ELECTORAL
+                  </span>
+                  <h2 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+                    SISTEMA DE ASIGNACIÓN DE TURNOS
+                  </h2>
+                  <p className="text-[10.5px] text-slate-400 font-semibold uppercase tracking-wider">
+                    DEPARTAMENTO DE EXTRANJERÍA ● MONITOR OFICIAL
+                  </p>
+                </div>
+              </div>
+ 
+              {/* Real-time Clock Info Panel */}
+              <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 w-full lg:w-auto">
+                <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-center lg:text-right shrink-0 min-w-[200px] shadow-inner font-sans">
+                  <div className="text-[13px] font-black text-amber-400 font-mono tracking-widest uppercase">
+                    {formattedTime}
+                  </div>
+                  <div className="text-[9.5px] font-extrabold text-slate-300 uppercase">
+                    <span className="text-amber-500/90 font-black">{formattedDay}</span>, {formattedDate}
+                  </div>
+                </div>
+ 
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleFullscreen}
+                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-850 text-slate-350 hover:text-amber-400 p-2.5 rounded-lg transition flex items-center gap-2 cursor-pointer"
+                    title={isFullscreen ? "Salir de pantalla completa" : "Poner en pantalla completa para TV"}
+                  >
+                    {isFullscreen ? <Minimize className="w-4 h-4 text-amber-500" /> : <Maximize className="w-4 h-4 text-amber-500" />}
+                    <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">
+                      {isFullscreen ? "Salir" : "Pantalla Completa 📺"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={fetchAppointments}
+                    disabled={loading}
+                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 p-2.5 rounded-lg transition"
+                    title="Actualizar Datos"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* HIGHLIGHTED HERO SPOTLIGHT HEADER: Pulsing called ticket attention box */}
+            {featuredApp && featuredBooth ? (
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-600/30 to-amber-950/35 border-2 border-amber-500/85 p-5 lg:p-7 shadow-2xl shadow-amber-500/10 animate-pulse">
+                <div className="absolute top-0 right-0 p-3 text-[10px] bg-amber-500/20 border-l border-b border-amber-500/40 rounded-bl-xl font-bold font-mono tracking-widest text-amber-300">
+                  🔔 ¡LLAMANDO CITACIÓN!
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                  <div className="md:col-span-5 text-center md:text-left space-y-1.5 border-b md:border-b-0 md:border-r border-amber-500/30 pb-4 md:pb-0 md:pr-4">
+                    <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-amber-300 bg-amber-950 border border-amber-500/35">
+                      TRÁMITE DE EXTRANJERÍA
+                    </span>
+                    <div className="text-[11px] font-black text-slate-300 uppercase tracking-widest">CIUDADANO CONVOCADO:</div>
+                    <div className="text-2xl font-black text-white uppercase tracking-tight truncate">
+                      {getExtranjeriaCitizenName(featuredApp)}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-4 text-center py-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-300 block">CÓDIGO DE TURNO</span>
+                    <div className="text-4xl lg:text-5xl font-mono font-black tracking-widest text-[#e8b958] drop-shadow-[0_0_12px_rgba(232,185,88,0.45)] mt-1">
+                      E-{featuredApp.id.slice(-4).toUpperCase()}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-3 text-center md:text-right space-y-1">
+                    <span className="text-[10px] font-black tracking-widest text-slate-350 block uppercase">DIRÍJASE AL</span>
+                    <div className="text-xl font-black text-white uppercase tracking-tight">
+                      {featuredBooth.name}
+                    </div>
+                    <div className="text-[11px] font-bold text-amber-300">
+                      Operador: {featuredBooth.staff}
+                    </div>
+                    <div className="pt-1.5">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                        Paso Habilitado
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl text-center space-y-1 py-10">
+                <p className="text-xs font-bold text-slate-450 uppercase tracking-wider">TRIBUNAL ELECTORAL ● MÓDULO EXTRANJERÍA</p>
+                <h3 className="text-lg font-black text-slate-300">SALA DE ESPERA OPERATIVA</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">No hay turnos activos llamados en este momento. Por favor tome asiento y espere a ser convocado en la pantalla.</p>
+              </div>
+            )}
+
+            {/* Main Monitor Display Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {booths.filter(b => b.active).map(b => {
+                // Find active appointments for this booth (not completed/realizada)
+                const assignedApps = appointments.filter(app => {
+                  const meta = appMetadata[app.id];
+                  return meta && meta.assignedCubiculo === b.id && meta.estadoTicket !== 'realizada';
+                });
+
+                // Current serving
+                const activeApp = assignedApps[0]; 
+                const queueRemaining = assignedApps.slice(1);
+
+                return (
+                  <div 
+                    key={`tv-booth-${b.id}`} 
+                    className={`bg-slate-900 border rounded-2xl p-5 transition-all duration-300 flex flex-col h-[290px] justify-between relative overflow-hidden ${
+                      activeApp 
+                        ? 'border-amber-500 border-2 shadow-2xl shadow-amber-500/10 bg-gradient-to-b from-slate-900 via-slate-900/95 to-amber-950/20 scale-[1.01]' 
+                        : 'border-slate-800 shadow-md shadow-black/40'
+                    }`}
+                  >
+                    {/* Top Header of booth */}
+                    <div className="border-b border-slate-850 pb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-200 uppercase tracking-widest">{b.name}</span>
+                        <div className="flex items-center gap-1.5">
+                          {activeApp && (
+                            <span className="text-[8px] bg-amber-950 text-amber-400 border border-amber-500/30 px-1 py-0.2 rounded font-black tracking-wider uppercase">
+                              LLAMANDO
+                            </span>
+                          )}
+                          <span className={`w-2.5 h-2.5 rounded-full ${activeApp ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-450 block truncate">Operador: <strong className="text-slate-300 font-semibold">{b.staff}</strong></span>
+                    </div>
+
+                    {/* Mid Content - Big Ticket Code, Procedure and Name */}
+                    <div className="py-4 my-auto text-center space-y-2 flex flex-col justify-center items-center">
+                      {activeApp ? (
+                        <div className="animate-fade-in space-y-1.5 w-full">
+                          <div className="text-[9px] font-black uppercase text-amber-400 tracking-widest bg-amber-950/70 border border-amber-500/30 py-0.5 px-2.5 rounded mx-auto w-fit">
+                            TRÁMITE DE EXTRANJERÍA 🛡️
+                          </div>
+                          
+                          <div className="text-3xl font-mono font-black tracking-widest text-[#e8b958] drop-shadow-[0_0_8px_rgba(232,185,88,0.3)] mt-1">
+                            E-{activeApp.id.slice(-4).toUpperCase()}
+                          </div>
+                          
+                          <div className="text-[13px] font-extrabold text-white uppercase truncate px-1 max-w-full">
+                            {getExtranjeriaCitizenName(activeApp)}
+                          </div>
+
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-[8.5px] font-black uppercase text-emerald-400 tracking-wider block bg-emerald-950/45 border border-emerald-500/20 py-0.5 px-2 rounded-sm mx-auto w-fit">
+                            CUBÍCULO DISPONIBLE
+                          </span>
+                          <div className="text-3xl font-mono font-black text-slate-700 tracking-widest select-none">
+                            ----
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 leading-none">Esperando Ciudadano</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Footer - Queue counts */}
+                    <div className="border-t border-slate-850 pt-3 flex items-center justify-between text-[10px]">
+                      <span className="text-slate-450 font-bold uppercase">Siguiente turno:</span>
+                      {queueRemaining.length > 0 ? (
+                        <span className="font-mono bg-slate-950 text-slate-200 border border-slate-800 px-2 py-0.5 rounded font-black text-[9px]">
+                          E-{queueRemaining[0].id.slice(-4).toUpperCase()} (+{queueRemaining.length - 1})
+                        </span>
+                      ) : (
+                        <span className="text-slate-550 font-mono italic">Sin cola asignada</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Section: Sala de Espera y Queue de Supervisor */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+              {/* Column 1 & 2: Cola general del día esperando verificación */}
+              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-md">
+                <div className="flex items-center justify-between border-b border-slate-850 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full" />
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-200">Próximos Despachos del Supervisor (En Espera)</span>
+                  </div>
+                  <span className="font-mono text-[10px] font-bold bg-slate-950 px-2 rounded border border-slate-850 text-slate-400">
+                    {queueSupervisorPending.length} Ciudadano(s) Listo(s)
+                  </span>
+                </div>
+
+                {queueSupervisorPending.length === 0 ? (
+                  <div className="p-10 text-center text-slate-505 text-xs font-bold italic text-slate-500">
+                    No hay ciudadanos listos en cola esperando despacho de cubículo.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-1">
+                    {queueSupervisorPending.map(app => (
+                      <div key={`tv-queue-${app.id}`} className="bg-slate-950/80 p-3.5 rounded-lg border border-slate-850 flex items-center justify-between gap-3">
+                        <div className="text-left space-y-0.5 truncate">
+                          <span className="text-xs font-bold text-slate-200 uppercase truncate block font-semibold text-slate-100">
+                            {getExtranjeriaCitizenName(app)}
+                          </span>
+                          <span className="text-[9.5px] font-mono text-indigo-400 font-bold block">
+                            E-{app.id.slice(-4).toUpperCase()} (Extranjería)
+                          </span>
+                        </div>
+                        <span className="text-[8.5px] bg-indigo-950/40 border border-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded font-black uppercase tracking-wider font-mono">
+                          ESPERA
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Column 3: Historial de Turnos Completados RECIENTES */}
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-md">
+                <div className="flex items-center gap-2 border-b border-slate-850 pb-3">
+                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-200">Trámites Finalizados</span>
+                </div>
+
+                {(() => {
+                  const realizadas = appointments.filter(app => appMetadata[app.id]?.estadoTicket === 'realizada');
+                  if (realizadas.length === 0) {
+                    return (
+                      <div className="p-10 text-center text-slate-505 text-xs font-bold italic text-slate-500">
+                        Cero registros de hoy.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                      {realizadas
+                        .slice(-4)
+                        .reverse()
+                        .map(app => (
+                          <div key={`tv-recent-${app.id}`} className="bg-emerald-950/10 border border-emerald-500/15 p-2.5 rounded-lg flex items-center justify-between">
+                            <div className="text-left font-mono space-y-0.5">
+                              <span className="text-[10px] font-black text-slate-300">E-{app.id.slice(-4).toUpperCase()}</span>
+                              <span className="text-[9px] text-slate-400 block truncate max-w-[130px] font-semibold">
+                                {getExtranjeriaCitizenName(app)}
+                              </span>
+                            </div>
+                            <span className="text-[8.5px] font-black text-emerald-450 uppercase font-bold">FINALIZADO</span>
+                          </div>
+                        ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ======================================================== */}
       {/* SECCIÓN IMPRIMIBLE OCULTA (OPTIMIZADA PARA PDF DE CITAS) */}
