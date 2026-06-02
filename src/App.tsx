@@ -323,18 +323,16 @@ export default function App() {
       </div>
 
       {/* Hero Announcement (Brief Context Panel) */}
-      <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-12 px-6 print:hidden">
-        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 text-center md:text-left">
-          <img
-            src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/Logo-TE-aniversario-256x256px-blanco-02.png"
-            alt="Tribunal Electoral de Panamá"
-            className="h-40 md:h-52 w-auto object-contain shrink-0"
-            referrerPolicy="no-referrer"
-          />
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight max-w-xl leading-tight">
-            Bienvenido a el Portal de citas del Tribunal Electoral
-          </h2>
-        </div>
+      <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-12 px-4 text-center space-y-6 print:hidden flex flex-col items-center justify-center">
+        <img
+          src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png"
+          alt="Tribunal Electoral de Panamá"
+          className="h-64 md:h-80 w-auto object-contain mx-auto"
+          referrerPolicy="no-referrer"
+        />
+        <h2 className="text-2xl md:text-3.5xl font-extrabold tracking-tight max-w-2xl mx-auto leading-tight">
+          Bienvenido al portal de citas del Tribunal Electoral
+        </h2>
       </section>
 
       {/* Main content body with Side informational columns or Full-width Admin Panel */}
