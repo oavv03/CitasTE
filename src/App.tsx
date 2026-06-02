@@ -327,10 +327,10 @@ export default function App() {
         <img
           src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png"
           alt="Tribunal Electoral de Panamá"
-          className="h-64 md:h-80 w-auto object-contain mx-auto"
+          className="h-32 md:h-44 w-auto object-contain mx-auto"
           referrerPolicy="no-referrer"
         />
-        <h2 className="text-2xl md:text-3.5xl font-extrabold tracking-tight max-w-2xl mx-auto leading-tight">
+        <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight max-w-3xl mx-auto leading-tight">
           Bienvenido al portal de citas del Tribunal Electoral
         </h2>
       </section>
