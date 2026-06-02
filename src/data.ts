@@ -2,6 +2,54 @@ import { CategoriaServicio, Sucursal } from './types';
 
 export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
   {
+    id: 'registro_civil',
+    nombre: 'Registro Civil',
+    descripcion: 'Certificados de nacimiento, matrimonio, defunción y otros trámites del estado civil de las personas.',
+    icono: 'FileText',
+    subServicios: [
+      {
+        id: 'rc_nacimiento',
+        nombre: 'Certificado de Nacimiento (Con o Sin Timbres)',
+        descripcion: 'Expedición de certificados oficiales para trámites escolares, legales o de viaje.',
+        requisitos: [
+          'Suministrar el número de cédula del titular o tomo, asiento y folio del nacimiento.',
+          'Costo de B/. 3.00 (con timbres fiscales de uso común).',
+          'Nombres completos de los padres.'
+        ]
+      },
+      {
+        id: 'rc_matrimonio',
+        nombre: 'Certificado de Matrimonio',
+        descripcion: 'Documento que certifica el enlace de matrimonio inscrito legalmente.',
+        requisitos: [
+          'Número de cédula de ambos contrayentes o tomo/folio de inscripción.',
+          'Costo de B/. 3.00 para uso nacional. Para uso internacional debe ser autenticado.',
+          'Fecha aproximada en que se celebró el acto.'
+        ]
+      },
+      {
+        id: 'rc_defuncion',
+        nombre: 'Certificado de Defunción',
+        descripcion: 'Expedición de actas para trámites legales de herencias o procesos luctuosos.',
+        requisitos: [
+          'Número de cédula del difunto y fecha exacta del deceso.',
+          'Identificación del solicitante con cédula de identidad personal.',
+          'Costo de B/. 3.00.'
+        ]
+      },
+      {
+        id: 'rc_inscripcion',
+        nombre: 'Inscripción de Nacimiento / Matrimonio',
+        descripcion: 'Registro oficial de un nuevo nacimiento o de un enlace matrimonial civil.',
+        requisitos: [
+          'Parte clínico del hospital/partera (para nacimientos).',
+          'Acta matrimonial original de la notaría o juzgado.',
+          'Cédulas vigentes de los padres o contrayentes.'
+        ]
+      }
+    ]
+  },
+  {
     id: 'cedulacion',
     nombre: 'Cedulación',
     descripcion: 'Trámites relacionados con la obtención, renovación, y duplicados de cédulas de identidad personal.',
@@ -92,73 +140,6 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
     ]
   },
   {
-    id: 'registro_civil',
-    nombre: 'Registro Civil',
-    descripcion: 'Certificados de nacimiento, matrimonio, defunción y otros trámites del estado civil de las personas.',
-    icono: 'FileText',
-    subServicios: [
-      {
-        id: 'rc_nacimiento',
-        nombre: 'Certificado de Nacimiento (Con o Sin Timbres)',
-        descripcion: 'Expedición de certificados oficiales para trámites escolares, legales o de viaje.',
-        requisitos: [
-          'Suministrar el número de cédula del titular o tomo, asiento y folio del nacimiento.',
-          'Costo de B/. 3.00 (con timbres fiscales de uso común).',
-          'Nombres completos de los padres.'
-        ]
-      },
-      {
-        id: 'rc_matrimonio',
-        nombre: 'Certificado de Matrimonio',
-        descripcion: 'Documento que certifica el enlace de matrimonio inscrito legalmente.',
-        requisitos: [
-          'Número de cédula de ambos contrayentes o tomo/folio de inscripción.',
-          'Costo de B/. 3.00 para uso nacional. Para uso internacional debe ser autenticado.',
-          'Fecha aproximada en que se celebró el acto.'
-        ]
-      },
-      {
-        id: 'rc_defuncion',
-        nombre: 'Certificado de Defunción',
-        descripcion: 'Expedición de actas para trámites legales de herencias o procesos luctuosos.',
-        requisitos: [
-          'Número de cédula del difunto y fecha exacta del deceso.',
-          'Identificación del solicitante con cédula de identidad personal.',
-          'Costo de B/. 3.00.'
-        ]
-      },
-      {
-        id: 'rc_inscripcion',
-        nombre: 'Inscripción de Nacimiento / Matrimonio',
-        descripcion: 'Registro oficial de un nuevo nacimiento o de un enlace matrimonial civil.',
-        requisitos: [
-          'Parte clínico del hospital/partera (para nacimientos).',
-          'Acta matrimonial original de la notaría o juzgado.',
-          'Cédulas vigentes de los padres o contrayentes.'
-        ]
-      }
-    ]
-  },
-  {
-    id: 'extranjeria',
-    nombre: 'Trámites de Extranjería',
-    descripcion: 'Procesamiento de cédulas de identidad para ciudadanos extranjeros (PE) y certificaciones.',
-    icono: 'Globe',
-    subServicios: [
-      {
-        id: 'ext_primera_vez',
-        nombre: 'Cédula de Extranjero por Primera Vez (PE)',
-        descripcion: 'Emisión del documento de identidad personal para extranjeros residentes permanentes.',
-        requisitos: [
-          'Resolución original del Servicio Nacional de Migración aprobando la residencia permanente.',
-          'Copia de la resolución debidamente autenticada.',
-          'Pasaporte original vigente con el sello de residencia.',
-          'Pago correspondiente de aranceles de carnet de extranjería.'
-        ]
-      }
-    ]
-  },
-  {
     id: 'organizacion_electoral',
     nombre: 'Organización Electoral',
     descripcion: 'Cambios de residencia electoral, inscripciones a partidos políticos, y más.',
@@ -191,6 +172,25 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Cédula de identidad vigente.',
           'Presentar formulario de renuncia debidamente firmado en oficinas del TE.'
+        ]
+      }
+    ]
+  },
+  {
+    id: 'extranjeria',
+    nombre: 'Trámites de Extranjería',
+    descripcion: 'Procesamiento de cédulas de identidad para ciudadanos extranjeros (PE) y certificaciones.',
+    icono: 'Globe',
+    subServicios: [
+      {
+        id: 'ext_primera_vez',
+        nombre: 'Cédula de Extranjero por Primera Vez (PE)',
+        descripcion: 'Emisión del documento de identidad personal para extranjeros residentes permanentes.',
+        requisitos: [
+          'Resolución original del Servicio Nacional de Migración aprobando la residencia permanente.',
+          'Copia de la resolución debidamente autenticada.',
+          'Pasaporte original vigente con el sello de residencia.',
+          'Pago correspondiente de aranceles de carnet de extranjería.'
         ]
       }
     ]
@@ -387,8 +387,12 @@ try {
   const cachedServicios = localStorage.getItem('TE_SERVICIOS');
   if (cachedServicios) {
     const parsed = JSON.parse(cachedServicios);
-    SERVICIOS_TRIBUNAL.length = 0;
-    SERVICIOS_TRIBUNAL.push(...parsed);
+    if (parsed && parsed.length > 0 && parsed[0].id === 'registro_civil') {
+      SERVICIOS_TRIBUNAL.length = 0;
+      SERVICIOS_TRIBUNAL.push(...parsed);
+    } else {
+      localStorage.removeItem('TE_SERVICIOS');
+    }
   }
 } catch (e) {
   console.error("Error loading cached servicios", e);
