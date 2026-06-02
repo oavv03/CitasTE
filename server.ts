@@ -4,6 +4,8 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dns from "dns";
 import fs from "fs";
+import { createClient } from "@supabase/supabase-js";
+import nodemailer from "nodemailer";
 
 // Fix Node warning about localhost dns resolution in some runtimes
 dns.setDefaultResultOrder("ipv4first");
@@ -13,6 +15,180 @@ const EXTRANJERIA_DB_PATH = path.join(process.cwd(), "extranjeria-db.json");
 const EXTRANJERIA_CONFIG_PATH = path.join(process.cwd(), "extranjeria-config.json");
 const TARDIA_CONFIG_PATH = path.join(process.cwd(), "tardia-config.json");
 const USERS_DB_PATH = path.join(process.cwd(), "users-db.json");
+
+// ==========================================
+// SUPABASE DATABASE WORKFLOW CONFIGS & INITIALIZER
+// ==========================================
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_KEY || "";
+const isSupabaseConfigured = !!(supabaseUrl && supabaseKey);
+
+console.log(`[Supabase Status] Configured: ${isSupabaseConfigured}`);
+if (isSupabaseConfigured) {
+  console.log(`[Supabase Url]: ${supabaseUrl}`);
+}
+
+const supabase = isSupabaseConfigured 
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false
+      }
+    }) 
+  : null;
+
+// ==========================================
+// OUTLOOK EMAIL CONFIGURATIONS & TRANSPORTER
+// ==========================================
+const outlookUser = process.env.OUTLOOK_USER || "";
+const outlookPass = process.env.OUTLOOK_PASS || "";
+const isOutlookConfigured = !!(outlookUser && outlookPass);
+
+console.log(`[Outlook Email Status] Configured: ${isOutlookConfigured}`);
+if (isOutlookConfigured) {
+  console.log(`[Outlook Email Account]: ${outlookUser}`);
+}
+
+async function sendOutlookEmail(to: string, subject: string, html: string) {
+  if (!isOutlookConfigured) {
+    throw new Error("Outlook no está configurado (falta OUTLOOK_USER o OUTLOOK_PASS)");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.OUTLOOK_HOST || "smtp.office365.com",
+    port: parseInt(process.env.OUTLOOK_PORT || "587"),
+    secure: false, // Port 587 is STARTTLS, meaning secure should be false initially
+    auth: {
+      user: outlookUser,
+      pass: outlookPass
+    },
+    tls: {
+      ciphers: "SSLv3",
+      rejectUnauthorized: false
+    }
+  });
+
+  const mailOptions = {
+    from: `"Tribunal Electoral de Panamá" <${outlookUser}>`,
+    to: to,
+    subject: subject,
+    html: html
+  };
+
+  return await transporter.sendMail(mailOptions);
+}
+
+// ==========================================
+// DYNAMIC SUPABASE TABLE NAME DETECTORS (FALLBACKS)
+// ==========================================
+let resolvedAppointmentsTable: string | null = null;
+async function getAppointmentsTableName(): Promise<string> {
+  if (resolvedAppointmentsTable) return resolvedAppointmentsTable;
+  if (!isSupabaseConfigured || !supabase) {
+    resolvedAppointmentsTable = "otro";
+    return "otro";
+  }
+  const candidates = ["otro", "equipo", "citas", "appointments"];
+  for (const table of candidates) {
+    try {
+      const { error } = await supabase.from(table).select("identificacion").limit(1);
+      if (!error || (error.message && !error.message.includes("Could not find") && !error.message.includes("does not exist") && !error.message.includes("public." + table))) {
+        console.log(`[Supabase Detector] Detected appointments table name: '${table}'`);
+        resolvedAppointmentsTable = table;
+        return table;
+      }
+    } catch (e) {}
+  }
+  resolvedAppointmentsTable = "otro";
+  return "otro";
+}
+
+let resolvedUsersTable: string | null = null;
+async function getUsersTableName(): Promise<string> {
+  if (resolvedUsersTable) return resolvedUsersTable;
+  if (!isSupabaseConfigured || !supabase) {
+    resolvedUsersTable = "usuarios";
+    return "usuarios";
+  }
+  const candidates = ["usuarios", "usuario", "users", "usuarios_db"];
+  for (const table of candidates) {
+    try {
+      const { error } = await supabase.from(table).select("nombre_usuario").limit(1);
+      if (!error || (error.message && !error.message.includes("Could not find") && !error.message.includes("does not exist") && !error.message.includes("public." + table))) {
+        console.log(`[Supabase Detector] Detected users table name: '${table}'`);
+        resolvedUsersTable = table;
+        return table;
+      }
+    } catch (e) {}
+  }
+  resolvedUsersTable = "usuarios";
+  return "usuarios";
+}
+
+let resolvedSucursalesTable: string | null = null;
+async function getSucursalesTableName(): Promise<string> {
+  if (resolvedSucursalesTable) return resolvedSucursalesTable;
+  if (!isSupabaseConfigured || !supabase) {
+    resolvedSucursalesTable = "sucursales";
+    return "sucursales";
+  }
+  const candidates = ["sucursales", "sucursal", "offices"];
+  for (const table of candidates) {
+    try {
+      const { error } = await supabase.from(table).select("identificacion").limit(1);
+      if (!error || (error.message && !error.message.includes("Could not find") && !error.message.includes("does not exist") && !error.message.includes("public." + table))) {
+        console.log(`[Supabase Detector] Detected sucursales table name: '${table}'`);
+        resolvedSucursalesTable = table;
+        return table;
+      }
+    } catch (e) {}
+  }
+  resolvedSucursalesTable = "sucursales";
+  return "sucursales";
+}
+
+let resolvedServiciosTable: string | null = null;
+async function getServiciosTableName(): Promise<string> {
+  if (resolvedServiciosTable) return resolvedServiciosTable;
+  if (!isSupabaseConfigured || !supabase) {
+    resolvedServiciosTable = "servicios_subservicios";
+    return "servicios_subservicios";
+  }
+  const candidates = ["servicios_subservicios", "servicios", "subservicios", "services"];
+  for (const table of candidates) {
+    try {
+      const { error } = await supabase.from(table).select("identificacion").limit(1);
+      if (!error || (error.message && !error.message.includes("Could not find") && !error.message.includes("does not exist") && !error.message.includes("public." + table))) {
+        console.log(`[Supabase Detector] Detected servicios table name: '${table}'`);
+        resolvedServiciosTable = table;
+        return table;
+      }
+    } catch (e) {}
+  }
+  resolvedServiciosTable = "servicios_subservicios";
+  return "servicios_subservicios";
+}
+
+let resolvedExtranjeriaTable: string | null = null;
+async function getExtranjeriaTableName(): Promise<string> {
+  if (resolvedExtranjeriaTable) return resolvedExtranjeriaTable;
+  if (!isSupabaseConfigured || !supabase) {
+    resolvedExtranjeriaTable = "extranjeria_records";
+    return "extranjeria_records";
+  }
+  const candidates = ["extranjeria_records", "extranjeria", "records_extranjeria", "migracion"];
+  for (const table of candidates) {
+    try {
+      const { error } = await supabase.from(table).select("pasaporte").limit(1);
+      if (!error || (error.message && !error.message.includes("Could not find") && !error.message.includes("does not exist") && !error.message.includes("public." + table))) {
+        console.log(`[Supabase Detector] Detected extranjeria table name: '${table}'`);
+        resolvedExtranjeriaTable = table;
+        return table;
+      }
+    } catch (e) {}
+  }
+  resolvedExtranjeriaTable = "extranjeria_records";
+  return "extranjeria_records";
+}
 
 interface ServerUser {
   username: string;
@@ -290,6 +466,318 @@ function saveAppointments(appointments: ServerCita[]): void {
   }
 }
 
+// ==========================================
+// SUPABASE SERVICES AND DATABASE MAPPING METHODS
+// ==========================================
+
+function categoryTranslation(cat: string): string {
+  if (cat === "extranjeria") return "Trámites de Extranjería";
+  if (cat === "organizacion_electoral") return "Organización Electoral";
+  if (cat === "cedulacion") return "Cedulación";
+  if (cat === "registro_civil") return "Registro Civil";
+  return cat || "Trámites";
+}
+
+function mapDBRowToCita(row: any): ServerCita {
+  const datosPersonales = row.datos_personales || {
+    tipoIdentificacion: row.tipo_identificacion || "Cedula",
+    identificacion: row.identificacion_ciudadano || row.identificacion || "",
+    fechaNacimiento: row.fecha_nacimiento || null,
+    telefono: row.telefono || "",
+    correo: row.correo || "",
+    nombreCompleto: row.nombre_completo || "",
+    numeroSeguimiento: row.numero_seguimiento || null,
+    primerNombre: row.primer_nombre || null,
+    segundoNombre: row.segundo_nombre || null,
+    primerApellido: row.primer_apellido || null,
+    segundoApellido: row.segundo_apellido || null,
+    pasaporte: row.pasaporte || null,
+    nacionalidad: row.nacionalidad || null,
+    fechaResolucion: row.fecha_resolucion || null,
+    numeroResolucion: row.numero_resolucion || null
+  };
+
+  return {
+    id: row.identificacion,
+    correo: row.correo || datosPersonales.correo || "",
+    codigoTransaccion: row.codigo_transaccion,
+    categoriaNombre: row.categoria_nombre || categoryTranslation(row.sub_servicio_id?.startsWith('ext_') ? 'extranjeria' : 'cedulacion'), 
+    subServicioNombre: row.sub_servicio_nombre || row.sub_servicio_id || "",
+    subServicioId: row.sub_servicio_id,
+    fecha: row.fecha,
+    hora: row.tiempo || row.hora || "",
+    sucursalNombre: row.sucursal_nombre || row.sucursal_id || "Sucursal",
+    sucursalDireccion: row.sucursal_direccion || "",
+    identificacion: row.identificacion_ciudadano || datosPersonales.identificacion || "",
+    telefono: row.telefono || datosPersonales.telefono || "",
+    requisitos: Array.isArray(row.requisitos) ? row.requisitos : [],
+    estado: row.estado || 'confirmada',
+    fechaCreacion: row.fecha_creacion,
+    numeroSeguimiento: row.numero_seguimiento || datosPersonales.numeroSeguimiento || undefined,
+    datosPersonales: datosPersonales,
+    nombre: row.nombre_completo || datosPersonales.nombreCompleto || ""
+  };
+}
+
+async function safeUpsertSupabase(tbl: string, row: any) {
+  if (!supabase) return;
+  const payload = { ...row };
+
+  // Common cross-mapping fallback properties
+  if (payload.tiempo !== undefined && payload.hora === undefined) {
+    payload.hora = payload.tiempo;
+  }
+  if (payload.hora !== undefined && payload.tiempo === undefined) {
+    payload.tiempo = payload.hora;
+  }
+
+  const MAX_RETRIES = 15;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const { error } = await supabase.from(tbl).upsert(payload);
+    if (!error) {
+      return;
+    }
+
+    const errMsg = error.message || "";
+    const matchSchemaCache = errMsg.match(/Could not find the '([^']+)' column/i);
+    const matchPostgresNotExist = errMsg.match(/column "([^"]+)" of relation "([^"]+)" does not exist/i);
+    const matchPostgresField = errMsg.match(/column "([^"]+)" does not exist/i);
+
+    const problematicColumn = matchSchemaCache?.[1] || matchPostgresNotExist?.[1] || matchPostgresField?.[1];
+
+    if (problematicColumn && payload.hasOwnProperty(problematicColumn)) {
+      console.log(`[Supabase Self-Healing] Table '${tbl}': Pruning non-existent column '${problematicColumn}' from payload.`);
+      delete payload[problematicColumn];
+    } else {
+      console.error(`[Supabase Upsert Fatal] Table '${tbl}' error:`, errMsg, "Payload:", payload);
+      throw error;
+    }
+  }
+  throw new Error(`Exceeded maximum retries (${MAX_RETRIES}) attempting to heal schema mismatch on table '${tbl}'`);
+}
+
+async function safeUpsertAppointment(row: any) {
+  const tbl = await getAppointmentsTableName();
+  await safeUpsertSupabase(tbl, row);
+}
+
+async function getDBUsers(): Promise<ServerUser[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const tbl = await getUsersTableName();
+      const { data, error } = await supabase.from(tbl).select("*");
+      if (error) {
+        console.error("Error reading users from Supabase:", error.message);
+        return getUsers(); 
+      }
+      if (data && data.length > 0) {
+        return data.map((row: any) => ({
+          username: row.nombre_usuario,
+          password: row.hash_contrasena,
+          role: row.role as any,
+          nombre: row.nombre,
+          fechaCreacion: row.fecha_creacion
+        }));
+      } else {
+        const localUsers = getUsers();
+        for (const u of localUsers) {
+          try {
+            await safeUpsertSupabase(tbl, {
+              identificacion: u.username,
+              nombre_usuario: u.username,
+              hash_contrasena: u.password || "",
+              nombre: u.nombre,
+              role: u.role,
+              fecha_creacion: u.fechaCreacion
+            });
+          } catch (e: any) {
+            console.warn(`[Supabase Seeder Warning] Failed to seed user ${u.username}:`, e.message || e);
+          }
+        }
+        return localUsers;
+      }
+    } catch (err) {
+      console.error("Catch in getDBUsers:", err);
+    }
+  }
+  return getUsers();
+}
+
+async function getDBAppointments(): Promise<ServerCita[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const tbl = await getAppointmentsTableName();
+      const { data, error } = await supabase.from(tbl).select("*");
+      if (error) {
+        console.error("Error fetching appointments from Supabase:", error.message);
+        return getAppointments(); 
+      }
+      
+      let sucs: any[] = [];
+      let subs: any[] = [];
+      try {
+        const tblSucs = await getSucursalesTableName();
+        const { data: resSucs } = await supabase.from(tblSucs).select("*");
+        if (resSucs) sucs = resSucs;
+      } catch (e) {
+        console.warn("Failed to load sucursales map:", e);
+      }
+      try {
+        const tblServs = await getServiciosTableName();
+        const { data: resSubs } = await supabase.from(tblServs).select("*");
+        if (resSubs) subs = resSubs;
+      } catch (e) {
+        console.warn("Failed to load servicios_subservicios map:", e);
+      }
+      
+      const sucursalMap = new Map<string, any>(sucs?.map((s: any) => [s.identificacion, s]) || []);
+      const subServicioMap = new Map<string, any>(subs?.map((s: any) => [s.identificacion, s]) || []);
+
+      return data.map((row: any) => {
+        const suc = sucursalMap.get(row.sucursal_id);
+        const sub = subServicioMap.get(row.sub_servicio_id);
+        
+        const mapped = mapDBRowToCita(row);
+        if (suc) {
+          mapped.sucursalNombre = suc.nombre;
+          mapped.sucursalDireccion = suc.direccion;
+        }
+        if (sub) {
+          mapped.subServicioNombre = sub.nombre;
+          mapped.requisitos = Array.isArray(sub.requisitos) ? sub.requisitos : [];
+        }
+        return mapped;
+      });
+    } catch (err) {
+      console.error("Catch in getDBAppointments:", err);
+    }
+  }
+  return getAppointments();
+}
+
+async function getDBExtranjeriaRecords(): Promise<ExtranjeriaRecord[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const tbl = await getExtranjeriaTableName();
+      const { data, error } = await supabase.from(tbl).select("*");
+      if (error) {
+        console.error("Error reading extranjeria records from Supabase:", error.message);
+        return getExtranjeriaRecords();
+      }
+      if (data && data.length > 0) {
+        return data.map((row: any) => ({
+          pasaporte: row.pasaporte,
+          nombre: row.nombre,
+          nacionalidad: row.nacionalidad,
+          elegible: row.elegible,
+          motivo: row.razon || row.motivo || ""
+        }));
+      } else {
+        const localRecs = getExtranjeriaRecords();
+        for (const r of localRecs) {
+          try {
+            await safeUpsertSupabase(tbl, {
+              pasaporte: r.pasaporte,
+              nombre: r.nombre,
+              nacionalidad: r.nacionalidad || "No especificada",
+              elegible: r.elegible,
+              razon: r.motivo
+            });
+          } catch (e: any) {
+            console.warn(`[Supabase Seeder Warning] Failed to seed extranjeria record for passport ${r.pasaporte}:`, e.message || e);
+          }
+        }
+        return localRecs;
+      }
+    } catch (err) {
+      console.error("Catch in getDBExtranjeriaRecords:", err);
+    }
+  }
+  return getExtranjeriaRecords();
+}
+
+async function initializeSupabaseTables() {
+  if (!isSupabaseConfigured || !supabase) return;
+
+  console.log("[Supabase Seeder] Checking and initializing database seeds...");
+
+  try {
+    // 1. Seed sucursales
+    const tblSucs = await getSucursalesTableName();
+    const { data: sucs, error: sucErr } = await supabase.from(tblSucs).select("identificacion");
+    if (sucErr) {
+      console.warn("[Supabase Seeder] 'sucursales' query failed (verify database structure):", sucErr.message);
+    } else if (!sucs || sucs.length === 0) {
+      console.log("[Supabase Seeder] Seeding sucursales...");
+      const sucursalSeeds = [
+        { identificacion: 'anc_main', provincia: 'Panamá', nombre: 'Tribunal Electoral de Panamá', direccion: 'Avenida Omar Torrijos Herrera, Ancón, frente a la terminal de Albrook, Ciudad de Panamá', telefono: '+507 507-8000', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'boc_office', provincia: 'Bocas del Toro', nombre: 'Dirección Regional de Bocas del Toro', direccion: 'Calle Principal, Isla Colón, Bocas del Toro', telefono: '+507 757-8100', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'coc_office', provincia: 'Coclé', nombre: 'Dirección Regional de Coclé', direccion: 'Vía Interamericana, entrada de Penonomé, frente a Plaza Iguana, Coclé', telefono: '+507 997-8100', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'col_office', provincia: 'Colón', nombre: 'Dirección Regional de Colón', direccion: 'Calle 11 y Avenida Roosevelt, Ciudad de Colón', telefono: '+507 433-8200', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'chi_office', provincia: 'Chiriquí', nombre: 'Dirección Regional de Chiriquí', direccion: 'Calle F Sur y Avenida 3ra Oeste, David, Chiriquí', telefono: '+507 728-8100', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'dar_office', provincia: 'Darién', nombre: 'Dirección Regional de Darién', direccion: 'Metetí, Carretera Panamericana, Darién', telefono: '+507 299-6350', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'her_office', provincia: 'Herrera', nombre: 'Dirección Regional de Herrera', direccion: 'Avenida Melitón Martín, Chitré, Herrera', telefono: '+507 913-8100', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'los_office', provincia: 'Los Santos', nombre: 'Dirección Regional de Los Santos', direccion: 'Vía Circunvalación, frente al Estadio Flaco Bala Hernández, Las Tablas', telefono: '+507 926-8100', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'pac_office', provincia: 'Panamá Centro', nombre: 'Dirección Regional de Panamá Centro', direccion: 'Centro Comercial El Dorado, Vía Ricardo J. Alfaro, Planta Alta, Ciudad de Panamá', telefono: '+507 507-8100', tiempo: 'Martes a Sábado 9:00 AM - 5:00 PM' },
+        { identificacion: 'pan_office', provincia: 'Panamá Norte', nombre: 'Dirección Regional de Panamá Norte', direccion: 'Vía Transístmica, Centro Comercial Plaza Las Cumbres, Las Cumbres', telefono: '+507 507-8250', tiempo: 'Lunes a Viernes 8:00 AM - 4:00 PM' },
+        { identificacion: 'pae_office', provincia: 'Panamá Este', nombre: 'Dirección Regional de Panamá Este', direccion: 'Plaza Comercial El Cruce, Planta Alta, 24 de Diciembre', telefono: '+507 507-8280', tiempo: 'Lunes a Viernes 8:00 AM - 4:00 PM' },
+        { identificacion: 'pao_office', provincia: 'Panamá Oeste', nombre: 'Dirección Regional de Panamá Oeste', direccion: 'Avenida Las Américas, al lado del cuartel de bomberos, La Chorrera', telefono: '+507 507-8400', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'sm_office', provincia: 'San Miguelito', nombre: 'Dirección Regional de San Miguelito', direccion: 'Centro Comercial Los Andes, Centro de Servicios Gubernamentales, San Miguelito', telefono: '+507 507-8300', tiempo: 'Martes a Sábado 9:00 AM - 5:00 PM' },
+        { identificacion: 'ver_office', provincia: 'Veraguas', nombre: 'Dirección Regional de Veraguas', direccion: 'Avenida Héctor Alejandro Santacoloma, Santiago, Veraguas', telefono: '+507 950-8100', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'gun_office', provincia: 'Guna Yala', nombre: 'Dirección Regional de Guna Yala', direccion: 'Sede Comarcal, El Porvenir, Guna Yala', telefono: '+507 299-9130', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
+        { identificacion: 'arr_office', provincia: 'Arraiján', nombre: 'Regional Especial de Arraiján', direccion: 'Vía Interamericana, Plaza Paseo Arraiján, Arraiján', telefono: '+507 507-8410', tiempo: 'Lunes a Viernes 8:00 AM - 4:00 PM' }
+      ];
+
+      for (const suc of sucursalSeeds) {
+        await supabase.from(tblSucs).insert(suc);
+      }
+      console.log("[Supabase Seeder] Sucursales seeded successfully.");
+    }
+
+    // 2. Seed servicios_subservicios
+    const tblServs = await getServiciosTableName();
+    const { data: subs, error: subErr } = await supabase.from(tblServs).select("identificacion");
+    if (subErr) {
+      console.warn("[Supabase Seeder] 'servicios_subservicios' query failed (verify database structure):", subErr.message);
+    } else if (!subs || subs.length === 0) {
+      console.log("[Supabase Seeder] Seeding servicios_subservicios...");
+      const serviceSeeds = [
+        { identificacion: 'ced_primera_vez', id_categoria: 'cedulacion', nombre: 'Cédula por Primera Vez (Mayores de 18 años)', descripcion: 'Para ciudadanos panameños nacidos en el territorio nacional que alcanzan la mayoría de edad.', requisitos: ['Tener 18 años cumplidos.', 'Copia de certificado de nacimiento del Registro Civil (para verificar filiación).', 'Presencia física del interesado.'] },
+        { identificacion: 'ced_renovacion', id_categoria: 'cedulacion', nombre: 'Renovación de Cédula de Identidad', descripcion: 'Renovación de documento vencido o próximo a vencer.', requisitos: ['Presentar la cédula de identidad vencida o por vencer.', 'Vestimenta adecuada para la toma de fotografía (no hombros descubiertos, no blusas escotadas).', 'Trámite gratuito para renovación regular.'] },
+        { identificacion: 'ced_duplicado', id_categoria: 'cedulacion', nombre: 'Duplicado de Cédula (Pérdida o Robo)', descripcion: 'Reposición del documento por pérdida, robo, hurto o deterioro.', requisitos: ['Costo de B/. 15.00 por el primer duplicado (B/. 25.00 a partir del segundo).', 'Denuncia de pérdida (opcional pero recomendada).', 'Confirmación de datos biométricos en oficina.'] },
+        { identificacion: 'ced_juvenil_primera', id_categoria: 'cedulacion', nombre: 'Cédula Juvenil por Primera Vez', descripcion: 'Formulación y entrega de cédula de identidad para menores de edad por primera vez.', requisitos: ['Estar acompañado de por lo menos uno de los padres con su cédula vigente.', 'Certificado de nacimiento del menor.', 'El menor de edad debe estar presente física voluntariamente.'] },
+        { identificacion: 'ced_juvenil_renovacion', id_categoria: 'cedulacion', nombre: 'Cédula Juvenil Renovación', descripcion: 'Trámite de renovación para la cédula de identidad de menor de edad por vencimiento.', requisitos: ['Estar acompañado de uno de los padres con su cédula vigente.', 'Presentar la cédula juvenil vencida o próxima a vencer.', 'El menor de edad debe estar presente físicamente.'] },
+        { identificacion: 'ced_pasados_edad', id_categoria: 'cedulacion', nombre: 'Mayores de Edad No Cedulados (Pasados de Edad)', descripcion: 'Trámite de cedulación tardía para ciudadanos panameños nacidos en el territorio nacional que alcanzaron la mayoría de edad sin obtener su documento.', requisitos: ['Declaración jurada de dos (2) testigos panameños mayores de edad.', 'Certificado de nacimiento expedido por el Registro Civil.', 'Pruebas documentales de presencia física en el país (certificados de escuela, cartillas de vacunas, etc.).', 'Presencia física del interesado con vestimenta formal y hombros cubiertos.'] },
+        { identificacion: 'ced_extranjero_renovacion', id_categoria: 'cedulacion', nombre: 'Renovación de Cédula de Extranjero (PE)', descripcion: 'Trámite de renovación del documento de identidad personal para ciudadanos extranjeros residentes permanentes.', requisitos: ['Presentar la cédula de extranjero (PE) vencida o próxima a vencer.', 'Certificado de estatus migratorio vigente, emitido por el Servicio Nacional de Migración.', 'Pasaporte original vigente (copia completa certificada).', 'Pago del costo del trámite en la sucursal del Tribunal Electoral.'] },
+        { identificacion: 'ced_extranjero_duplicado_perdida', id_categoria: 'cedulacion', nombre: 'Duplicado de Cédula PE por Pérdida', descripcion: 'Reposición de la cédula de extranjero (PE) residente permanente debido a robo, extravío o deterioro.', requisitos: ['Denuncia formal registrada de pérdida o robo ante la DIJ.', 'Copia de pasaporte vigente y resolución autorizada de residencia.', 'Pago de arancel obligatorio por duplicado de extranjería (B/. 50.00).'] },
+        { identificacion: 'rc_nacimiento', id_categoria: 'registro_civil', nombre: 'Certificado de Nacimiento (Con o Sin Timbres)', descripcion: 'Expedición de certificados oficiales para trámites escolares, legales o de viaje.', requisitos: ['Suministrar el número de cédula del titular o tomo, asiento y folio del nacimiento.', 'Costo de B/. 3.00 (con timbres fiscales de uso común).', 'Nombres completos de los padres.'] },
+        { identificacion: 'rc_matrimonio', id_categoria: 'registro_civil', nombre: 'Certificado de Matrimonio', descripcion: 'Documento que certifica el enlace de matrimonio inscrito legalmente.', requisitos: ['Número de cédula de ambos contrayentes o tomo/folio de inscripción.', 'Costo de B/. 3.00 para uso nacional. Para uso internacional debe ser autenticado.', 'Fecha aproximada en que se celebró el acto.'] },
+        { identificacion: 'rc_defuncion', id_categoria: 'registro_civil', nombre: 'Certificado de Defunción', descripcion: 'Expedición de actas para trámites legales de herencias o procesos luctuosos.', requisitos: ['Número de cédula del difunto y fecha exacta del deceso.', 'Identificación del solicitante con cédula de identidad personal.', 'Costo de B/. 3.00.'] },
+        { identificacion: 'rc_inscripcion', id_categoria: 'registro_civil', nombre: 'Inscripción de Nacimiento / Matrimonio', descripcion: 'Registro oficial de un nuevo nacimiento o de un enlace matrimonial civil.', requisitos: ['Parte clínico del hospital/partera (para nacimientos).', 'Acta matrimonial original de la notaría o juzgado.', 'Cédulas vigentes de los padres o contrayentes.'] },
+        { identificacion: 'ext_primera_vez', id_categoria: 'extranjeria', nombre: 'Cédula de Extranjero por Primera Vez (PE)', descripcion: 'Emisión del documento de identidad personal para extranjeros residentes permanentes.', requisitos: ['Resolución original del Servicio Nacional de Migración aprobando la residencia permanente.', 'Copia de la resolución debidamente autenticada.', 'Pasaporte original vigente con el sello de residencia.', 'Pago correspondiente de aranceles de carnet de extranjería.'] },
+        { identificacion: 'oe_cambio_residencia', id_categoria: 'organizacion_electoral', nombre: 'Cambio de Residencia Electoral', descripcion: 'Actualización del centro de votación asignado según su domicilio habitual real.', requisitos: ['Cédula de identidad personal vigente.', 'Factura de servicio público (agua, luz, teléfono) o documento que demuestre la nueva dirección (Opcional).', 'Someterse a declaración jurada de residencia electoral.'] },
+        { identificacion: 'oe_afiliacion_partido', id_categoria: 'organizacion_electoral', nombre: 'Afiliación a Partido Político', descripcion: 'Registro voluntario de pertenencia a un esquema de partido político oficialmente reconocido.', requisitos: ['Cédula de identidad personal panameña vigente.', 'Estar en pleno goce de sus derechos políticos (no tener suspensiones vigentes).', 'La afiliación es de character personal e indelegable.'] },
+        { identificacion: 'oe_renuncia_partido', id_categoria: 'organizacion_electoral', nombre: 'Renuncia a Partido Político', descripcion: 'Trámite para desafiliarse de un colectivo partidario y regresar a estado independiente.', requisitos: ['Cédula de identidad vigente.', 'Presentar formulario de renuncia debidamente firmado en oficinas del TE.'] },
+        { identificacion: 'pe_nacimiento', id_categoria: 'panamenos_extranjero', nombre: 'Inscripción de Nacimiento en el Extranjero', descripcion: 'Registro de nacimiento para hijos de padre y/o madre panameños nacidos fuera del territorio nacional.', requisitos: ['Certificado de nacimiento original otorgado por el país extranjero, debidamente apostillado o legalizado.', 'Cédula de identidad de origen o pasaportes vigentes del padre o la madre panameña.', 'Copia simple del documento de identidad del menor.'] },
+        { identificacion: 'pe_cedulacion', id_categoria: 'panamenos_extranjero', nombre: 'Cédula de Identidad en Oficinas Consulares', descripcion: 'Gestión y renovación de cédula de identidad a través de delegaciones diplomáticas y consulados de enlace.', requisitos: ['Presencia física obligatoria en el consulado panameño correspondiente.', 'Suministrar número de cédula anterior o pasaporte panameño vigente.', 'Formulario de validación biométrica consular firmado.'] },
+        { identificacion: 'pe_matrimonio', id_categoria: 'panamenos_extranjero', nombre: 'Inscripción de Matrimonio celebrado en el Extranjero', descripcion: 'Registro oficial de matrimonios de ciudadanos panameños celebrados en el exterior.', requisitos: ['Certificado de matrimonio original extranjero apostillado o legalizado.', 'Cédula de identidad vigente del cónyuge panameño.', 'Traducción autorizada al español si el documento original fue emitido en otro idioma.'] }
+      ];
+
+      for (const service of serviceSeeds) {
+        await supabase.from(tblServs).insert(service);
+      }
+      console.log("[Supabase Seeder] Servicios/Subservicios seeded successfully.");
+    }
+
+    // 3. Populate default admin profiles and whitelist registers if empty
+    await getDBUsers();
+    await getDBExtranjeriaRecords();
+    
+  } catch (err: any) {
+    console.error("[Supabase Seeder Error] Exception during table initialization:", err.message || err);
+  }
+}
+
 function renderStatusPage(
   title: string, 
   subtitle: string, 
@@ -449,6 +937,9 @@ async function startServer() {
   // Middleware to parse requests
   app.use(express.json());
 
+  // Check and seed Supabase schema on start
+  await initializeSupabaseTables();
+
   // Proxy endpoint to load the official logo, bypassing potential hotlinking/CORS protection on the Tribunal Electoral server
   app.get("/api/logo", async (req, res) => {
     try {
@@ -521,7 +1012,7 @@ async function startServer() {
 
       // Automatically register or update this appointment inside our server DB
       if (codigoTransaccion) {
-        const appointments = getAppointments();
+        const appointments = await getDBAppointments();
         const existingIdx = appointments.findIndex(a => a.id === id || a.codigoTransaccion === codigoTransaccion);
         
         const serverCita: ServerCita = {
@@ -530,6 +1021,7 @@ async function startServer() {
           codigoTransaccion: codigoTransaccion,
           categoriaNombre: categoriaNombre || "",
           subServicioNombre: subServicioNombre || "",
+          subServicioId: req.body.subServicioId || undefined,
           fecha: fecha || new Date().toISOString().split('T')[0],
           hora: hora || "",
           sucursalNombre: sucursalNombre || "",
@@ -544,13 +1036,45 @@ async function startServer() {
           nombre: req.body.nombre || (req.body.datosPersonales?.nombreCompleto) || ""
         };
 
-        if (existingIdx >= 0) {
-          appointments[existingIdx] = serverCita;
+        if (isSupabaseConfigured && supabase) {
+          const row = {
+            identificacion: serverCita.id,
+            codigo_transaccion: serverCita.codigoTransaccion,
+            fecha: serverCita.fecha,
+            tiempo: serverCita.hora,
+            fecha_creacion: serverCita.fechaCreacion,
+            estado: serverCita.estado,
+            sucursal_id: req.body.sucursalId || "anc_main",
+            sub_servicio_id: req.body.subServicioId || "ced_primera_vez",
+            tipo_identificacion: serverCita.datosPersonales?.tipoIdentificacion || "Cedula",
+            identificacion_ciudadano: serverCita.identificacion,
+            fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || null,
+            telefono: serverCita.telefono,
+            correo: serverCita.correo,
+            nombre_completo: serverCita.nombre || serverCita.datosPersonales?.nombreCompleto || "",
+            numero_seguimiento: serverCita.numeroSeguimiento || null,
+            primer_nombre: serverCita.datosPersonales?.primerNombre || null,
+            segundo_nombre: serverCita.datosPersonales?.segundoNombre || null,
+            primer_apellido: serverCita.datosPersonales?.primerApellido || null,
+            segundo_apellido: serverCita.datosPersonales?.segundoApellido || null,
+            pasaporte: serverCita.datosPersonales?.pasaporte || null,
+            nacionalidad: serverCita.datosPersonales?.nacionalidad || null,
+            numero_resolucion: serverCita.datosPersonales?.numeroResolucion || null,
+            fecha_resolucion: serverCita.datosPersonales?.fechaResolucion || null
+          };
+          try {
+            await safeUpsertAppointment(row);
+          } catch (dbErr: any) {
+            console.error("[Email Service - DB Sync Warning] Failed to register/update appointment row in Supabase, continuing email delivery:", dbErr.message || dbErr);
+          }
         } else {
-          appointments.push(serverCita);
+          if (existingIdx >= 0) {
+            appointments[existingIdx] = serverCita;
+          } else {
+            appointments.push(serverCita);
+          }
+          saveAppointments(appointments);
         }
-        
-        saveAppointments(appointments);
       }
 
       // Use the local proxy endpoint on our server which sets proper headers (Referer, User-Agent) to bypass hotlinking protection and support unblocked PNG fallbacks
@@ -888,67 +1412,42 @@ async function startServer() {
         </html>
       `;
 
-      const apiKey = process.env.RESEND_API_KEY;
-      // Use strictly "onboarding@resend.dev" by default if custom sender is not set,
-      // as display names like "Tribunal Electoral <...>" are often rejected with validation_error on trial accounts.
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
-
-      // Check if Resend API Key is defined
-      if (apiKey && apiKey !== "undefined" && apiKey.trim() !== "") {
-        console.log(`[Email Service] Attempting real Resend email delivery to ${email} (From: ${fromEmail})...`);
-        
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            from: fromEmail,
-            to: [email],
-            subject: `Comprobante de Cita Oficial: ${codigoTransaccion} - Tribunal Electoral`,
-            html: htmlContent
-          })
-        });
-
-        // Some trial API keys might only allow sending to the registered sandbox email,
-        // or Resend requires verified domains, let's gracefully capture any Resend API responses
-        const resData = await response.json() as any;
-        
-        if (response.ok) {
-          console.log("[Email Service] Email sent successfully via Resend:", resData);
+      // Check if Outlook is configured
+      if (isOutlookConfigured) {
+        console.log(`[Email Service] Attempting real Outlook email delivery to ${email} (From: ${outlookUser})...`);
+        try {
+          const info = await sendOutlookEmail(
+            email,
+            `Comprobante de Cita Oficial: ${codigoTransaccion} - Tribunal Electoral`,
+            htmlContent
+          );
+          console.log("[Email Service] Email sent successfully via Outlook SMTP:", info.messageId);
           return res.json({ 
             success: true, 
             message: "El comprobante ha sido enviado a su correo electrónico exitosamente.",
-            id: resData.id,
+            id: info.messageId,
             simulated: false
           });
-        } else {
-          console.error("[Email Service] Resend API responded with error:", resData);
-          
-          let friendlyError = resData.message || JSON.stringify(resData);
-          if (resData.name === "validation_error") {
-            friendlyError = `Su clave de Resend existe, pero su cuenta gratuita está limitada. No se pudo enviar el correo a "${email}" porque no es el correo con el que se registró en Resend (las cuentas de prueba de Resend solo permiten enviar correos a su propia dirección de registro). Para enviar a cualquier persona, debe verificar su dominio o añadir el correo a su lista de destinatarios permitidos en Resend.`;
-          }
-          
+        } catch (error: any) {
+          console.error("[Email Service] Outlook sending error:", error);
           return res.status(400).json({ 
             success: false, 
-            error: friendlyError,
-            errorType: resData.name || "api_error",
+            error: `Error al enviar correo por Outlook: ${error.message || error}. Asegúrese de que su usuario y contraseña o clave de aplicación de Outlook sean válidos.`,
+            errorType: "smtp_error",
             simulated: false,
             htmlPreview: htmlContent
           });
         }
       } else {
         // Run in Simulation Mode (perfect for Sandbox preview)
-        console.log(`[Email Service] Simulating email delivery to ${email} (no RESEND_API_KEY configured).`);
+        console.log(`[Email Service] Simulating email delivery to ${email} (no OUTLOOK_USER configured).`);
         
         // Emulate a 1 second net delay for high fidelity
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         return res.json({
           success: true,
-          message: "Se simuló el envío correctamente debido a que está operando en modo de pruebas sin clave de API.",
+          message: "Se simuló el envío correctamente debido a que está operando en modo de pruebas sin credenciales de Outlook.",
           simulated: true,
           htmlPreview: htmlContent
         });
@@ -965,9 +1464,9 @@ async function startServer() {
   // ==========================================
   
   // Endpoint to fetch the full list of foreigner passport eligibility records
-  app.get("/api/extranjeria/list", (req, res) => {
+  app.get("/api/extranjeria/list", async (req, res) => {
     try {
-      const records = getExtranjeriaRecords();
+      const records = await getDBExtranjeriaRecords();
       return res.json({ success: true, records });
     } catch (e: any) {
       console.error("Error fetching extranjería list:", e);
@@ -976,7 +1475,7 @@ async function startServer() {
   });
 
   // Endpoint to upload/overwrite foreign passport records (expecting parsed array of records)
-  app.post("/api/extranjeria/upload", (req, res) => {
+  app.post("/api/extranjeria/upload", async (req, res) => {
     try {
       const { records } = req.body;
       if (!Array.isArray(records)) {
@@ -992,7 +1491,25 @@ async function startServer() {
         motivo: String(r.motivo || "").trim() || "Consulte en ventanilla"
       })).filter(r => r.pasaporte !== "");
 
-      saveExtranjeriaRecords(normalizedRecords);
+      if (isSupabaseConfigured && supabase) {
+        const tbl = await getExtranjeriaTableName();
+        for (const r of normalizedRecords) {
+          try {
+            await safeUpsertSupabase(tbl, {
+              pasaporte: r.pasaporte,
+              nombre: r.nombre,
+              nacionalidad: r.nacionalidad,
+              elegible: r.elegible,
+              razon: r.motivo
+            });
+          } catch (e: any) {
+            console.error(`[Extranjería Migrate Error] Fail on passport ${r.pasaporte}:`, e.message || e);
+          }
+        }
+      } else {
+        saveExtranjeriaRecords(normalizedRecords);
+      }
+
       console.log(`[Extranjería] CSV Upload Success. Conserved ${normalizedRecords.length} records.`);
       return res.json({ success: true, count: normalizedRecords.length, records: normalizedRecords });
     } catch (e: any) {
@@ -1002,7 +1519,7 @@ async function startServer() {
   });
 
   // Endpoint to verify a specific passport number
-  app.post("/api/extranjeria/verify", (req, res) => {
+  app.post("/api/extranjeria/verify", async (req, res) => {
     try {
       const { pasaporte } = req.body;
       if (!pasaporte) {
@@ -1010,7 +1527,7 @@ async function startServer() {
       }
 
       const searchPassport = String(pasaporte).trim().toUpperCase();
-      const records = getExtranjeriaRecords();
+      const records = await getDBExtranjeriaRecords();
       const match = records.find(r => r.pasaporte === searchPassport);
 
       if (match) {
@@ -1093,7 +1610,7 @@ async function startServer() {
   });
 
   // API to register appointment directly
-  app.post("/api/register-appointment", (req, res) => {
+  app.post("/api/register-appointment", async (req, res) => {
     try {
       const { 
         id, 
@@ -1117,7 +1634,7 @@ async function startServer() {
         return res.status(400).json({ error: "Datos incompletos." });
       }
 
-      const appointments = getAppointments();
+      const appointments = await getDBAppointments();
 
       // Enforce capacity check for Extranjeria appointments
       const isExtranjeria = servicioCategoria === 'extranjeria' || 
@@ -1185,15 +1702,44 @@ async function startServer() {
         nombre: datosPersonales?.nombreCompleto || req.body.nombre || ""
       };
 
-      if (existingIdx >= 0) {
-        const existing = appointments[existingIdx];
-        serverCita.estado = existing.estado;
-        appointments[existingIdx] = serverCita;
+      if (isSupabaseConfigured && supabase) {
+        const row = {
+          identificacion: serverCita.id,
+          codigo_transaccion: serverCita.codigoTransaccion,
+          fecha: serverCita.fecha,
+          tiempo: serverCita.hora,
+          fecha_creacion: serverCita.fechaCreacion,
+          estado: existingIdx >= 0 ? appointments[existingIdx].estado : serverCita.estado,
+          sucursal_id: sucursalId || "anc_main",
+          sub_servicio_id: subServicioId || "ced_primera_vez",
+          tipo_identificacion: serverCita.datosPersonales?.tipoIdentificacion || "Cedula",
+          identificacion_ciudadano: serverCita.identificacion,
+          fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || null,
+          telefono: serverCita.telefono,
+          correo: serverCita.correo,
+          nombre_completo: serverCita.nombre || serverCita.datosPersonales?.nombreCompleto || "",
+          numero_seguimiento: serverCita.numeroSeguimiento || null,
+          primer_nombre: serverCita.datosPersonales?.primerNombre || null,
+          segundo_nombre: serverCita.datosPersonales?.segundoNombre || null,
+          primer_apellido: serverCita.datosPersonales?.primerApellido || null,
+          segundo_apellido: serverCita.datosPersonales?.segundoApellido || null,
+          pasaporte: serverCita.datosPersonales?.pasaporte || null,
+          nacionalidad: serverCita.datosPersonales?.nacionalidad || null,
+          numero_resolucion: serverCita.datosPersonales?.numeroResolucion || null,
+          fecha_resolucion: serverCita.datosPersonales?.fechaResolucion || null
+        };
+        await safeUpsertAppointment(row);
       } else {
-        appointments.push(serverCita);
+        if (existingIdx >= 0) {
+          const existing = appointments[existingIdx];
+          serverCita.estado = existing.estado;
+          appointments[existingIdx] = serverCita;
+        } else {
+          appointments.push(serverCita);
+        }
+        saveAppointments(appointments);
       }
 
-      saveAppointments(appointments);
       return res.json({ success: true, appointment: serverCita });
     } catch (e: any) {
       console.error("Error registering appointment:", e);
@@ -1202,14 +1748,14 @@ async function startServer() {
   });
 
   // API to bulk-sync appointment statuses
-  app.post("/api/sync-appointments", (req, res) => {
+  app.post("/api/sync-appointments", async (req, res) => {
     try {
       const { ids } = req.body;
       if (!Array.isArray(ids)) {
         return res.status(400).json({ error: "Ids debe ser un array" });
       }
 
-      const appointments = getAppointments();
+      const appointments = await getDBAppointments();
       const results = appointments.filter(a => ids.includes(a.id));
       return res.json({ success: true, appointments: results });
     } catch (e: any) {
@@ -1219,9 +1765,9 @@ async function startServer() {
   });
 
   // API to get all appointments
-  app.get("/api/appointments", (req, res) => {
+  app.get("/api/appointments", async (req, res) => {
     try {
-      const appointments = getAppointments();
+      const appointments = await getDBAppointments();
       return res.json({ success: true, appointments });
     } catch (e: any) {
       console.error("Error fetching all appointments:", e);
@@ -1230,19 +1776,26 @@ async function startServer() {
   });
 
   // API to cancel an appointment from dashboard
-  app.post("/api/cancel-appointment", (req, res) => {
+  app.post("/api/cancel-appointment", async (req, res) => {
     try {
       const { id } = req.body;
       if (!id) {
         return res.status(400).json({ error: "Se requiere un ID de cita" });
       }
 
-      const appointments = getAppointments();
-      const appointment = appointments.find(a => a.id === id);
-      if (appointment) {
-        appointment.estado = 'cancelada';
-        saveAppointments(appointments);
+      if (isSupabaseConfigured && supabase) {
+        const tbl = await getAppointmentsTableName();
+        const { error } = await supabase.from(tbl).update({ estado: 'cancelada' }).eq("identificacion", id);
+        if (error) throw error;
         return res.json({ success: true, status: 'cancelada' });
+      } else {
+        const appointments = getAppointments();
+        const appointment = appointments.find(a => a.id === id);
+        if (appointment) {
+          appointment.estado = 'cancelada';
+          saveAppointments(appointments);
+          return res.json({ success: true, status: 'cancelada' });
+        }
       }
       return res.status(404).json({ error: "Cita no encontrada en el servidor." });
     } catch (e: any) {
@@ -1252,12 +1805,12 @@ async function startServer() {
   });
 
   // HTTP Endpoint to Confirm Attendance via Email Links
-  app.get("/api/appointment/confirm", (req, res) => {
+  app.get("/api/appointment/confirm", async (req, res) => {
     const code = req.query.code as string;
     const id = req.query.id as string;
     const host = req.get("host") || "localhost:3000";
 
-    const appointments = getAppointments();
+    const appointments = await getDBAppointments();
     const appointment = appointments.find(a => a.id === id || a.codigoTransaccion === code);
 
     if (!appointment) {
@@ -1272,7 +1825,18 @@ async function startServer() {
 
     // Update status to confirm attendance ('asistire')
     appointment.estado = 'asistire';
-    saveAppointments(appointments);
+    
+    if (isSupabaseConfigured && supabase) {
+      const tbl = await getAppointmentsTableName();
+      await supabase.from(tbl).update({ estado: 'asistire' }).eq("identificacion", appointment.id);
+    } else {
+      const allAppts = getAppointments();
+      const match = allAppts.find(a => a.id === appointment.id);
+      if (match) {
+        match.estado = 'asistire';
+        saveAppointments(allAppts);
+      }
+    }
 
     const iconHtml = `
       <svg style="width: 32px; height: 32px; color: #ffffff;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
@@ -1326,12 +1890,12 @@ async function startServer() {
   });
 
   // HTTP Endpoint to Cancel Appointment via Email Links
-  app.get("/api/appointment/cancel", (req, res) => {
+  app.get("/api/appointment/cancel", async (req, res) => {
     const code = req.query.code as string;
     const id = req.query.id as string;
     const host = req.get("host") || "localhost:3000";
 
-    const appointments = getAppointments();
+    const appointments = await getDBAppointments();
     const appointment = appointments.find(a => a.id === id || a.codigoTransaccion === code);
 
     if (!appointment) {
@@ -1346,7 +1910,18 @@ async function startServer() {
 
     // Update status to cancel 'cancelada'
     appointment.estado = 'cancelada';
-    saveAppointments(appointments);
+    
+    if (isSupabaseConfigured && supabase) {
+      const tbl = await getAppointmentsTableName();
+      await supabase.from(tbl).update({ estado: 'cancelada' }).eq("identificacion", appointment.id);
+    } else {
+      const allAppts = getAppointments();
+      const match = allAppts.find(a => a.id === appointment.id);
+      if (match) {
+        match.estado = 'cancelada';
+        saveAppointments(allAppts);
+      }
+    }
 
     const iconHtml = `
       <svg style="width: 32px; height: 32px; color: #ffffff;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
@@ -1407,7 +1982,7 @@ async function startServer() {
       }
 
       // Automatically register/update status on reminder send too!
-      const appointments = getAppointments();
+      const appointments = await getDBAppointments();
       const existingIdx = appointments.findIndex(a => a.id === id || a.codigoTransaccion === codigoTransaccion);
       
       const serverCita: ServerCita = {
@@ -1416,6 +1991,7 @@ async function startServer() {
         codigoTransaccion: codigoTransaccion,
         categoriaNombre: categoryTranslation(categoriaNombre) || "",
         subServicioNombre: subServicioNombre || "",
+        subServicioId: req.body.subServicioId || undefined,
         fecha: req.body.fecha || new Date().toISOString().split('T')[0],
         hora: hora || "",
         sucursalNombre: sucursalNombre || "",
@@ -1430,12 +2006,41 @@ async function startServer() {
         nombre: req.body.nombre || (req.body.datosPersonales?.nombreCompleto) || ""
       };
 
-      if (existingIdx >= 0) {
-        appointments[existingIdx] = serverCita;
+      if (isSupabaseConfigured && supabase) {
+        const row = {
+          identificacion: serverCita.id,
+          codigo_transaccion: serverCita.codigoTransaccion,
+          fecha: serverCita.fecha,
+          tiempo: serverCita.hora,
+          fecha_creacion: serverCita.fechaCreacion,
+          estado: serverCita.estado,
+          sucursal_id: req.body.sucursalId || "anc_main",
+          sub_servicio_id: req.body.subServicioId || "ced_primera_vez",
+          tipo_identificacion: serverCita.datosPersonales?.tipoIdentificacion || "Cedula",
+          identificacion_ciudadano: serverCita.identificacion,
+          fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || null,
+          telefono: serverCita.telefono,
+          correo: serverCita.correo,
+          nombre_completo: serverCita.nombre || serverCita.datosPersonales?.nombreCompleto || "",
+          numero_seguimiento: serverCita.numeroSeguimiento || null,
+          primer_nombre: serverCita.datosPersonales?.primerNombre || null,
+          segundo_nombre: serverCita.datosPersonales?.segundoNombre || null,
+          primer_apellido: serverCita.datosPersonales?.primerApellido || null,
+          segundo_apellido: serverCita.datosPersonales?.segundoApellido || null,
+          pasaporte: serverCita.datosPersonales?.pasaporte || null,
+          nacionalidad: serverCita.datosPersonales?.nacionalidad || null,
+          numero_resolucion: serverCita.datosPersonales?.numeroResolucion || null,
+          fecha_resolucion: serverCita.datosPersonales?.fechaResolucion || null
+        };
+        await safeUpsertAppointment(row);
       } else {
-        appointments.push(serverCita);
+        if (existingIdx >= 0) {
+          appointments[existingIdx] = serverCita;
+        } else {
+          appointments.push(serverCita);
+        }
+        saveAppointments(appointments);
       }
-      saveAppointments(appointments);
 
       const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || "https";
       const host = (req.headers['x-forwarded-host'] as string) || req.get('host');
@@ -1763,30 +2368,15 @@ async function startServer() {
         </html>
       `;
 
-      const apiKey = process.env.RESEND_API_KEY;
-      // Use strictly "onboarding@resend.dev" by default if custom sender is not set,
-      // as display names like "Tribunal Electoral <...>" are often rejected with validation_error on trial accounts.
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
-
-      if (apiKey && apiKey !== "undefined" && apiKey.trim() !== "") {
-        console.log(`[Email Service - Reminder] Sending 24h reminder email to ${email} (From: ${fromEmail})...`);
-        
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            from: fromEmail,
-            to: [email],
-            subject: `Recordatorio de Cita Oficial: Mañana a las ${hora} - Tribunal Electoral`,
-            html: htmlContent
-          })
-        });
-
-        const resData = await response.json() as any;
-        if (response.ok) {
+      if (isOutlookConfigured) {
+        console.log(`[Email Service - Reminder] Sending 24h reminder email to ${email} (From: ${outlookUser})...`);
+        try {
+          const info = await sendOutlookEmail(
+            email,
+            `Recordatorio de Cita Oficial: Mañana a las ${hora} - Tribunal Electoral`,
+            htmlContent
+          );
+          console.log("[Email Service - Reminder] Email sent successfully via Outlook SMTP:", info.messageId);
           return res.json({ 
             success: true, 
             message: "Se ha enviado el recordatorio de 24h a su correo electrónico exitosamente.",
@@ -1794,28 +2384,24 @@ async function startServer() {
             confirmUrl,
             cancelUrl
           });
-        } else {
-          console.error("[Email Service - Reminder] Resend API responded with error:", resData);
-          let friendlyError = resData.message || JSON.stringify(resData);
-          if (resData.name === "validation_error") {
-            friendlyError = `Su clave de Resend existe, pero su cuenta gratuita está limitada. No se pudo enviar el correo a "${email}" porque no es el correo con el que se registró en Resend (las cuentas de prueba de Resend solo permiten enviar correos a su propia dirección de registro). Para enviar a cualquier persona, debe verificar su dominio o añadir el correo a su lista de destinatarios permitidos en Resend.`;
-          }
+        } catch (error: any) {
+          console.error("[Email Service - Reminder] Outlook sending error:", error);
           return res.status(400).json({ 
             success: false, 
-            error: friendlyError,
-            errorType: resData.name || "api_error",
+            error: `Error al enviar recordatorio por Outlook: ${error.message || error}`,
+            errorType: "smtp_error",
             htmlPreview: htmlContent,
             confirmUrl,
             cancelUrl
           });
         }
       } else {
-        console.log(`[Email Service - Reminder] Simulating reminder sent to ${email}.`);
+        console.log(`[Email Service - Reminder] Simulating reminder sent to ${email} (no OUTLOOK_USER configured).`);
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         return res.json({
           success: true,
-          message: "Se simuló el envío del recordatorio correctamente (modo sin clave de API).",
+          message: "Se simuló el envío del recordatorio correctamente (modo sin credenciales de Outlook).",
           simulated: true,
           htmlPreview: htmlContent,
           confirmUrl,
@@ -1841,9 +2427,9 @@ async function startServer() {
   // ==========================================
   // GESTIÓN DE USUARIOS POR EL SUPER ADMIN
   // ==========================================
-  app.get("/api/users", (req, res) => {
+  app.get("/api/users", async (req, res) => {
     try {
-      const users = getUsers();
+      const users = await getDBUsers();
       return res.json({ success: true, users });
     } catch (e: any) {
       console.error("Error fetching users list:", e);
@@ -1851,7 +2437,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/users", (req, res) => {
+  app.post("/api/users", async (req, res) => {
     try {
       const { username, password, role, nombre } = req.body;
       if (!username || !password || !role || !nombre) {
@@ -1864,7 +2450,7 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "El nombre de usuario debe tener al menos 3 caracteres." });
       }
 
-      const users = getUsers();
+      const users = await getDBUsers();
       const existingIdx = users.findIndex(u => u.username.toLowerCase() === cleanUsername);
 
       const newUser: ServerUser = {
@@ -1875,13 +2461,27 @@ async function startServer() {
         fechaCreacion: existingIdx >= 0 ? users[existingIdx].fechaCreacion : new Date().toISOString()
       };
 
-      if (existingIdx >= 0) {
-        users[existingIdx] = newUser;
+      if (isSupabaseConfigured && supabase) {
+        const newUserRow = {
+          identificacion: cleanUsername,
+          nombre_usuario: cleanUsername,
+          hash_contrasena: String(password).trim(),
+          role: role,
+          nombre: String(nombre).trim(),
+          fecha_creacion: newUser.fechaCreacion
+        };
+        const tbl = await getUsersTableName();
+        const { error } = await supabase.from(tbl).upsert(newUserRow);
+        if (error) throw error;
       } else {
-        users.push(newUser);
+        if (existingIdx >= 0) {
+          users[existingIdx] = newUser;
+        } else {
+          users.push(newUser);
+        }
+        saveUsers(users);
       }
 
-      saveUsers(users);
       return res.json({ success: true, user: newUser });
     } catch (e: any) {
       console.error("Error registering user:", e);
@@ -1889,7 +2489,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/users/:username", (req, res) => {
+  app.delete("/api/users/:username", async (req, res) => {
     try {
       const usernameToDelete = String(req.params.username).trim().toLowerCase();
       
@@ -1898,16 +2498,23 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No es posible eliminar el Super Administrador principal (adminte)." });
       }
 
-      const users = getUsers();
-      const initialLength = users.length;
-      const filteredUsers = users.filter(u => u.username.toLowerCase() !== usernameToDelete);
+      if (isSupabaseConfigured && supabase) {
+        const tbl = await getUsersTableName();
+        const { error } = await supabase.from(tbl).delete().eq("nombre_usuario", usernameToDelete);
+        if (error) throw error;
+        return res.json({ success: true, message: `Usuario '${usernameToDelete}' eliminado exitosamente.` });
+      } else {
+        const users = getUsers();
+        const initialLength = users.length;
+        const filteredUsers = users.filter(u => u.username.toLowerCase() !== usernameToDelete);
 
-      if (filteredUsers.length === initialLength) {
-        return res.status(404).json({ success: false, error: "Usuario no encontrado." });
+        if (filteredUsers.length === initialLength) {
+          return res.status(404).json({ success: false, error: "Usuario no encontrado." });
+        }
+
+        saveUsers(filteredUsers);
+        return res.json({ success: true, message: `Usuario '${usernameToDelete}' eliminado exitosamente.` });
       }
-
-      saveUsers(filteredUsers);
-      return res.json({ success: true, message: `Usuario '${usernameToDelete}' eliminado exitosamente.` });
     } catch (e: any) {
       console.error("Error deleting user:", e);
       return res.status(500).json({ success: false, error: e.message });
