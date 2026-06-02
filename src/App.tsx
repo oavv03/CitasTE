@@ -390,7 +390,7 @@ export default function App() {
       </section>
 
       {/* Main content body with Side informational columns or Full-width Admin Panel */}
-      <main className={`flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 ${activeTab === 'admin' ? 'block' : 'grid grid-cols-1 lg:grid-cols-12 gap-6'}`}>
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 block">
         
         {activeTab === 'admin' ? (
           <div className="w-full">
@@ -403,11 +403,11 @@ export default function App() {
         ) : (
           <>
             {/* Left main area (wizard or dashboard) */}
-            <div className="lg:col-span-8 space-y-6">
+            <div className="w-full space-y-6">
              {activeTab === 'agendar' ? (
             /* WIZARD CARD WRAPPER */
             <div className="bg-white border border-slate-200 rounded shadow-sm p-4 md:p-6 space-y-6">
-              
+               
               {/* Step indicator visuals */}
               {currentStep < 4 && (
                 <div className="border-b border-slate-100 pb-5" aria-label="Progreso de agendamiento">
@@ -535,20 +535,6 @@ export default function App() {
               />
             </div>
           )}
-
-        </div>
-
-        {/* Right Info pane (Help & Contact information) */}
-        <div className="lg:col-span-4 space-y-6 print:hidden">
-
-          {/* Constitutional banner of Electoral Integrity */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3 text-[11px] text-slate-500 leading-normal">
-            <Scale className="w-5 h-5 text-slate-400 shrink-0 select-none mt-0.5" />
-            <div>
-              <p className="font-semibold text-slate-700 mb-0.5">Tribunal Electoral de Panamá</p>
-              Garantizamos la libertad, honradez y eficacia del sufragio libre de Panamá. Regulamos el estado civil de las personas naturales.
-            </div>
-          </div>
 
         </div>
           </>
