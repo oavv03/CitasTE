@@ -472,14 +472,30 @@ export default function SeleccionServicio({
                   
                   <div className="bg-slate-50/50 border border-slate-100/80 rounded-xl p-4 space-y-3">
                     <ul className="space-y-2.5 text-xs text-slate-600 leading-relaxed font-semibold pl-1">
-                      {currentSubService.requisitos.map((req: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2.5">
-                          <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-[9px] border border-emerald-200">
-                            ✓
-                          </span>
-                          <span className="flex-1">{req}</span>
-                        </li>
-                      ))}
+                      {currentSubService.requisitos.map((req: string, idx: number) => {
+                        const colonIndex = req.indexOf(':');
+                        const hasColon = colonIndex > 0 && colonIndex < req.length - 1;
+                        const label = hasColon ? req.substring(0, colonIndex) : '';
+                        const text = hasColon ? req.substring(colonIndex + 1) : req;
+
+                        return (
+                          <li key={idx} className="flex items-start gap-2.5">
+                            <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-[9px] border border-emerald-200">
+                              ✓
+                            </span>
+                            <span className="flex-1 col-span-1">
+                              {hasColon ? (
+                                <>
+                                  <strong className="font-extrabold text-slate-800">{label}:</strong>
+                                  {text}
+                                </>
+                              ) : (
+                                req
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>
