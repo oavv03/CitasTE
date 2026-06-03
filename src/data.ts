@@ -101,7 +101,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Estar acompañado de por lo menos uno de los padres con su cédula vigente.',
           'Certificado de nacimiento del menor.',
-          'El menor de edad debe estar presente física voluntariamente.'
+          'El menor de edad debe estar presente física voluntariamente.',
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       },
       {
@@ -111,7 +114,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Estar acompañado de uno de los padres con su cédula vigente.',
           'Presentar la cédula juvenil vencida o próxima a vencer.',
-          'El menor de edad debe estar presente físicamente.'
+          'El menor de edad debe estar presente físicamente.',
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       },
       {
