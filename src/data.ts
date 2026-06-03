@@ -61,7 +61,7 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         descripcion: 'Para ciudadanos panameños nacidos en el territorio nacional que alcanzan la mayoría de edad.',
         requisitos: [
           'Tener 18 años cumplidos.',
-          'Copia de certificado de nacimiento del Registro Civil (para verificar filiación).',
+          'Cédula juvenil',
           'Presencia física del interesado.',
           'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
           'Evita accesorios en el rostro: No lleves gorras, sombreros, lentes oscuros ni piercings visibles en la cara.',
@@ -70,10 +70,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
       },
       {
         id: 'ced_renovacion',
-        nombre: 'Renovación de Cédula de Identidad',
+        nombre: 'Renovación de Cédula',
         descripcion: 'Renovación de documento vencido o próximo a vencer.',
         requisitos: [
-          'Presentar la cédula de identidad vencida o por vencer.',
+          'Presentar la cédula de identidad vencida o por vencer (6 meses antes).',
           'Vestimenta adecuada para la toma de fotografía (no hombros descubiertos, no blusas escotadas).',
           'Trámite gratuito para renovación regular.',
           'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
