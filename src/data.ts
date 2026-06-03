@@ -86,7 +86,7 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         nombre: 'Duplicado de Cédula (Pérdida o Robo)',
         descripcion: 'Reposición del documento por pérdida, robo, hurto o deterioro.',
         requisitos: [
-          'Costo de B/. 15.00 por el primer duplicado (B/. 25.00 a partir del segundo).',
+          'El costo es de B/. 35.00',
           'Denuncia de pérdida (opcional pero recomendada).',
           'Confirmación de datos biométricos en oficina.',
           'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
