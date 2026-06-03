@@ -63,9 +63,9 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
           'Tener 18 años cumplidos.',
           'Cédula juvenil',
           'Presencia física del interesado.',
-          'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
-          'Evita accesorios en el rostro: No lleves gorras, sombreros, lentes oscuros ni piercings visibles en la cara.',
-          'Cabello despejado: Asegúrate de llevar el rostro y las cejas totalmente visibles.'
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       },
       {
@@ -76,9 +76,9 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
           'Presentar la cédula de identidad vencida o por vencer (6 meses antes).',
           'Vestimenta adecuada para la toma de fotografía (no hombros descubiertos, no blusas escotadas).',
           'Trámite gratuito para renovación regular.',
-          'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
-          'Evita accesorios en el rostro: No lleves gorras, sombreros, lentes oscuros ni piercings visibles en la cara.',
-          'Cabello despejado: Asegúrate de llevar el rostro y las cejas totalmente visibles.'
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       },
       {
@@ -89,9 +89,9 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
           'El costo es de B/. 35.00',
           'Denuncia de pérdida (opcional pero recomendada).',
           'Confirmación de datos biométricos en oficina.',
-          'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
-          'Evita accesorios en el rostro: No lleves gorras, sombreros, lentes oscuros ni piercings visibles en la cara.',
-          'Cabello despejado: Asegúrate de llevar el rostro y las cejas totalmente visibles.'
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       },
       {
@@ -193,13 +193,17 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
     subServicios: [
       {
         id: 'ext_primera_vez',
-        nombre: 'Cédula de Extranjero por Primera Vez (PE)',
+        nombre: 'Carnet de residente permanente por primera vez',
         descripcion: 'Emisión del documento de identidad personal para extranjeros residentes permanentes.',
         requisitos: [
-          'Resolución original del Servicio Nacional de Migración aprobando la residencia permanente.',
-          'Copia de la resolución debidamente autenticada.',
-          'Pasaporte original vigente con el sello de residencia.',
-          'Pago correspondiente de aranceles de carnet de extranjería.'
+          'Nota de migración',
+          'Fotocopia de carné de residente permanente',
+          'Fotocopia de pasaporte',
+          'B/. 100.00(en efectivo)',
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.',
+          'Tener cita programada y presentarse 15 minutos antes'
         ]
       }
     ]

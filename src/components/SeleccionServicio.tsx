@@ -478,15 +478,20 @@ export default function SeleccionServicio({
                         const label = hasColon ? req.substring(0, colonIndex) : '';
                         const text = hasColon ? req.substring(colonIndex + 1) : req;
 
+                        const isSpecialRule = 
+                          req.toUpperCase().includes('EVITA EL COLOR BLANCO') ||
+                          req.toUpperCase().includes('EVITA ACCESORIOS') ||
+                          req.toUpperCase().includes('CABELLO DESPEJADO');
+
                         return (
                           <li key={idx} className="flex items-start gap-2.5">
                             <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-[9px] border border-emerald-200">
                               ✓
                             </span>
-                            <span className="flex-1 col-span-1">
+                            <span className={`flex-1 col-span-1 ${isSpecialRule ? 'font-extrabold text-slate-900 uppercase bg-yellow-50/30' : ''}`}>
                               {hasColon ? (
                                 <>
-                                  <strong className="font-extrabold text-slate-800">{label}:</strong>
+                                  <strong className={isSpecialRule ? 'font-black text-slate-950' : 'font-extrabold text-slate-800'}>{label}:</strong>
                                   {text}
                                 </>
                               ) : (
