@@ -62,7 +62,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Tener 18 años cumplidos.',
           'Copia de certificado de nacimiento del Registro Civil (para verificar filiación).',
-          'Presencia física del interesado.'
+          'Presencia física del interesado.',
+          'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
+          'Evita accesorios en el rostro: No lleves gorras, sombreros, lentes oscuros ni piercings visibles en la cara.',
+          'Cabello despejado: Asegúrate de llevar el rostro y las cejas totalmente visibles.'
         ]
       },
       {
@@ -72,7 +75,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Presentar la cédula de identidad vencida o por vencer.',
           'Vestimenta adecuada para la toma de fotografía (no hombros descubiertos, no blusas escotadas).',
-          'Trámite gratuito para renovación regular.'
+          'Trámite gratuito para renovación regular.',
+          'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
+          'Evita accesorios en el rostro: No lleves gorras, sombreros, lentes oscuros ni piercings visibles en la cara.',
+          'Cabello despejado: Asegúrate de llevar el rostro y las cejas totalmente visibles.'
         ]
       },
       {
@@ -82,7 +88,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Costo de B/. 15.00 por el primer duplicado (B/. 25.00 a partir del segundo).',
           'Denuncia de pérdida (opcional pero recomendada).',
-          'Confirmación de datos biométricos en oficina.'
+          'Confirmación de datos biométricos en oficina.',
+          'Evita el color blanco: No uses suéteres, camisas, blusas ni bufandas blancas.',
+          'Evita accesorios en el rostro: No lleves gorras, sombreros, lentes oscuros ni piercings visibles en la cara.',
+          'Cabello despejado: Asegúrate de llevar el rostro y las cejas totalmente visibles.'
         ]
       },
       {
