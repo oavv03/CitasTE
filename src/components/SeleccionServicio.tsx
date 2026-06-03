@@ -98,7 +98,35 @@ export default function SeleccionServicio({
   onBack,
   onSelect,
 }: SeleccionServicioProps) {
-  const [activeCat, setActiveCat] = useState<ServicioCategoriaId | null>(selectedCategoria);
+  const getSubServicesForCategory = (catId: ServicioCategoriaId): any[] => {
+    const mainCat = SERVICIOS_TRIBUNAL.find(c => c.id === catId);
+    if (!mainCat) return [];
+    
+    let list = [...mainCat.subServicios];
+    
+    if (catId === 'registro_civil') {
+      const extPan = SERVICIOS_TRIBUNAL.find(c => c.id === 'panamenos_extranjero');
+      if (extPan) {
+        list = [...list, ...extPan.subServicios];
+      }
+    } else if (catId === 'cedulacion') {
+      const ext = SERVICIOS_TRIBUNAL.find(c => c.id === 'extranjeria');
+      if (ext) {
+        list = [...list, ...ext.subServicios];
+      }
+    }
+    
+    return list;
+  };
+
+  const getInitialCategory = (cat: ServicioCategoriaId | null): ServicioCategoriaId | null => {
+    if (!cat) return null;
+    if (cat === 'extranjeria') return 'cedulacion';
+    if (cat === 'panamenos_extranjero') return 'registro_civil';
+    return cat;
+  };
+
+  const [activeCat, setActiveCat] = useState<ServicioCategoriaId | null>(getInitialCategory(selectedCategoria));
   const [activeSub, setActiveSub] = useState<string | null>(selectedSubServicioId);
 
   const handleCategoryClick = (catId: ServicioCategoriaId) => {
@@ -107,12 +135,33 @@ export default function SeleccionServicio({
   };
 
   const currentCategory = SERVICIOS_TRIBUNAL.find((c) => c.id === activeCat);
-  const currentSubService = currentCategory?.subServicios.find((s) => s.id === activeSub);
+  const subServicesList = activeCat ? getSubServicesForCategory(activeCat) : [];
+  const currentSubService = subServicesList.find((s) => s.id === activeSub);
 
   const handleNextSubmit = () => {
     if (activeCat && activeSub) {
-      onSelect(activeCat, activeSub);
+      let finalCat = activeCat;
+      if (activeSub.startsWith('ext_')) {
+        finalCat = 'extranjeria';
+      } else if (activeSub.startsWith('pe_')) {
+        finalCat = 'panamenos_extranjero';
+      }
+      onSelect(finalCat, activeSub);
     }
+  };
+
+  const getSubServicesCount = (catId: ServicioCategoriaId): number => {
+    const mainCat = SERVICIOS_TRIBUNAL.find(c => c.id === catId);
+    if (!mainCat) return 0;
+    let count = mainCat.subServicios.length;
+    if (catId === 'registro_civil') {
+      const extPan = SERVICIOS_TRIBUNAL.find(c => c.id === 'panamenos_extranjero');
+      if (extPan) count += extPan.subServicios.length;
+    } else if (catId === 'cedulacion') {
+      const ext = SERVICIOS_TRIBUNAL.find(c => c.id === 'extranjeria');
+      if (ext) count += ext.subServicios.length;
+    }
+    return count;
   };
 
   return (
@@ -155,7 +204,7 @@ export default function SeleccionServicio({
         </div>
       </div>
 
-      {/* Grid of Categories - Modern Responsive Layout for 5 Items */}
+      {/* Grid of Categories - Modern Responsive Layout for 3 Items */}
       <div className="space-y-3">
         <div className="flex items-center justify-between pb-1">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
@@ -165,8 +214,8 @@ export default function SeleccionServicio({
           <span className="text-[11px] text-slate-400 font-medium">Haga clic sobre una opción</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {SERVICIOS_TRIBUNAL.map((cat) => {
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {SERVICIOS_TRIBUNAL.filter(cat => ['registro_civil', 'cedulacion', 'organizacion_electoral'].includes(cat.id)).map((cat) => {
             const isSelected = activeCat === cat.id;
             const meta = CATEGORY_META[cat.id] || {
               themeColor: 'bg-blue-600',
@@ -177,12 +226,14 @@ export default function SeleccionServicio({
               badgeText: 'Trámite'
             };
 
+            const optionsCount = getSubServicesCount(cat.id);
+
             return (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => handleCategoryClick(cat.id)}
-                className={`text-left p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md ${
+                className={`text-left p-5 rounded-xl border-2 transition-all duration-300 cursor-pointer flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md ${
                   isSelected
                     ? `${meta.activeBorder} ring-4 shadow-md scale-[1.02]`
                     : 'border-slate-100 bg-white hover:border-slate-300 shadow-sm'
@@ -222,7 +273,7 @@ export default function SeleccionServicio({
                 {/* Counter & Arrow Footer */}
                 <div className="pt-3 w-full border-t border-slate-100/80 mt-4 flex items-center justify-between text-[11px] font-bold">
                   <span className={`px-2 py-0.5 rounded text-[10px] ${isSelected ? meta.bgLight : 'bg-slate-50 text-slate-400'}`}>
-                    {cat.subServicios.length} opciones
+                    {optionsCount} opciones
                   </span>
                   <span className={`transition-transform duration-300 ${isSelected ? 'translate-x-1.5 font-extrabold text-blue-700' : 'text-slate-300'}`}>
                     {isSelected ? '✓ Seleccionado' : 'Elegir →'}
@@ -261,13 +312,15 @@ export default function SeleccionServicio({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* List left side */}
             <div className="space-y-2 max-h-[380px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-              {currentCategory.subServicios.map((sub) => {
+              {subServicesList.map((sub) => {
                 const isSelected = activeSub === sub.id;
                 
                 // Dynamic helper checks for realistic tags
                 const isPaid = sub.requisitos.some(r => r.toLowerCase().includes('costo') || r.toLowerCase().includes('pago') || r.toLowerCase().includes('b/.'));
                 const isJuvenilOrMenor = sub.id.includes('juvenil') || sub.nombre.toLowerCase().includes('menor');
                 const isFirstTime = sub.id.includes('primera_vez') || sub.nombre.toLowerCase().includes('primera');
+                const isPanamenoExt = sub.id.startsWith('pe_');
+                const isExtranjeriaSub = sub.id.startsWith('ext_');
 
                 return (
                   <button
@@ -319,6 +372,18 @@ export default function SeleccionServicio({
                         {isFirstTime && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200/50">
                             Primera Vez
+                          </span>
+                        )}
+
+                        {isPanamenoExt && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200/50">
+                            Panameños en el Exterior
+                          </span>
+                        )}
+
+                        {isExtranjeriaSub && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200/50">
+                            Extranjería PE
                           </span>
                         )}
                       </div>
