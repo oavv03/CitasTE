@@ -48,7 +48,7 @@ const CATEGORY_META: Record<ServicioCategoriaId, {
     bgLight: 'bg-indigo-50 text-indigo-700',
     textColor: 'text-indigo-900',
     pillColor: 'bg-indigo-100 text-indigo-800',
-    badgeText: 'Dpto. de Cedulación'
+    badgeText: 'Cedulación'
   },
   registro_civil: {
     themeColor: 'bg-teal-600',
@@ -374,12 +374,8 @@ export default function SeleccionServicio({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between pb-1">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                <span>Categorías Gubernamentales</span>
-                <span className="w-4 h-[1px] bg-slate-200"></span>
-              </h3>
-              <span className="text-[11px] text-slate-400 font-medium">Haga clic sobre una opción de departamento</span>
+            <div className="flex items-center justify-end pb-1">
+              <span className="text-[11px] text-slate-400 font-medium">Elige una de nuestras opciones</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -312,7 +312,7 @@ export default function App() {
   };
 
   return (
-    <div id="applet-root" className="min-h-screen bg-slate-50 flex flex-col font-sans select-none antialiased">
+    <div id="applet-root" className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased">
       
       {/* Decorative Superior Flags of Panama strip */}
       <div className="w-full h-1.5 flex" aria-hidden="true">
