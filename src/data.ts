@@ -133,23 +133,22 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
       },
       {
         id: 'ced_extranjero_renovacion',
-        nombre: 'Renovación de Cédula de Extranjero (PE)',
+        nombre: 'Renovación de carné de residente permanente',
         descripcion: 'Trámite de renovación del documento de identidad personal para ciudadanos extranjeros residentes permanentes.',
         requisitos: [
-          'Presentar la cédula de extranjero (PE) vencida o próxima a vencer.',
-          'Certificado de estatus migratorio vigente, emitido por el Servicio Nacional de Migración.',
-          'Pasaporte original vigente (copia completa certificada).',
-          'Pago del costo del trámite en la sucursal del Tribunal Electoral.'
+          'Presentarse a las oficinas del Tribunal Electoral.',
+          'Proporcionar el número de su cédula o el de su carné de residente permanente.',
+          'Costo B/.75.00.'
         ]
       },
       {
         id: 'ced_extranjero_duplicado_perdida',
-        nombre: 'Duplicado de Cédula PE por Pérdida',
+        nombre: 'Duplicado carné de residente permanente',
         descripcion: 'Reposición de la cédula de extranjero (PE) residente permanente debido a robo, extravío o deterioro.',
         requisitos: [
-          'Denuncia formal registrada de pérdida o robo ante la DIJ.',
-          'Copia de pasaporte vigente y resolución autorizada de residencia.',
-          'Pago de arancel obligatorio por duplicado de extranjería (B/. 50.00).'
+          'Presentarse a las oficinas del Tribunal Electoral.',
+          'Presentar el carné de residente permanente que requiere reemplazar.',
+          'Costo B/.65.00.'
         ]
       }
     ]
@@ -199,7 +198,7 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
     subServicios: [
       {
         id: 'ext_primera_vez',
-        nombre: 'Carnet de residente permanente por primera vez',
+        nombre: 'Carné de residente permanente por primera vez',
         descripcion: 'Emisión del documento de identidad personal para extranjeros residentes permanentes.',
         requisitos: [
           'Nota de migración',

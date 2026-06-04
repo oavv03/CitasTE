@@ -4340,7 +4340,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                     >
                       <option value="Cedula">Cédula Nacional</option>
                       <option value="CedulaJuvenil">Cédula Juvenil</option>
-                      <option value="Extranjero">Carnet PE (Extranjería)</option>
+                      <option value="Extranjero">Carné PE (Extranjería)</option>
                       <option value="Pasaporte">Pasaporte Internacional</option>
                     </select>
                   </div>
