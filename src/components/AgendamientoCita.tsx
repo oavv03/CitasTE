@@ -378,7 +378,7 @@ export default function AgendamientoCita({
             >
               {provincias.map((p) => (
                 <option key={p} value={p}>
-                  {p === 'Todos' ? 'Todas las Provincias' : p}
+                  {p === 'Todos' ? 'Todas las regionales' : p}
                 </option>
               ))}
             </select>
