@@ -16,8 +16,10 @@ import {
   HelpCircle,
   AlertTriangle,
   Search,
-  X
+  X,
+  Building2
 } from 'lucide-react';
+import VisitasGuiadasForm from './VisitasGuiadasForm';
 
 const normalizeText = (text: string): string => {
   return text
@@ -138,29 +140,46 @@ export default function SeleccionServicio({
   const [activeCat, setActiveCat] = useState<ServicioCategoriaId | null>(getInitialCategory(selectedCategoria));
   const [activeSub, setActiveSub] = useState<string | null>(selectedSubServicioId);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showVisitasGuiadas, setShowVisitasGuiadas] = useState(false);
 
   // Global search items list across all categories
-  const allSubServices = SERVICIOS_TRIBUNAL.flatMap((cat) => {
-    return cat.subServicios.map((sub) => {
-      let customCategoryName = cat.nombre;
-      let targetCategoryId: ServicioCategoriaId = cat.id;
+  const allSubServices = [
+    ...SERVICIOS_TRIBUNAL.flatMap((cat) => {
+      return cat.subServicios.map((sub) => {
+        let customCategoryName = cat.nombre;
+        let targetCategoryId: ServicioCategoriaId = cat.id;
 
-      if (cat.id === 'extranjeria') {
-        customCategoryName = 'Cedulación (Extranjería)';
-        targetCategoryId = 'cedulacion';
-      } else if (cat.id === 'panamenos_extranjero') {
-        customCategoryName = 'Registro Civil (Exterior)';
-        targetCategoryId = 'registro_civil';
-      }
+        if (cat.id === 'extranjeria') {
+          customCategoryName = 'Cedulación (Extranjería)';
+          targetCategoryId = 'cedulacion';
+        } else if (cat.id === 'panamenos_extranjero') {
+          customCategoryName = 'Registro Civil (Exterior)';
+          targetCategoryId = 'registro_civil';
+        }
 
-      return {
-        ...sub,
-        categoriaNombre: customCategoryName,
-        categoriaId: targetCategoryId,
-        originalCategoriaId: cat.id,
-      };
-    });
-  });
+        return {
+          ...sub,
+          categoriaNombre: customCategoryName,
+          categoriaId: targetCategoryId,
+          originalCategoriaId: cat.id,
+        };
+      });
+    }),
+    {
+      id: 'visitas_guiadas_virtual',
+      nombre: 'Visitas Guiadas al Tribunal Electoral',
+      descripcion: 'Registro de solicitudes para visitas guiadas de personas individuales, grupos escolares, universidades, instituciones o colectivos (Exclusivo en Sede Principal).',
+      requisitos: [
+        'Nombre completo, identificación, correo, teléfono',
+        'Definir tipo de visitante y tamaño del grupo',
+        'Elegir fecha y horario preferido del recorrido'
+      ],
+      categoriaNombre: 'Visitas Guiadas',
+      categoriaId: 'registro_civil' as any,
+      originalCategoriaId: 'registro_civil',
+      isVisitasGuiadas: true
+    }
+  ];
 
   // Filter based on normalized search query
   const filteredSubServices = allSubServices.filter((sub) => {
@@ -179,9 +198,14 @@ export default function SeleccionServicio({
   });
 
   const handleSearchResultClick = (sub: any) => {
-    setActiveCat(sub.categoriaId);
-    setActiveSub(sub.id);
-    setSearchQuery('');
+    if (sub.isVisitasGuiadas) {
+      setShowVisitasGuiadas(true);
+      setSearchQuery('');
+    } else {
+      setActiveCat(sub.categoriaId);
+      setActiveSub(sub.id);
+      setSearchQuery('');
+    }
   };
 
   const handleCategoryClick = (catId: ServicioCategoriaId) => {
@@ -218,6 +242,14 @@ export default function SeleccionServicio({
     }
     return count;
   };
+
+  if (showVisitasGuiadas) {
+    return (
+      <div className="animate-fade-in">
+        <VisitasGuiadasForm onBack={() => setShowVisitasGuiadas(false)} />
+      </div>
+    );
+  }
 
   if (!activeCat) {
     return (
@@ -376,7 +408,7 @@ export default function SeleccionServicio({
               <span className="text-[11px] text-slate-400 font-medium">Elige una de nuestras opciones</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {SERVICIOS_TRIBUNAL.filter(cat => ['registro_civil', 'cedulacion', 'organizacion_electoral'].includes(cat.id)).map((cat) => {
                 const meta = CATEGORY_META[cat.id] || {
                   themeColor: 'bg-blue-600',
@@ -430,6 +462,45 @@ export default function SeleccionServicio({
                   </button>
                 );
               })}
+
+              {/* Visitas Guiadas Card */}
+              <button
+                type="button"
+                onClick={() => setShowVisitasGuiadas(true)}
+                className="text-left p-6 rounded-2xl border-2 border-slate-105 bg-white hover:border-indigo-300 shadow-sm transition-all duration-300 cursor-pointer flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md hover:scale-[1.015]"
+              >
+                <div className="space-y-5">
+                  {/* Icon & Mini-badge */}
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 bg-indigo-50 text-indigo-705 border border-indigo-100">
+                      <Building2 className="w-6 h-6" />
+                    </div>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-750">
+                      Fomento Cívico
+                    </span>
+                  </div>
+
+                  {/* Title & description */}
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black tracking-wide uppercase text-slate-700 group-hover:text-indigo-950 transition-colors">
+                      Visitas Guiadas
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-snug line-clamp-3 font-medium">
+                      Regístrese para conocer la historia, funciones y espacios institucionales del Tribunal Electoral de Panamá (Exclusivamente en la Sede Principal).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Counter & Arrow Footer */}
+                <div className="pt-3 w-full border-t border-slate-150 mt-5 flex items-center justify-between text-[11px] font-bold">
+                  <span className="px-2.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-800 font-bold group-hover:bg-emerald-100 transition-all">
+                    Estudiantil / Grupal
+                  </span>
+                  <span className="transition-transform duration-300 group-hover:translate-x-1.5 text-slate-350 group-hover:text-indigo-750 font-extrabold flex items-center gap-1">
+                    Registrarse <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
         )}
