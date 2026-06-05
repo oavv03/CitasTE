@@ -233,8 +233,6 @@ export default function SeleccionServicio({
               <span className="bg-blue-600 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border border-blue-400/20">
                 Paso 1 de 3: Selección de Trámite
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span className="text-[11px] text-slate-300 font-medium">Buzón de Atención Presencial</span>
             </div>
             
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -243,7 +241,7 @@ export default function SeleccionServicio({
                   ¿Qué trámite desea realizar hoy?
                 </h2>
                 <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                  Para comenzar, seleccione a qué departamento pertenece el trámite correspondiente. Al ingresar, podrá examinar las opciones disponibles y requisitos obligatorios para reservar su cita.
+                  Para comenzar, seleccione la opción correspondiente. Una vez dentro, podrá revisar los requisitos obligatorios y reservar su cita.
                 </p>
               </div>
               {onBack && (
@@ -440,7 +438,7 @@ export default function SeleccionServicio({
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-start gap-3">
           <Info className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
           <p className="text-xs text-slate-500 leading-relaxed font-medium">
-            <strong>¿Sabía usted?</strong> Los trámites del Departamento de Extranjería (PE) han sido reubicados dentro de la opción de <strong>Cedulación</strong>. Del mismo modo, los trámites para Panameños en el Extranjero se encuentran consolidados dentro del departamento de <strong>Registro Civil</strong>.
+            <strong>¿Sabía usted?</strong> Los trámites de Extranjería (PE) han sido reubicados dentro de la opción de <strong>Cedulación</strong>. Del mismo modo, los trámites para Panameños en el Extranjero se encuentran consolidados dentro de <strong>Registro Civil</strong>.
           </p>
         </div>
       </div>
@@ -477,10 +475,10 @@ export default function SeleccionServicio({
                   {meta.badgeText}
                 </span>
                 <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                <span className="text-[11px] text-slate-500 font-semibold uppercase">Paso 1: Trámites del Departamento</span>
+                <span className="text-[11px] text-slate-500 font-semibold uppercase">Paso 1: Trámites de la sección</span>
               </div>
               <h2 className="text-lg md:text-xl font-extrabold tracking-tight text-slate-800">
-                Departamento de {currentCategory?.nombre}
+                {currentCategory?.nombre}
               </h2>
             </div>
           </div>
@@ -491,7 +489,7 @@ export default function SeleccionServicio({
             className="md:self-center px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-850 rounded-lg transition text-xs font-bold flex items-center justify-center gap-2 cursor-pointer bg-white"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            Cambiar Departamento
+            Otras Opciones
           </button>
         </div>
       </div>
