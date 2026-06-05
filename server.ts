@@ -311,7 +311,7 @@ const DEFAULT_EXTRANJERIA_CONFIG: ExtranjeriaConfig = {
   capacidad: 2,
   intervalo: 15,
   horaInicio: "07:00 AM",
-  horaFin: "02:00 AM"
+  horaFin: "01:45 PM"
 };
 
 function getExtranjeriaConfig(): ExtranjeriaConfig {
@@ -321,7 +321,13 @@ function getExtranjeriaConfig(): ExtranjeriaConfig {
       return DEFAULT_EXTRANJERIA_CONFIG;
     }
     const data = fs.readFileSync(EXTRANJERIA_CONFIG_PATH, "utf8");
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (parsed.horaFin === "02:00 AM" || parsed.horaFin === "02:00 PM" || !parsed.horaFin) {
+      parsed.horaFin = "01:45 PM";
+      parsed.capacidad = 2;
+      fs.writeFileSync(EXTRANJERIA_CONFIG_PATH, JSON.stringify(parsed, null, 2), "utf8");
+    }
+    return parsed;
   } catch (error) {
     console.error("Error reading extranjeria config DB:", error);
   }

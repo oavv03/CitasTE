@@ -31,7 +31,8 @@ import {
   Volume2,
   Tv,
   Maximize,
-  Minimize
+  Minimize,
+  Info
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { AdminRole } from '../types';
@@ -134,6 +135,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   // Selected appointment for supervisor validation
   const [selectedAppForSupervisor, setSelectedAppForSupervisor] = useState<any | null>(null);
   const [supervisorCheckedDocs, setSupervisorCheckedDocs] = useState<string[]>([]);
+  
+  // Supervisor custom period visibility filter
+  const [supervisorPeriodFilter, setSupervisorPeriodFilter] = useState<'dia' | 'semana' | 'mes' | 'año'>('dia');
 
   // Capacity / Schedule setups
   const [capacidad, setCapacidad] = useState<number>(() => {
@@ -644,6 +648,43 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       return meta && meta.passedToSupervisor && meta.assignedCubiculo === null;
     });
   }, [appointments, appMetadata]);
+
+  // Filtered appointments for the supervisor's period dashboard
+  const supervisorFilteredAppointments = useMemo(() => {
+    const now = new Date('2026-06-05T12:00:00');
+    return appointments.filter((app: any) => {
+      if (!app.fecha) return false;
+      const appDate = new Date(app.fecha + 'T12:00:00');
+      if (isNaN(appDate.getTime())) return false;
+
+      if (supervisorPeriodFilter === 'dia') {
+        const todayStr = '2026-06-05';
+        return app.fecha === todayStr;
+      }
+
+      if (supervisorPeriodFilter === 'semana') {
+        const getSunday = (dObj: Date) => {
+          const d = new Date(dObj);
+          const day = d.getDay();
+          const pDiff = d.getDate() - day;
+          const sun = new Date(d.setDate(pDiff));
+          sun.setHours(0,0,0,0);
+          return sun.getTime();
+        };
+        return getSunday(now) === getSunday(appDate);
+      }
+
+      if (supervisorPeriodFilter === 'mes') {
+        return appDate.getFullYear() === now.getFullYear() && appDate.getMonth() === now.getMonth();
+      }
+
+      if (supervisorPeriodFilter === 'año') {
+        return appDate.getFullYear() === now.getFullYear();
+      }
+
+      return true;
+    });
+  }, [appointments, supervisorPeriodFilter]);
 
   // Recommended booth based on load balancing
   const recommendedBooth = useMemo(() => {
@@ -1475,6 +1516,94 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                     );
                   })}
                 </div>
+              </div>
+
+              {/* VISUALIZADOR DE CITAS REGISTRADAS POR PERIODO */}
+              <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl text-left">
+                <div className="border-b border-slate-900 pb-3 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5 font-sans">
+                      <Calendar className="w-4 h-4 text-amber-500" />
+                      <span>Visualizador de Citas por Período</span>
+                    </h4>
+                    <p className="text-[10px] text-slate-450 font-bold uppercase font-mono">Citas agendadas en Sede Principal de Extranjería</p>
+                  </div>
+                  
+                  {/* Period Switcher Tabs */}
+                  <div className="flex bg-slate-900 rounded p-1 border border-slate-800 w-fit shrink-0">
+                    {(['dia', 'semana', 'mes', 'año'] as const).map(period => (
+                      <button
+                        key={`tab-v-${period}`}
+                        type="button"
+                        onClick={() => setSupervisorPeriodFilter(period)}
+                        className={`px-3 py-1 text-[9.5px] font-black uppercase rounded transition tracking-wider cursor-pointer ${
+                          supervisorPeriodFilter === period
+                            ? 'bg-amber-600 text-white shadow-sm font-extrabold'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }`}
+                      >
+                        {period === 'dia' ? 'Día' : period === 'semana' ? 'Semana' : period === 'mes' ? 'Mes' : 'Año'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {supervisorFilteredAppointments.length === 0 ? (
+                  <div className="p-8 border border-dashed border-slate-850 rounded-lg text-center space-y-1 text-slate-450">
+                    <Info className="w-6 h-6 mx-auto text-slate-600" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider block text-slate-400">Sin Citas</span>
+                    <p className="text-[9.5px] leading-relaxed max-w-xs mx-auto text-slate-500 font-medium">
+                      No se encontraron citas agendadas registradas para el período seleccionado.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1 divide-y divide-slate-850 border border-slate-900 bg-slate-900/10 p-2 rounded-lg">
+                    {supervisorFilteredAppointments.map((app: any) => {
+                      const name = app.datosPersonales?.nombreCompleto || app.nombre || 'Ciudadano N/D';
+                      const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
+                      const subservice = app.subServicioNombre || 'Servicio de Extranjería';
+                      const stepStatus = appMetadata[app.id]?.estadoTicket || 'En Entrada';
+
+                      // Status Badge color
+                      let badgeStyle = 'bg-slate-900 border-slate-850 text-slate-350';
+                      if (app.estado === 'cancelada') {
+                        badgeStyle = 'bg-red-950/20 border-red-900/30 text-red-400';
+                      } else if (app.estado === 'confirmada' || stepStatus === 'realizada') {
+                        badgeStyle = 'bg-emerald-950/20 border-emerald-900/30 text-emerald-400';
+                      } else if (stepStatus === 'modulo') {
+                        badgeStyle = 'bg-blue-950/20 border-blue-900/30 text-blue-400';
+                      } else if (stepStatus === 'supervisor') {
+                        badgeStyle = 'bg-amber-950/25 border-amber-800/30 text-amber-500';
+                      }
+
+                      return (
+                        <div key={`supervisor-v-${app.id}`} className="pt-2 last:pb-1 first:pt-0 flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-xs leading-relaxed">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-amber-500 text-[11px]">{app.id}</span>
+                              <span className="text-[8.5px] uppercase tracking-wide bg-slate-900 border border-slate-800 px-1.5 py-0.2 rounded font-black text-slate-400 font-mono">
+                                {subservice}
+                              </span>
+                            </div>
+                            <h5 className="font-bold text-slate-200 uppercase tracking-wide">{name}</h5>
+                            <p className="text-[10px] text-slate-450 font-semibold leading-none">
+                              Pasaporte: <span className="font-mono text-slate-300 font-bold">{passport}</span> | Fecha: <span className="font-mono text-amber-300 font-bold">{app.fecha}</span> ({app.hora})
+                            </p>
+                          </div>
+
+                          <div className="shrink-0 flex flex-col items-end gap-1 font-sans">
+                            <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded border tracking-wider font-mono ${badgeStyle}`}>
+                              {app.estado === 'cancelada' ? 'Cancelada' : stepStatus === 'realizada' ? 'Atendido' : stepStatus === 'modulo' ? 'En Módulo' : stepStatus === 'supervisor' ? 'S. Control' : 'En Cola'}
+                            </span>
+                            {app.telefono && (
+                              <span className="text-[9px] font-mono text-slate-500 font-bold">{app.telefono}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
             </div>

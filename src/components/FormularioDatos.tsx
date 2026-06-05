@@ -142,33 +142,8 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
         return;
       }
 
-      // Passport verification against the approval database
-      setVerifyingPassport(true);
-      try {
-        const response = await fetch('/api/extranjeria/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pasaporte: pasaporte.trim().toUpperCase() })
-        });
-        const data = await response.json();
-        if (data && data.success) {
-          if (!data.found) {
-            newErrors.pasaporte = `Su pasaporte (${pasaporte.trim().toUpperCase()}) no figura aprobado por Extranjería. Verifique el número.`;
-            setErrors(newErrors);
-            setVerifyingPassport(false);
-            return;
-          } else if (data.record && !data.record.elegible) {
-            newErrors.pasaporte = `Acción Suspendida: Este número de pasaporte cuenta con restricciones de Inmigración: "${data.record.motivo}"`;
-            setErrors(newErrors);
-            setVerifyingPassport(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error('Passport validator network issue in Extranjeria mode:', err);
-      } finally {
-        setVerifyingPassport(false);
-      }
+      // Se permite cualquier número de pasaporte alfanumérico o numérico sin restricciones de base de datos
+      setVerifyingPassport(false);
 
       setErrors({});
       onSuccess({
@@ -257,35 +232,9 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
       return;
     }
 
-    // Passport live eligibility check
+    // Se permite cualquier número de pasaporte alfanumérico o numérico sin restricciones de base de datos
     if (tipoIdentificacion === 'Pasaporte') {
-      setVerifyingPassport(true);
-      try {
-        const response = await fetch('/api/extranjeria/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pasaporte: identificacion.trim().toUpperCase() })
-        });
-        const data = await response.json();
-        if (data && data.success) {
-          if (!data.found) {
-            newErrors.identificacion = `Su pasaporte (${identificacion.trim().toUpperCase()}) no figura aprobado por Extranjería. Verifique el número o consulte la pestaña de validación.`;
-            setErrors(newErrors);
-            setVerifyingPassport(false);
-            return;
-          } else if (data.record && !data.record.elegible) {
-            newErrors.identificacion = `Acción Suspendida: Este número de pasaporte cuenta con restricciones de Inmigración: "${data.record.motivo}"`;
-            setErrors(newErrors);
-            setVerifyingPassport(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error('Passport validator network issue:', err);
-        // Fail-safe: allow proceeding if server fails to connect but notify console log
-      } finally {
-        setVerifyingPassport(false);
-      }
+      setVerifyingPassport(false);
     }
 
     setErrors({});

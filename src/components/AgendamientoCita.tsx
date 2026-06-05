@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Sucursal } from '../types';
 import { SUCURSALES_TE, HORAS_DISPONIBLES } from '../data';
-import { ArrowLeft, ArrowRight, MapPin, Calendar, Clock, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, MapPin, Calendar, Clock, Sparkles, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 
 interface AgendamientoCitaProps {
   selectedSucursalId: string | null;
@@ -77,7 +77,10 @@ export default function AgendamientoCita({
   // Load custom settings from localStorage or fallback to standard properties
   const [extranjeriaConfig, setExtranjeriaConfig] = useState(() => {
     const start = localStorage.getItem('extranjeria_hora_inicio') || '07:00 AM';
-    const end = localStorage.getItem('extranjeria_hora_fin') || '02:00 AM';
+    let end = localStorage.getItem('extranjeria_hora_fin') || '01:45 PM';
+    if (end === '02:00 AM' || end === '02:00 PM') {
+      end = '01:45 PM';
+    }
     const interval = parseInt(localStorage.getItem('extranjeria_intervalo_minutos') || '15', 10);
     const capacity = parseInt(localStorage.getItem('extranjeria_capacidad_usuarios') || '2', 10);
     return { start, end, interval, capacity };
@@ -98,7 +101,10 @@ export default function AgendamientoCita({
         .then(res => res.json())
         .then(data => {
           if (data && data.success && data.config) {
-            const { capacidad, intervalo, horaInicio, horaFin } = data.config;
+            let { capacidad, intervalo, horaInicio, horaFin } = data.config;
+            if (horaFin === '02:00 AM' || horaFin === '02:00 PM') {
+              horaFin = '01:45 PM';
+            }
             setExtranjeriaConfig({
               start: horaInicio,
               end: horaFin,
@@ -248,83 +254,171 @@ export default function AgendamientoCita({
     return SUCURSALES_TE.find((s) => s.id === sucursalId);
   }, [sucursalId]);
 
-  // Determine valid days based on the selected sucursal's operational days
-  const nextAvailableDates = useMemo(() => {
+  // Set default calendar month to June 2026 or selected date's month
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    if (selectedFecha) {
+      const parsed = new Date(selectedFecha + 'T12:00:00');
+      if (!isNaN(parsed.getTime())) return parsed.getMonth();
+    }
+    return 5; // June (0-indexed)
+  });
+
+  const [currentYear, setCurrentYear] = useState(() => {
+    if (selectedFecha) {
+      const parsed = new Date(selectedFecha + 'T12:00:00');
+      if (!isNaN(parsed.getTime())) return parsed.getFullYear();
+    }
+    return 2026; // 2026
+  });
+
+  const MONTH_NAMES_ES = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+
+  const WEEK_DAYS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  // Calculate calendar days
+  const calendarCells = useMemo(() => {
     if (!selectedSucursal) return [];
 
-    const dates: { dateString: string; displayString: string; dayName: string }[] = [];
-    const today = new Date();
-    
-    // Check if the sucursal works Tuesday to Saturday
-    const isTuesdayToSaturday = selectedSucursal.horario.toLowerCase().includes('martes a sábado');
-    
-    let daysAdded = 0;
-    let daysChecked = 0;
+    const cells: { 
+      dateString: string; 
+      dayNumber: number; 
+      isPast: boolean; 
+      isValidWorkingDay: boolean; 
+      isFull: boolean;
+      bookedCount: number;
+      isToday: boolean;
+      isEmptyCell: boolean;
+    }[] = [];
 
-    // Look ahead 25 days to find 10 valid working days
-    while (daysAdded < 10 && daysChecked < 25) {
-      const targetDate = new Date();
-      targetDate.setDate(today.getDate() + daysChecked);
-      
-      const dayOfWeek = targetDate.getDay(); // 0: Sunday, 1: Monday, ..., 6: Saturday
-      
-      let isValidDay = false;
-      if (isTuesdayToSaturday) {
-        // Tuesday (2) to Saturday (6)
-        if (dayOfWeek >= 2 && dayOfWeek <= 6) {
-          isValidDay = true;
-        }
-      } else {
-        // Monday (1) to Friday (5)
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-          isValidDay = true;
-        }
-      }
-
-      // Avoid booking for today if it is past 3 PM already
-      const isToday = daysChecked === 0;
-      if (isToday) {
-        const currentHour = today.getHours();
-        if (currentHour >= 15) {
-          isValidDay = false;
-        }
-      }
-
-      if (isValidDay) {
-        const yyyy = targetDate.getFullYear();
-        const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(targetDate.getDate()).padStart(2, '0');
-        const dateString = `${yyyy}-${mm}-${dd}`;
-        
-        // Format display text in Spanish
-        const dayNames = ['Domingo', 'Lunes', 'Martas', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        // Fix Tuesday accent display typo
-        const correctedDayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        const monthNames = [
-          'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
-        ];
-        
-        const dayName = correctedDayNames[dayOfWeek];
-        const displayString = `${dayName}, ${targetDate.getDate()} de ${monthNames[targetDate.getMonth()]}`;
-
-        dates.push({
-          dateString,
-          displayString,
-          dayName
-        });
-        daysAdded++;
-      }
-      daysChecked++;
+    // Empty cells at the start of the month
+    const firstDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      cells.push({
+        dateString: '',
+        dayNumber: 0,
+        isPast: true,
+        isValidWorkingDay: false,
+        isFull: false,
+        bookedCount: 0,
+        isToday: false,
+        isEmptyCell: true
+      });
     }
 
-    return dates;
-  }, [selectedSucursal]);
+    // Days in current month
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const todaySimulated = new Date('2026-06-05T00:00:00');
+    const isTuesdayToSaturday = selectedSucursal.horario.toLowerCase().includes('martes a sábado');
 
-  // Reset date and time if sucursal changes and the old date is no longer in the valid dates list
+    for (let day = 1; day <= daysInMonth; day++) {
+      const yyyy = currentYear;
+      const mm = String(currentMonth + 1).padStart(2, '0');
+      const dd = String(day).padStart(2, '0');
+      const dateString = `${yyyy}-${mm}-${dd}`;
+
+      const targetDate = new Date(dateString + 'T00:00:00');
+      const isPast = targetDate < todaySimulated;
+      const isToday = dateString === '2026-06-05';
+
+      // Verify sucursal working day
+      const dayOfWeek = targetDate.getDay();
+      let isValidWorkingDay = false;
+      if (isTuesdayToSaturday) {
+        if (dayOfWeek >= 2 && dayOfWeek <= 6) {
+          isValidWorkingDay = true;
+        }
+      } else {
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          isValidWorkingDay = true;
+        }
+      }
+
+      // Avoid booking for today if past 15:00
+      if (isToday) {
+        const hObj = new Date();
+        if (hObj.getHours() >= 15) {
+          isValidWorkingDay = false;
+        }
+      }
+
+      // Counting bookings
+      let isFull = false;
+      let bookedCount = 0;
+
+      if (isExtranjeria) {
+        // Daily quota limit for Extranjería = 20
+        bookedCount = mergedBookings.filter((c) => 
+          c.fecha === dateString && 
+          (c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranjero') || c.subServicioId?.startsWith('ext_')) &&
+          c.estado !== 'cancelada'
+        ).length;
+        
+        if (bookedCount >= 20) {
+          isFull = true;
+        }
+      } else if (isPastAgeTrámiteSelected) {
+        // Daily limit for Tardia / Pasados de Edad
+        bookedCount = mergedBookings.filter((c) => 
+          c.fecha === dateString && 
+          (c.subServicioId === 'ced_pasados_edad' || c.subServicioNombre?.toLowerCase().includes('pasado') || c.subServicioNombre?.toLowerCase().includes('tardía')) &&
+          c.estado !== 'cancelada'
+        ).length;
+        
+        if (bookedCount >= tardiaConfig.capacityTotal) {
+          isFull = true;
+        }
+      }
+
+      cells.push({
+        dateString,
+        dayNumber: day,
+        isPast,
+        isValidWorkingDay,
+        isFull,
+        bookedCount,
+        isToday,
+        isEmptyCell: false
+      });
+    }
+
+    return cells;
+  }, [currentMonth, currentYear, selectedSucursal, isExtranjeria, isPastAgeTrámiteSelected, mergedBookings, tardiaConfig]);
+
+  const handlePrevMonth = () => {
+    if (currentYear === 2026 && currentMonth <= 5) return;
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(prev => prev - 1);
+    } else {
+      setCurrentMonth(prev => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentYear === 2027 && currentMonth === 11) return;
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(prev => prev + 1);
+    } else {
+      setCurrentMonth(prev => prev + 1);
+    }
+  };
+
+  // Reset selected date if sucursal changes and the previously selected date is not a working day for the newly selected sucursal
   React.useEffect(() => {
-    if (selectedSucursal) {
-      const isValid = nextAvailableDates.some((d) => d.dateString === fecha);
+    if (selectedSucursal && fecha) {
+      const parsed = new Date(fecha + 'T12:00:00');
+      const isTuesdayToSaturday = selectedSucursal.horario.toLowerCase().includes('martes a sábado');
+      const dayOfWeek = parsed.getDay();
+      let isValid = false;
+      if (isTuesdayToSaturday) {
+        if (dayOfWeek >= 2 && dayOfWeek <= 6) isValid = true;
+      } else {
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) isValid = true;
+      }
       if (!isValid) {
         setFecha('');
         setHora('');
@@ -333,7 +427,24 @@ export default function AgendamientoCita({
       setFecha('');
       setHora('');
     }
-  }, [sucursalId, nextAvailableDates, selectedSucursal]);
+  }, [sucursalId, selectedSucursal]);
+
+  const formatFechaEs = (fechaStr: string) => {
+    if (!fechaStr) return '';
+    const parts = fechaStr.split('-');
+    if (parts.length !== 3) return fechaStr;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const dateObj = new Date(year, month, day);
+    if (isNaN(dateObj.getTime())) return fechaStr;
+    const daysEs = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const monthsEs = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    return `${daysEs[dateObj.getDay()]}, ${day} de ${monthsEs[month]} de ${year}`;
+  };
 
   const handleBookingSubmit = () => {
     if (sucursalId && fecha && hora) {
@@ -390,7 +501,7 @@ export default function AgendamientoCita({
                 ⚠️ Trámite Exclusivo de Extranjería
               </span>
               <span>
-                Por regulación institucional del Tribunal Electoral de Panamá, toda la atención presencial para trámites migratorios o de extranjería (PE) se gestiona de manera centralizada <strong>exclusivamente en la Sede Principal de Ancón</strong> (Tribunal Electoral de Panamá).
+                Por regulación institucional del Tribunal Electoral de Panamá, toda la atención presencial para trámites de extranjería se gestiona de manera centralizada exclusivamente en la Sede Principal de Ancón (Tribunal Electoral de Panamá).
               </span>
             </div>
           )}
@@ -431,70 +542,146 @@ export default function AgendamientoCita({
           {selectedSucursal ? (
             <div className="space-y-5">
               
-              {/* DATE PICKING */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-slate-500" />
-                  <span>2. Seleccione el Día Mandatorio</span>
-                  <span className="text-red-500">*</span>
-                </label>
-                <p className="text-xs text-slate-500 font-medium">Días laborables disponibles en base al calendario de la sede:</p>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  {nextAvailableDates.map((item) => {
-                    const isSelected = fecha === item.dateString;
-                    
-                    // Count current bookings of this type for this date
-                    const isPastAgeTrámite = selectedSubServicioId === 'ced_pasados_edad';
-                    const countPasadosEdad = mergedBookings.filter((c) => 
-                      c.fecha === item.dateString && 
-                      (c.subServicioId === 'ced_pasados_edad' || c.subServicioNombre?.toLowerCase().includes('pasado') || c.subServicioNombre?.toLowerCase().includes('tardía')) &&
-                      c.estado !== 'cancelada'
-                    ).length;
+              {/* DATE PICKING (ANNUAL CALENDAR VIEW) */}
+              <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                  <div className="space-y-1 text-left">
+                    <label className="block text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-blue-700" />
+                      <span>2. Seleccione el Día Mandatorio (Calendario Anual)</span>
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {isExtranjeria 
+                        ? 'Citas de Extranjería limitadas a un cupo diario máximo de 20 personas.' 
+                        : 'Seleccione un día laborable del año para agendar su cita.'}
+                    </p>
+                  </div>
+                  
+                  {/* Month Switcher Controls */}
+                  <div className="flex items-center gap-1 self-start sm:self-center">
+                    <button
+                      type="button"
+                      onClick={handlePrevMonth}
+                      disabled={currentYear === 2026 && currentMonth <= 5}
+                      className="p-1 px-2.5 rounded bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition text-xs font-black flex items-center gap-1"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Ant</span>
+                    </button>
+                    <span className="text-xs font-bold text-slate-800 px-2 min-w-[100px] text-center uppercase font-mono tracking-wider">
+                      {MONTH_NAMES_ES[currentMonth]} {currentYear}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleNextMonth}
+                      disabled={currentYear === 2027 && currentMonth === 11}
+                      className="p-1 px-2.5 rounded bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition text-xs font-black flex items-center gap-1"
+                    >
+                      <span>Sig</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-700" />
+                    </button>
+                  </div>
+                </div>
 
-                    const isDayFullForPasados = isPastAgeTrámite && countPasadosEdad >= tardiaConfig.capacityTotal;
+                {/* Weekday Labels row */}
+                <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] uppercase text-slate-500 py-1 font-sans">
+                  {WEEK_DAYS_ES.map(dayLabel => (
+                    <div key={`weekday-${dayLabel}`} className="py-0.5">{dayLabel}</div>
+                  ))}
+                </div>
+
+                {/* Days Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarCells.map((cell, idx) => {
+                    if (cell.isEmptyCell) {
+                      return <div key={`empty-${idx}`} className="p-1" />;
+                    }
+
+                    const isSelected = fecha === cell.dateString;
+                    const isDisabled = cell.isPast || !cell.isValidWorkingDay;
+
+                    // If full, the day disappears as an option (renders empty / faded empty with alert)
+                    if (cell.isFull) {
+                      return (
+                        <div 
+                          key={cell.dateString} 
+                          title="Fila de cupos agotada para este día (Desaparecido para agendar)" 
+                          className="h-11 sm:h-12 border border-dashed border-red-200 rounded bg-red-10 border-red-300 bg-red-50/50 flex flex-col items-center justify-center opacity-40 select-none relative overflow-hidden"
+                        >
+                          <span className="text-[10px] font-mono font-black text-red-500 strikethrough line-through">
+                            {cell.dayNumber}
+                          </span>
+                          <span className="text-[7.5px] font-black text-red-600 uppercase tracking-tighter leading-none mt-0.5 scale-90">
+                            Agotado
+                          </span>
+                        </div>
+                      );
+                    }
 
                     return (
                       <button
-                        key={item.dateString}
+                        key={cell.dateString}
                         type="button"
-                        disabled={isDayFullForPasados && !isSelected}
+                        disabled={isDisabled}
                         onClick={() => {
-                          setFecha(item.dateString);
-                          setHora(''); // Reset time when date changes
+                          setFecha(cell.dateString);
+                          setHora('');
                         }}
-                        className={`p-2.5 rounded border-2 text-center transition cursor-pointer flex flex-col items-center justify-center relative ${
+                        className={`h-11 sm:h-12 rounded border text-center transition flex flex-col items-center justify-center relative select-none cursor-pointer ${
                           isSelected
-                            ? 'border-blue-700 bg-blue-50/25 text-slate-900 font-extrabold shadow-sm'
-                            : isDayFullForPasados
-                              ? 'border-red-900/30 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
-                              : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                            ? 'border-blue-700 bg-blue-100 text-blue-900 font-extrabold shadow-sm ring-2 ring-blue-600/20'
+                            : isDisabled
+                              ? 'border-slate-100 bg-slate-100/60 text-slate-350 cursor-not-allowed text-[11px]'
+                              : cell.isToday
+                                ? 'border-amber-400 bg-amber-50/60 text-amber-900 font-bold hover:bg-amber-100'
+                                : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
-                          {item.dayName}
+                        <span className={`text-[12px] font-bold ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+                          {cell.dayNumber}
                         </span>
-                        <span className="text-sm font-bold mt-0.5">
-                          {item.dateString.split('-')[2]}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {item.displayString.split(' de ')[1]}
-                        </span>
-
-                        {isPastAgeTrámite && (
-                          <span className={`text-[8.5px] mt-1.5 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight block border ${
-                            isDayFullForPasados
-                              ? 'bg-red-50 text-red-700 border-red-200'
-                              : countPasadosEdad > 0
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
-                            {isDayFullForPasados ? '🚫 Sin Cupo' : `${countPasadosEdad}/${tardiaConfig.capacityTotal} Citas`}
+                        
+                        {!isDisabled && (
+                          <span className="text-[7.5px] font-bold uppercase tracking-tight scale-90">
+                            {isExtranjeria ? (
+                              <span className="text-slate-500 font-mono">
+                                {20 - cell.bookedCount} L
+                              </span>
+                            ) : isPastAgeTrámiteSelected ? (
+                              <span className="text-blue-600 font-mono">
+                                {tardiaConfig.capacityTotal - cell.bookedCount} L
+                              </span>
+                            ) : (
+                              <span className="text-emerald-500 font-bold">✓</span>
+                            )}
                           </span>
                         )}
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Calendar Legend Info */}
+                <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] text-slate-500 font-medium pt-2 border-t border-slate-200 mt-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded bg-white border border-slate-200" />
+                      <span>Disponible</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded bg-slate-100 border border-slate-200" />
+                      <span>Cerrado / No laborable</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded bg-red-50 border border-dashed border-red-200 text-red-500 font-bold flex items-center justify-center text-[8px]" />
+                      <span>Cupo Exhausto (Desaparece del calendario)</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-400">
+                    <Info className="w-3 h-3 shrink-0" />
+                    <span>L = Cupos libres diarios</span>
+                  </div>
                 </div>
               </div>
 
@@ -538,48 +725,78 @@ export default function AgendamientoCita({
                         }
                       </p>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {availableSlots.map((slot) => {
-                          const isSelected = hora === slot;
-                          
-                          // Count current bookings in this slot to apply slot limitations
-                          const bookedCount = activeBookings.filter(c => 
-                            c.fecha === fecha && 
-                            c.hora === slot && 
-                            (c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranjero') || c.subServicioId?.startsWith('ext_')) &&
-                            c.estado !== 'cancelada'
-                          ).length;
-                          
-                          const isFull = isExtranjeria && bookedCount >= extranjeriaConfig.capacity;
-                          
+                      {(() => {
+                        const filteredSlots = availableSlots.filter((slot) => {
+                          if (isExtranjeria) {
+                            const bookedCount = mergedBookings.filter(c => 
+                              c.fecha === fecha && 
+                              c.hora === slot && 
+                              (c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranjero') || c.subServicioId?.startsWith('ext_')) &&
+                              c.estado !== 'cancelada'
+                            ).length;
+                            return bookedCount < extranjeriaConfig.capacity;
+                          }
+                          return true;
+                        });
+
+                        if (filteredSlots.length === 0) {
                           return (
-                            <button
-                              key={slot}
-                              type="button"
-                              disabled={isFull && !isSelected}
-                              onClick={() => setHora(slot)}
-                              className={`p-2.5 rounded border text-center text-xs font-bold transition flex flex-col items-center justify-center gap-1 ${
-                                isSelected
-                                  ? 'border-blue-700 bg-blue-700 text-white shadow-sm shadow-blue-100'
-                                  : isFull
-                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                              }`}
-                            >
-                              <span className="tracking-tight text-[11px] font-bold">{slot}</span>
-                              {isExtranjeria && isFull && (
-                                <span className={`text-[9px] tracking-tight block ${
-                                  isSelected 
-                                    ? 'text-blue-200 font-medium' 
-                                    : 'text-red-500 font-bold'
-                                }`}>
-                                  ⛔ Lleno
-                                </span>
-                              )}
-                            </button>
+                            <div className="bg-amber-50 border border-amber-200 text-amber-950 p-4 rounded text-center space-y-2 shadow-sm">
+                              <p className="font-extrabold text-xs uppercase text-amber-800 tracking-wide">
+                                ⚠️ Horarios de Extranjería Agotados
+                              </p>
+                              <p className="text-[11px] font-semibold text-slate-650 max-w-sm mx-auto leading-relaxed">
+                                Todos los cupos horarios de extranjería para este día han sido completados (máximo {extranjeriaConfig.capacity} personas por intervalo). Por favor, seleccione otra fecha en el calendario.
+                              </p>
+                            </div>
                           );
-                        })}
-                      </div>
+                        }
+
+                        return (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {filteredSlots.map((slot) => {
+                              const isSelected = hora === slot;
+                              
+                              // Count current bookings in this slot to apply slot limitations
+                              const bookedCount = mergedBookings.filter(c => 
+                                c.fecha === fecha && 
+                                c.hora === slot && 
+                                (c.servicioCategoria === 'extranjeria' || c.subServicioId?.includes('extranjero') || c.subServicioId?.startsWith('ext_')) &&
+                                c.estado !== 'cancelada'
+                              ).length;
+                              
+                              const isFull = isExtranjeria && bookedCount >= extranjeriaConfig.capacity;
+                              
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  disabled={isFull && !isSelected}
+                                  onClick={() => setHora(slot)}
+                                  className={`p-2.5 rounded border text-center text-xs font-bold transition flex flex-col items-center justify-center gap-1 ${
+                                    isSelected
+                                      ? 'border-blue-700 bg-blue-700 text-white shadow-sm shadow-blue-100'
+                                      : isFull
+                                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <span className="tracking-tight text-[11px] font-bold">{slot}</span>
+                                  {isExtranjeria && isFull && (
+                                    <span className={`text-[9px] tracking-tight block ${
+                                      isSelected 
+                                        ? 'text-blue-200 font-medium' 
+                                        : 'text-red-500 font-bold'
+                                    }`}>
+                                      ⛔ Lleno
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </>
                   )}
                 </div>
@@ -600,7 +817,7 @@ export default function AgendamientoCita({
                     <p className="text-xs text-slate-700 font-medium leading-normal">
                       Asistencia en <strong className="text-slate-900">{selectedSucursal.nombre}</strong> el día{' '}
                       <strong className="text-slate-900">
-                        {nextAvailableDates.find((d) => d.dateString === fecha)?.displayString}
+                        {formatFechaEs(fecha)}
                       </strong>{' '}
                       a las <strong className="text-slate-900">{hora}</strong>.
                     </p>
