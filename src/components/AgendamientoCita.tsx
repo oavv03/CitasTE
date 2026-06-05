@@ -152,14 +152,10 @@ export default function AgendamientoCita({
       );
     }
     if (isPastAgeTrámiteSelected) {
-      return generateExtranjeriaSlots(
-        tardiaConfig.start,
-        tardiaConfig.end,
-        tardiaConfig.interval
-      );
+      return ['08:00 AM', '09:00 AM', '10:30 AM', '11:30 AM'];
     }
     return HORAS_DISPONIBLES;
-  }, [isExtranjeria, isPastAgeTrámiteSelected, extranjeriaConfig, tardiaConfig]);
+  }, [isExtranjeria, isPastAgeTrámiteSelected, extranjeriaConfig]);
 
   // Load active bookings in order to enforce dynamic capacity constraints
   const activeBookings = useMemo(() => {
@@ -222,33 +218,33 @@ export default function AgendamientoCita({
     ).length;
   }, [fecha, mergedBookings]);
 
-  // Automatically switch to Ancón and Panamá province when component is loaded or switching to Extranjería
+  // Automatically switch to Ancón and Panamá province when component is loaded or switching to Extranjería or Pasados de Edad
   React.useEffect(() => {
-    if (isExtranjeria) {
+    if (isExtranjeria || isPastAgeTrámiteSelected) {
       setSucursalId('anc_main');
       setSelectedProvincia('Panamá');
     }
-  }, [isExtranjeria]);
+  }, [isExtranjeria, isPastAgeTrámiteSelected]);
 
   // Extract unique provinces
   const provincias = useMemo(() => {
-    if (isExtranjeria) {
+    if (isExtranjeria || isPastAgeTrámiteSelected) {
       return ['Panamá'];
     }
     const list = SUCURSALES_TE.map((s) => s.provincia);
     return ['Todos', ...Array.from(new Set(list))];
-  }, [isExtranjeria]);
+  }, [isExtranjeria, isPastAgeTrámiteSelected]);
 
   // Filter sucursales based on selected province
   const filteredSucursales = useMemo(() => {
-    if (isExtranjeria) {
+    if (isExtranjeria || isPastAgeTrámiteSelected) {
       return SUCURSALES_TE.filter((s) => s.id === 'anc_main');
     }
     if (selectedProvincia === 'Todos') {
       return SUCURSALES_TE;
     }
     return SUCURSALES_TE.filter((s) => s.provincia === selectedProvincia);
-  }, [selectedProvincia, isExtranjeria]);
+  }, [selectedProvincia, isExtranjeria, isPastAgeTrámiteSelected]);
 
   const selectedSucursal = useMemo(() => {
     return SUCURSALES_TE.find((s) => s.id === sucursalId);
@@ -326,7 +322,12 @@ export default function AgendamientoCita({
       // Verify sucursal working day
       const dayOfWeek = targetDate.getDay();
       let isValidWorkingDay = false;
-      if (isTuesdayToSaturday) {
+      if (isPastAgeTrámiteSelected) {
+        // Only lunes a jueves (Monday to Thursday) are permitted
+        if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+          isValidWorkingDay = true;
+        }
+      } else if (isTuesdayToSaturday) {
         if (dayOfWeek >= 2 && dayOfWeek <= 6) {
           isValidWorkingDay = true;
         }
@@ -485,7 +486,7 @@ export default function AgendamientoCita({
               aria-label="Filtrar por provincia"
               onChange={(e) => setSelectedProvincia(e.target.value)}
               className="bg-white border border-slate-300 rounded py-1 px-2.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-700 cursor-pointer font-semibold"
-              disabled={isExtranjeria}
+              disabled={isExtranjeria || isPastAgeTrámiteSelected}
             >
               {provincias.map((p) => (
                 <option key={p} value={p}>
@@ -502,6 +503,17 @@ export default function AgendamientoCita({
               </span>
               <span>
                 Por regulación institucional del Tribunal Electoral de Panamá, toda la atención presencial para trámites de extranjería se gestiona de manera centralizada exclusivamente en la Sede Principal de Ancón (Tribunal Electoral de Panamá).
+              </span>
+            </div>
+          )}
+
+          {isPastAgeTrámiteSelected && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-950 p-3 rounded text-xs font-semibold flex flex-col gap-1.5 leading-relaxed shadow-sm">
+              <span className="text-blue-850 font-extrabold uppercase tracking-wide flex items-center gap-1">
+                ⚠️ Trámite Exclusivo de Sede Principal
+              </span>
+              <span>
+                Por regulación institucional, la inscripción de ciudadanos Pasados de Edad se gestiona de manera centralizada <strong>exclusivamente en la Sede Principal de Ancón</strong> (Vía Omar Torrijos Herrera). Las demás sedes regionales o distritales no están habilitadas para este trámite.
               </span>
             </div>
           )}
@@ -716,13 +728,8 @@ export default function AgendamientoCita({
                     </div>
                   ) : (
                     <>
-                      <p className="text-xs text-slate-500 font-medium">
-                        {isExtranjeria 
-                          ? `Espacios de atención de ${extranjeriaConfig.interval} minutos disponibles (Capacidad: ${extranjeriaConfig.capacity} usuarios por intervalo):`
-                          : isPastAgeTrámiteSelected
-                            ? `Espacios de atención de ${tardiaConfig.interval} minutos disponibles:`
-                            : 'Espacios de atención de 30 minutos disponibles:'
-                        }
+                      <p className="text-xs text-slate-500 font-bold">
+                        Horarios de atención disponibles:
                       </p>
 
                       {(() => {
@@ -736,17 +743,35 @@ export default function AgendamientoCita({
                             ).length;
                             return bookedCount < extranjeriaConfig.capacity;
                           }
-                          return true;
+                          if (isPastAgeTrámiteSelected) {
+                            const bookedCount = mergedBookings.filter(c => 
+                              c.fecha === fecha && 
+                              c.hora === slot && 
+                              (c.subServicioId === 'ced_pasados_edad' || c.subServicioNombre?.toLowerCase().includes('pasado') || c.subServicioNombre?.toLowerCase().includes('tardía')) &&
+                              c.estado !== 'cancelada'
+                            ).length;
+                            return bookedCount < 1; // 1 person per slot max for Pasados de Edad -> hidden if booked
+                          }
+                          // General/standard appointments: if already booked on this date, hide it
+                          const bookedCountGeneral = mergedBookings.filter(c => 
+                            c.fecha === fecha && 
+                            c.hora === slot && 
+                            c.estado !== 'cancelada'
+                          ).length;
+                          return bookedCountGeneral < 1;
                         });
 
                         if (filteredSlots.length === 0) {
                           return (
                             <div className="bg-amber-50 border border-amber-200 text-amber-950 p-4 rounded text-center space-y-2 shadow-sm">
                               <p className="font-extrabold text-xs uppercase text-amber-800 tracking-wide">
-                                ⚠️ Horarios de Extranjería Agotados
+                                {isPastAgeTrámiteSelected ? '⚠️ Horarios de Pasado de Edad Agotados' : '⚠️ Horarios de Extranjería Agotados'}
                               </p>
                               <p className="text-[11px] font-semibold text-slate-650 max-w-sm mx-auto leading-relaxed">
-                                Todos los cupos horarios de extranjería para este día han sido completados (máximo {extranjeriaConfig.capacity} personas por intervalo). Por favor, seleccione otra fecha en el calendario.
+                                {isPastAgeTrámiteSelected 
+                                  ? 'Todos los cupos de pasados de edad para este día han sido reservados (máximo 1 persona por cada horario: 8:00 AM, 9:00 AM, 10:30 AM y 11:30 AM). Por favor, seleccione otra fecha en el calendario.'
+                                  : `Todos los cupos horarios de extranjería para este día han sido completados (máximo ${extranjeriaConfig.capacity} personas por intervalo). Por favor, seleccione otra fecha en el calendario.`
+                                }
                               </p>
                             </div>
                           );

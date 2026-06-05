@@ -14,6 +14,7 @@ const DB_PATH = path.join(process.cwd(), "appointments-db.json");
 const EXTRANJERIA_DB_PATH = path.join(process.cwd(), "extranjeria-db.json");
 const EXTRANJERIA_CONFIG_PATH = path.join(process.cwd(), "extranjeria-config.json");
 const TARDIA_CONFIG_PATH = path.join(process.cwd(), "tardia-config.json");
+const WHATSAPP_CONFIG_PATH = path.join(process.cwd(), "whatsapp-config.json");
 const USERS_DB_PATH = path.join(process.cwd(), "users-db.json");
 
 // ==========================================
@@ -209,6 +210,20 @@ interface ServerUser {
 
 const DEFAULT_USERS: ServerUser[] = [
   {
+    username: "oscargave3003",
+    password: "Value1234",
+    role: "super",
+    nombre: "Oscar Super Admin",
+    fechaCreacion: "2026-06-05T18:11:00Z"
+  },
+  {
+    username: "oscargave3003@gmail.com",
+    password: "Value1234",
+    role: "super",
+    nombre: "Oscar Super Admin (Email)",
+    fechaCreacion: "2026-06-05T18:11:00Z"
+  },
+  {
     username: "adminmini",
     password: "admin1234",
     role: "sencillo",
@@ -375,6 +390,45 @@ function saveTardiaConfig(config: TardiaConfig): void {
     fs.writeFileSync(TARDIA_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch (error) {
     console.error("Error writing tardia config DB:", error);
+  }
+}
+
+interface WhatsappConfig {
+  numero: string;
+  mensaje: string;
+  habilitado: boolean;
+}
+
+const DEFAULT_WHATSAPP_CONFIG: WhatsappConfig = {
+  numero: "50766666666",
+  mensaje: "Hola, me gustaría recibir más información sobre mi cita en el Tribunal Electoral.",
+  habilitado: true
+};
+
+function getWhatsappConfig(): WhatsappConfig {
+  try {
+    if (!fs.existsSync(WHATSAPP_CONFIG_PATH)) {
+      fs.writeFileSync(WHATSAPP_CONFIG_PATH, JSON.stringify(DEFAULT_WHATSAPP_CONFIG, null, 2), "utf8");
+      return DEFAULT_WHATSAPP_CONFIG;
+    }
+    const data = fs.readFileSync(WHATSAPP_CONFIG_PATH, "utf8");
+    const parsed = JSON.parse(data);
+    return {
+      numero: typeof parsed.numero === "string" ? parsed.numero : DEFAULT_WHATSAPP_CONFIG.numero,
+      mensaje: typeof parsed.mensaje === "string" ? parsed.mensaje : DEFAULT_WHATSAPP_CONFIG.mensaje,
+      habilitado: typeof parsed.habilitado === "boolean" ? parsed.habilitado : DEFAULT_WHATSAPP_CONFIG.habilitado
+    };
+  } catch (error) {
+    console.error("Error reading whatsapp config DB:", error);
+  }
+  return DEFAULT_WHATSAPP_CONFIG;
+}
+
+function saveWhatsappConfig(config: WhatsappConfig): void {
+  try {
+    fs.writeFileSync(WHATSAPP_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  } catch (error) {
+    console.error("Error writing whatsapp config DB:", error);
   }
 }
 
@@ -546,6 +600,13 @@ async function safeUpsertSupabase(tbl: string, row: any) {
     payload.tiempo = payload.hora;
   }
 
+  // Handle NOT NULL constraint on fecha_nacimiento
+  if (tbl === "citas" || tbl === "appointments" || tbl === "otro" || tbl === "equipo") {
+    if (!payload.fecha_nacimiento) {
+      payload.fecha_nacimiento = "2000-01-01";
+    }
+  }
+
   const MAX_RETRIES = 15;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const { error } = await supabase.from(tbl).upsert(payload);
@@ -554,6 +615,46 @@ async function safeUpsertSupabase(tbl: string, row: any) {
     }
 
     const errMsg = error.message || "";
+
+    // 1. Handle foreign key constraint violations on sub_servicio_id dynamically
+    if (errMsg.includes("violates foreign key constraint") && errMsg.includes("sub_servicio_id")) {
+      console.warn(`[Supabase Self-Healing] Foreign key violation on sub_servicio_id: "${payload.sub_servicio_id}". Attempting to fallback.`);
+      try {
+        const tblServs = await getServiciosTableName();
+        const { data: validServices } = await supabase.from(tblServs).select("*");
+        if (validServices && validServices.length > 0) {
+          const firstValidId = validServices[0].identificacion || validServices[0].id || validServices[0].identificacion_servicio;
+          if (firstValidId) {
+            console.log(`[Supabase Self-Healing] Falling back sub_servicio_id from "${payload.sub_servicio_id}" to "${firstValidId}"`);
+            payload.sub_servicio_id = firstValidId;
+            continue;
+          }
+        }
+      } catch (err) {
+        console.error("[Supabase Self-Healing] Error trying to retrieve valid sub-services:", err);
+      }
+    }
+
+    // 2. Handle foreign key constraint on sucursal_id
+    if (errMsg.includes("violates foreign key constraint") && errMsg.includes("sucursal_id")) {
+      console.warn(`[Supabase Self-Healing] Foreign key violation on sucursal_id: "${payload.sucursal_id}". Attempting to fallback.`);
+      try {
+        const tblSucs = await getSucursalesTableName();
+        const { data: validSucs } = await supabase.from(tblSucs).select("*");
+        if (validSucs && validSucs.length > 0) {
+          const firstValidSucId = validSucs[0].identificacion || validSucs[0].id;
+          if (firstValidSucId) {
+            console.log(`[Supabase Self-Healing] Falling back sucursal_id from "${payload.sucursal_id}" to "${firstValidSucId}"`);
+            payload.sucursal_id = firstValidSucId;
+            continue;
+          }
+        }
+      } catch (err) {
+        console.error("[Supabase Self-Healing] Error trying to retrieve valid sucursales:", err);
+      }
+    }
+
+    // 3. Handle non-existent columns (original pattern)
     const matchSchemaCache = errMsg.match(/Could not find the '([^']+)' column/i);
     const matchPostgresNotExist = errMsg.match(/column "([^"]+)" of relation "([^"]+)" does not exist/i);
     const matchPostgresField = errMsg.match(/column "([^"]+)" does not exist/i);
@@ -719,11 +820,25 @@ async function initializeSupabaseTables() {
   try {
     // 1. Seed sucursales
     const tblSucs = await getSucursalesTableName();
-    const { data: sucs, error: sucErr } = await supabase.from(tblSucs).select("identificacion");
+    let sucs: any[] | null = null;
+    let sucErr: any = null;
+
+    // Try selecting identificacion, fallback to select *
+    const { data: sd1, error: se1 } = await supabase.from(tblSucs).select("identificacion");
+    if (!se1) {
+      sucs = sd1;
+    } else {
+      const { data: sd2, error: se2 } = await supabase.from(tblSucs).select("*");
+      if (!se2) {
+        sucs = sd2;
+      } else {
+        sucErr = se2;
+      }
+    }
+
     if (sucErr) {
       console.warn("[Supabase Seeder] 'sucursales' query failed (verify database structure):", sucErr.message);
-    } else if (!sucs || sucs.length === 0) {
-      console.log("[Supabase Seeder] Seeding sucursales...");
+    } else {
       const sucursalSeeds = [
         { identificacion: 'anc_main', provincia: 'Panamá', nombre: 'Tribunal Electoral de Panamá', direccion: 'Avenida Omar Torrijos Herrera, Ancón, frente a la terminal de Albrook, Ciudad de Panamá', telefono: '+507 507-8000', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
         { identificacion: 'boc_office', provincia: 'Bocas del Toro', nombre: 'Dirección Regional de Bocas del Toro', direccion: 'Calle Principal, Isla Colón, Bocas del Toro', telefono: '+507 757-8100', tiempo: 'Lunes a Viernes 7:30 AM - 3:30 PM' },
@@ -743,28 +858,64 @@ async function initializeSupabaseTables() {
         { identificacion: 'arr_office', provincia: 'Arraiján', nombre: 'Regional Especial de Arraiján', direccion: 'Vía Interamericana, Plaza Paseo Arraiján, Arraiján', telefono: '+507 507-8410', tiempo: 'Lunes a Viernes 8:00 AM - 4:00 PM' }
       ];
 
+      const existingSucs = new Set(
+        sucs?.map((s: any) => s.identificacion || s.id).filter(Boolean) || []
+      );
+
       for (const suc of sucursalSeeds) {
-        await supabase.from(tblSucs).insert(suc);
+        if (!existingSucs.has(suc.identificacion)) {
+          console.log(`[Supabase Seeder] Inserting missing sucursal: ${suc.identificacion}`);
+          const payload = {
+            identificacion: suc.identificacion,
+            id: suc.identificacion,
+            provincia: suc.provincia,
+            nombre: suc.nombre,
+            direccion: suc.direccion,
+            telefono: suc.telefono,
+            tiempo: suc.tiempo,
+            horario: suc.tiempo
+          };
+          try {
+            await safeUpsertSupabase(tblSucs, payload);
+          } catch (upsertErr: any) {
+            console.error(`[Supabase Seeder Error] Failed to safely seed sucursal ${suc.identificacion}:`, upsertErr.message || upsertErr);
+          }
+        }
       }
-      console.log("[Supabase Seeder] Sucursales seeded successfully.");
+      console.log("[Supabase Seeder] Sucursales verified / seeded successfully.");
     }
 
     // 2. Seed servicios_subservicios
     const tblServs = await getServiciosTableName();
-    const { data: subs, error: subErr } = await supabase.from(tblServs).select("identificacion");
+    let subs: any[] | null = null;
+    let subErr: any = null;
+
+    // Try selecting identificacion, fallback to select *
+    const { data: d1, error: e1 } = await supabase.from(tblServs).select("identificacion");
+    if (!e1) {
+      subs = d1;
+    } else {
+      const { data: d2, error: e2 } = await supabase.from(tblServs).select("*");
+      if (!e2) {
+        subs = d2;
+      } else {
+        subErr = e2;
+      }
+    }
+
     if (subErr) {
       console.warn("[Supabase Seeder] 'servicios_subservicios' query failed (verify database structure):", subErr.message);
-    } else if (!subs || subs.length === 0) {
-      console.log("[Supabase Seeder] Seeding servicios_subservicios...");
+    } else {
+      console.log("[Supabase Seeder] Verifying and inserting missing servicios_subservicios...");
       const serviceSeeds = [
         { identificacion: 'ced_primera_vez', id_categoria: 'cedulacion', nombre: 'Cédula por Primera Vez (Mayores de 18 años)', descripcion: 'Para ciudadanos panameños nacidos en el territorio nacional que alcanzan la mayoría de edad.', requisitos: ['Tener 18 años cumplidos.', 'Copia de certificado de nacimiento del Registro Civil (para verificar filiación).', 'Presencia física del interesado.'] },
         { identificacion: 'ced_renovacion', id_categoria: 'cedulacion', nombre: 'Renovación de Cédula de Identidad', descripcion: 'Renovación de documento vencido o próximo a vencer.', requisitos: ['Presentar la cédula de identidad vencida o por vencer.', 'Vestimenta adecuada para la toma de fotografía (no hombros descubiertos, no blusas escotadas).', 'Trámite gratuito para renovación regular.'] },
         { identificacion: 'ced_duplicado', id_categoria: 'cedulacion', nombre: 'Duplicado de Cédula (Pérdida o Robo)', descripcion: 'Reposición del documento por pérdida, robo, hurto o deterioro.', requisitos: ['Costo de B/. 15.00 por el primer duplicado (B/. 25.00 a partir del segundo).', 'Denuncia de pérdida (opcional pero recomendada).', 'Confirmación de datos biométricos en oficina.'] },
         { identificacion: 'ced_juvenil_primera', id_categoria: 'cedulacion', nombre: 'Cédula Juvenil por Primera Vez', descripcion: 'Formulación y entrega de cédula de identidad para menores de edad por primera vez.', requisitos: ['Estar acompañado de por lo menos uno de los padres con su cédula vigente.', 'Certificado de nacimiento del menor.', 'El menor de edad debe estar presente física voluntariamente.'] },
         { identificacion: 'ced_juvenil_renovacion', id_categoria: 'cedulacion', nombre: 'Cédula Juvenil Renovación', descripcion: 'Trámite de renovación para la cédula de identidad de menor de edad por vencimiento.', requisitos: ['Estar acompañado de uno de los padres con su cédula vigente.', 'Presentar la cédula juvenil vencida o próxima a vencer.', 'El menor de edad debe estar presente físicamente.'] },
-        { identificacion: 'ced_pasados_edad', id_categoria: 'cedulacion', nombre: 'Mayores de Edad No Cedulados (Pasados de Edad)', descripcion: 'Trámite de cedulación tardía para ciudadanos panameños nacidos en el territorio nacional que alcanzaron la mayoría de edad sin obtener su documento.', requisitos: ['Declaración jurada de dos (2) testigos panameños mayores de edad.', 'Certificado de nacimiento expedido por el Registro Civil.', 'Pruebas documentales de presencia física en el país (certificados de escuela, cartillas de vacunas, etc.).', 'Presencia física del interesado con vestimenta formal y hombros cubiertos.'] },
-        { identificacion: 'ced_extranjero_renovacion', id_categoria: 'cedulacion', nombre: 'Renovación de Cédula de Extranjero (PE)', descripcion: 'Trámite de renovación del documento de identidad personal para ciudadanos extranjeros residentes permanentes.', requisitos: ['Presentar la cédula de extranjero (PE) vencida o próxima a vencer.', 'Certificado de estatus migratorio vigente, emitido por el Servicio Nacional de Migración.', 'Pasaporte original vigente (copia completa certificada).', 'Pago del costo del trámite en la sucursal del Tribunal Electoral.'] },
-        { identificacion: 'ced_extranjero_duplicado_perdida', id_categoria: 'cedulacion', nombre: 'Duplicado de Cédula PE por Pérdida', descripcion: 'Reposición de la cédula de extranjero (PE) residente permanente debido a robo, extravío o deterioro.', requisitos: ['Denuncia formal registrada de pérdida o robo ante la DIJ.', 'Copia de pasaporte vigente y resolución autorizada de residencia.', 'Pago de arancel obligatorio por duplicado de extranjería (B/. 50.00).'] },
+        { identificacion: 'ced_pasados_edad', id_categoria: 'cedulacion', nombre: 'Cédula por primera pasados de edad', descripcion: 'Trámite de cedulación tardía para ciudadanos panameños nacidos en el territorio nacional que alcanzaron la mayoría de edad sin obtener su documento.', requisitos: ['Declaración jurada de dos (2) testigos panameños mayores de edad.', 'Certificado de nacimiento expedido por el Registro Civil.', 'Pruebas documentales de presencia física en el país (certificados de escuela, cartillas de vacunas, etc.).', 'Presencia física del interesado con vestimenta formal y hombros cubiertos.', 'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.', 'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.', 'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'] },
+        { identificacion: 'ced_extranjero_renovacion', id_categoria: 'cedulacion', nombre: 'Renovación de carné de residente permanente', "descripcion": "Trámite de renovación del documento de identidad personal para ciudadanos extranjeros residentes permanentes.", requisitos: ['Presentar la cédula de extranjero (PE) vencida o próxima a vencer.', 'Certificado de estatus migratorio vigente, emitido por el Servicio Nacional de Migración.', 'Pasaporte original vigente (copia completa certificada).', 'Pago del costo del trámite en la sucursal del Tribunal Electoral.', 'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.', 'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.', 'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'] },
+        { identificacion: 'ced_extranjero_duplicado_perdida', id_categoria: 'cedulacion', nombre: 'Duplicado carné de residente permanente', "descripcion": "Reposición de la cédula de extranjero (PE) residente permanente debido a robo, extravío o deterioro.", requisitos: ['Denuncia formal registrada de pérdida o robo ante la DIJ.', 'Copia de pasaporte vigente y resolución autorizada de residencia.', 'Pago de arancel obligatorio por duplicado de extranjería (B/. 50.00).', 'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.', 'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.', 'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'] },
         { identificacion: 'rc_nacimiento', id_categoria: 'registro_civil', nombre: 'Certificado de Nacimiento (Con o Sin Timbres)', descripcion: 'Expedición de certificados oficiales para trámites escolares, legales o de viaje.', requisitos: ['Suministrar el número de cédula del titular o tomo, asiento y folio del nacimiento.', 'Costo de B/. 3.00 (con timbres fiscales de uso común).', 'Nombres completos de los padres.'] },
         { identificacion: 'rc_matrimonio', id_categoria: 'registro_civil', nombre: 'Certificado de Matrimonio', descripcion: 'Documento que certifica el enlace de matrimonio inscrito legalmente.', requisitos: ['Número de cédula de ambos contrayentes o tomo/folio de inscripción.', 'Costo de B/. 3.00 para uso nacional. Para uso internacional debe ser autenticado.', 'Fecha aproximada en que se celebró el acto.'] },
         { identificacion: 'rc_defuncion', id_categoria: 'registro_civil', nombre: 'Certificado de Defunción', descripcion: 'Expedición de actas para trámites legales de herencias o procesos luctuosos.', requisitos: ['Número de cédula del difunto y fecha exacta del deceso.', 'Identificación del solicitante con cédula de identidad personal.', 'Costo de B/. 3.00.'] },
@@ -778,16 +929,76 @@ async function initializeSupabaseTables() {
         { identificacion: 'pe_matrimonio', id_categoria: 'panamenos_extranjero', nombre: 'Inscripción de Matrimonio celebrado en el Extranjero', descripcion: 'Registro oficial de matrimonios de ciudadanos panameños celebrados en el exterior.', requisitos: ['Certificado de matrimonio original extranjero apostillado o legalizado.', 'Cédula de identidad vigente del cónyuge panameño.', 'Traducción autorizada al español si el documento original fue emitido en otro idioma.'] }
       ];
 
+      const existingSubs = new Set(
+        subs?.map((s: any) => s.identificacion || s.id || s.identificacion_servicio).filter(Boolean) || []
+      );
+
       for (const service of serviceSeeds) {
-        await supabase.from(tblServs).insert(service);
+        if (!existingSubs.has(service.identificacion)) {
+          console.log(`[Supabase Seeder] Inserting missing subservicio: ${service.identificacion}`);
+          const payload = {
+            identificacion: service.identificacion,
+            id: service.identificacion,
+            id_categoria: service.id_categoria,
+            categoria_id: service.id_categoria,
+            nombre: service.nombre,
+            descripcion: service.descripcion,
+            requisitos: service.requisitos
+          };
+          try {
+            await safeUpsertSupabase(tblServs, payload);
+          } catch (upsertErr: any) {
+            console.error(`[Supabase Seeder Error] Failed to safely seed subservicio ${service.identificacion}:`, upsertErr.message || upsertErr);
+          }
+        } else if (
+          service.identificacion === 'ced_pasados_edad' ||
+          service.identificacion === 'ced_extranjero_renovacion' ||
+          service.identificacion === 'ced_extranjero_duplicado_perdida'
+        ) {
+          console.log(`[Supabase Seeder] Updating name and requirements for existing ${service.identificacion} sub-service...`);
+          const updatePayload = {
+            nombre: service.nombre,
+            requisitos: service.requisitos
+          };
+          try {
+            const { error: updErr1 } = await supabase.from(tblServs).update(updatePayload).eq('identificacion', service.identificacion);
+            if (updErr1) {
+              await supabase.from(tblServs).update(updatePayload).eq('id', service.identificacion);
+            }
+          } catch (updateErr: any) {
+            console.error(`[Supabase Seeder Error] Failed to update existing subservice ${service.identificacion}:`, updateErr.message || updateErr);
+          }
+        }
       }
-      console.log("[Supabase Seeder] Servicios/Subservicios seeded successfully.");
+      console.log("[Supabase Seeder] Servicios/Subservicios verified / seeded successfully.");
     }
 
     // 3. Populate default admin profiles and whitelist registers if empty
     await getDBUsers();
     await getDBExtranjeriaRecords();
-    
+
+    // Ensure our new super admin accounts are seeded in Supabase if active
+    try {
+      const tblUsers = await getUsersTableName();
+      const usersToEnsure = [
+        { username: "oscargave3003", password: "Value1234", role: "super", nombre: "Oscar Super Admin", fechaCreacion: "2026-06-05T18:11:00Z" },
+        { username: "oscargave3003@gmail.com", password: "Value1234", role: "super", nombre: "Oscar Super Admin (Email)", fechaCreacion: "2026-06-05T18:11:00Z" }
+      ];
+      for (const u of usersToEnsure) {
+        await safeUpsertSupabase(tblUsers, {
+          identificacion: u.username,
+          nombre_usuario: u.username,
+          hash_contrasena: u.password,
+          nombre: u.nombre,
+          role: u.role,
+          fecha_creacion: u.fechaCreacion
+        });
+      }
+      console.log("[Supabase Seeder] Verified and upserted custom super admin profiles.");
+    } catch (usersErr: any) {
+      console.warn("[Supabase Seeder Warning] Error ensuring custom super users in Supabase:", usersErr.message || usersErr);
+    }
+
   } catch (err: any) {
     console.error("[Supabase Seeder Error] Exception during table initialization:", err.message || err);
   }
@@ -958,7 +1169,7 @@ async function startServer() {
   // Proxy endpoint to load the official logo, bypassing potential hotlinking/CORS protection on the Tribunal Electoral server
   app.get("/api/logo", async (req, res) => {
     try {
-      const targetUrl = "https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/AGENDATE-01.png";
+      const targetUrl = "https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png";
       const response = await fetch(targetUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -1064,7 +1275,7 @@ async function startServer() {
             tipo_identificacion: serverCita.datosPersonales?.tipoIdentificacion || "Cedula",
             identificacion_ciudadano: serverCita.identificacion,
             ciudadano_identificacion: serverCita.identificacion,
-            fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || null,
+            fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || "2000-01-01",
             telefono: serverCita.telefono,
             correo: serverCita.correo,
             nombre_completo: serverCita.nombre || serverCita.datosPersonales?.nombreCompleto || "",
@@ -1154,11 +1365,11 @@ async function startServer() {
               background-color: #ffffff;
             }
             .header {
-              background-color: #ffffff;
+              background-color: #0b1329;
               padding: 24px;
               text-align: center;
-              color: #1e3a8a;
-              border-bottom: 2px solid #f1f5f9;
+              color: #ffffff;
+              border-bottom: 2px solid #b45309;
             }
             .header-emblem {
               display: inline-block;
@@ -1346,9 +1557,9 @@ async function startServer() {
               </div>
               
               <!-- Header Brand -->
-              <div class="header" style="background-color: #ffffff; border-bottom: 2px solid #e2e8f0; padding: 24px; text-align: center;">
+              <div class="header" style="background-color: #0b1329; border-bottom: 2px solid #b45309; padding: 24px; text-align: center;">
                 <img 
-                  src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/04/WhatsApp-Image-2026-04-30-at-09.45.35.png" 
+                  src="${logoAbsoluteUrl}" 
                   alt="Tribunal Electoral" 
                   style="max-height: 52px; width: auto; max-width: 100%; display: inline-block; vertical-align: middle;"
                 />
@@ -1646,6 +1857,34 @@ async function startServer() {
     }
   });
 
+  app.get("/api/whatsapp/config", (req, res) => {
+    try {
+      const config = getWhatsappConfig();
+      return res.json({ success: true, config });
+    } catch (e: any) {
+      console.error("Error fetching whatsapp settings:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/whatsapp/config", (req, res) => {
+    try {
+      const { numero, mensaje, habilitado } = req.body;
+      
+      const updatedConfig: WhatsappConfig = {
+        numero: typeof numero === "string" ? numero.trim() : DEFAULT_WHATSAPP_CONFIG.numero,
+        mensaje: typeof mensaje === "string" ? mensaje.trim() : DEFAULT_WHATSAPP_CONFIG.mensaje,
+        habilitado: typeof habilitado === "boolean" ? habilitado : DEFAULT_WHATSAPP_CONFIG.habilitado
+      };
+
+      saveWhatsappConfig(updatedConfig);
+      return res.json({ success: true, config: updatedConfig });
+    } catch (e: any) {
+      console.error("Error saving whatsapp config:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // API to register appointment directly
   app.post("/api/register-appointment", async (req, res) => {
     try {
@@ -1696,18 +1935,51 @@ async function startServer() {
         }
       }
 
-      // Enforce daily capacity check for Pasados de Edad (max 4 per day)
+      // Enforce daily capacity, days of the week, and hours check for Pasados de Edad
       const isPastAge = subServicioId === 'ced_pasados_edad' || 
         (subServicioId && (subServicioId.includes('pasado') || subServicioId.toLowerCase().includes('ced_pasados_edad'))) ||
         (subServicioNombre && (subServicioNombre.toLowerCase().includes('pasado') || subServicioNombre.toLowerCase().includes('tardía')));
       
       if (isPastAge) {
+        // 1. Verify working days (de lunes a jueves / Mon - Thu)
+        const targetDate = new Date(fecha + 'T00:00:00');
+        const dayOfWeek = targetDate.getDay(); 
+        if (dayOfWeek < 1 || dayOfWeek > 4) {
+          return res.status(400).json({
+            success: false,
+            error: "Las citas para Pasados de Edad solo están habilitadas de lunes a jueves."
+          });
+        }
+
+        // 2. Verify allowed times
+        const allowedTimes = ['08:00 AM', '09:00 AM', '10:30 AM', '11:30 AM'];
+        if (!allowedTimes.includes(hora)) {
+          return res.status(400).json({
+            success: false,
+            error: "Horario no disponible. Las citas de Pasados de Edad se agendan únicamente a las 08:00 AM, 09:00 AM, 10:30 AM o 11:30 AM."
+          });
+        }
+
+        // 3. Enforce slot capacity of exactly 1 appointment for that specific hour
+        const hourlyCitas = appointments.filter(a => 
+          a.fecha === fecha && 
+          a.hora === hora && 
+          (a.subServicioId === 'ced_pasados_edad' || a.subServicioNombre?.toLowerCase().includes('pasado') || a.subServicioNombre?.toLowerCase().includes('tardía')) &&
+          a.estado !== 'cancelada'
+        );
+        const isNewBooking = appointments.findIndex(a => a.id === id) < 0;
+        if (isNewBooking && hourlyCitas.length >= 1) {
+          return res.status(400).json({
+            success: false,
+            error: `El cupo de las ${hora} para inscripción de Pasado de Edad ya se encuentra reservado. Por favor, elija otra hora o fecha.`
+          });
+        }
+
         const activePasadosEdadCitas = appointments.filter(a => 
           a.fecha === fecha && 
           (a.subServicioId === 'ced_pasados_edad' || a.subServicioNombre?.toLowerCase().includes('pasado') || a.subServicioNombre?.toLowerCase().includes('tardía')) &&
           a.estado !== 'cancelada'
         );
-        const isNewBooking = appointments.findIndex(a => a.id === id) < 0;
         if (isNewBooking && activePasadosEdadCitas.length >= 4) {
           return res.status(400).json({
             success: false,
@@ -1752,7 +2024,7 @@ async function startServer() {
           tipo_identificacion: serverCita.datosPersonales?.tipoIdentificacion || "Cedula",
           identificacion_ciudadano: serverCita.identificacion,
           ciudadano_identificacion: serverCita.identificacion,
-          fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || null,
+          fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || "2000-01-01",
           telefono: serverCita.telefono,
           correo: serverCita.correo,
           nombre_completo: serverCita.nombre || serverCita.datosPersonales?.nombreCompleto || "",
@@ -2057,7 +2329,7 @@ async function startServer() {
           tipo_identificacion: serverCita.datosPersonales?.tipoIdentificacion || "Cedula",
           identificacion_ciudadano: serverCita.identificacion,
           ciudadano_identificacion: serverCita.identificacion,
-          fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || null,
+          fecha_nacimiento: serverCita.datosPersonales?.fechaNacimiento || "2000-01-01",
           telefono: serverCita.telefono,
           correo: serverCita.correo,
           nombre_completo: serverCita.nombre || serverCita.datosPersonales?.nombreCompleto || "",

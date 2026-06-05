@@ -122,13 +122,16 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
       },
       {
         id: 'ced_pasados_edad',
-        nombre: 'Mayores de Edad No Cedulados (Pasados de Edad)',
+        nombre: 'Cédula por primera pasados de edad',
         descripcion: 'Trámite de cedulación tardía para ciudadanos panameños nacidos en el territorio nacional que alcanzaron la mayoría de edad sin obtener su documento.',
         requisitos: [
           'Declaración jurada de dos (2) testigos panameños mayores de edad.',
           'Certificado de nacimiento expedido por el Registro Civil.',
           'Pruebas documentales de presencia física en el país (certificados de escuela, cartillas de vacunas, etc.).',
-          'Presencia física del interesado con vestimenta formal y hombros cubiertos.'
+          'Presencia física del interesado con vestimenta formal y hombros cubiertos.',
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       },
       {
@@ -138,7 +141,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Presentarse a las oficinas del Tribunal Electoral.',
           'Proporcionar el número de su cédula o el de su carné de residente permanente.',
-          'Costo B/.75.00.'
+          'Costo B/.75.00.',
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       },
       {
@@ -148,7 +154,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Presentarse a las oficinas del Tribunal Electoral.',
           'Presentar el carné de residente permanente que requiere reemplazar.',
-          'Costo B/.65.00.'
+          'Costo B/.65.00.',
+          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
+          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
+          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
         ]
       }
     ]

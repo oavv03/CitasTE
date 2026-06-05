@@ -80,6 +80,40 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
 
   useEffect(() => {
     generateCaptcha();
+
+    // Seed default expedientes for "Pasados de Edad" if not present
+    try {
+      const stored = localStorage.getItem('te_panama_historical_expedientes');
+      if (!stored) {
+        const seed = [
+          {
+            id: "Nº26-123-456",
+            number: "Nº26-123-456",
+            citizenName: "Oscar González G.",
+            identificacion: "8-999-9999",
+            fechaNacimiento: "1975-04-12",
+            correo: "oscargave3003@gmail.com",
+            telefono: "6123-4567",
+            notes: "Expediente de prueba pre-autorizado por la Dirección de Registro Civil",
+            fechaCreacion: new Date().toISOString()
+          },
+          {
+            id: "Nº54-474-325",
+            number: "Nº54-474-325",
+            citizenName: "Ana María Espinoza",
+            identificacion: "4-789-1234",
+            fechaNacimiento: "1980-08-30",
+            correo: "ana.espinoza@example.com",
+            telefono: "6987-6543",
+            notes: "Filiación biométrica tardía aprobada",
+            fechaCreacion: new Date().toISOString()
+          }
+        ];
+        localStorage.setItem('te_panama_historical_expedientes', JSON.stringify(seed));
+      }
+    } catch (e) {
+      console.warn('Could not seed default expedientes', e);
+    }
   }, []);
 
   // Validate the answer dynamically or while editing
@@ -214,6 +248,42 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
         newErrors.numeroSeguimiento = 'El número de seguimiento de expediente es obligatorio para este trámite';
       } else if (numeroSeguimiento.trim().length < 4) {
         newErrors.numeroSeguimiento = 'Ingrese un número de seguimiento válido de mínimo 4 caracteres';
+      } else {
+        // Strict platform registration validation
+        try {
+          const stored = localStorage.getItem('te_panama_historical_expedientes');
+          let isValid = false;
+          let citizenDetails: any = null;
+          if (stored) {
+            const list = JSON.parse(stored);
+            if (Array.isArray(list)) {
+              const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+              const cleanedInput = clean(numeroSeguimiento);
+              const found = list.find((item: any) => {
+                const itemNum = item.number || item.id || '';
+                return clean(itemNum) === cleanedInput;
+              });
+              if (found) {
+                isValid = true;
+                citizenDetails = found;
+              }
+            }
+          }
+          if (!isValid) {
+            newErrors.numeroSeguimiento = `Su número de expediente "${numeroSeguimiento}" no fue ubicado en la base de datos de control. El trámite requiere de un expediente previamente aprobado por la Dirección General (ej. Nº26-123-456).`;
+          } else if (citizenDetails) {
+            // Update tracking value to official casing/formatting
+            if (citizenDetails.number && citizenDetails.number !== numeroSeguimiento) {
+              setNumeroSeguimiento(citizenDetails.number);
+            }
+            // Auto pre-fill citizen name if empty to avoid mismatched inputs
+            if (citizenDetails.citizenName && !nombreCompleto.trim()) {
+              setNombreCompleto(citizenDetails.citizenName);
+            }
+          }
+        } catch (e) {
+          console.error('Error verifying platform expediente', e);
+        }
       }
     }
 

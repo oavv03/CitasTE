@@ -15,7 +15,8 @@ import {
   Zap,
   ArrowRight,
   Shield,
-  Globe
+  Globe,
+  MessageCircle
 } from 'lucide-react';
 import { DatosPersonales, ServicioCategoriaId, Cita } from './types';
 import FormularioDatos from './components/FormularioDatos';
@@ -42,6 +43,42 @@ export default function App() {
 
   // Full appointments history list
   const [citasList, setCitasList] = useState<Cita[]>([]);
+
+  // WhatsApp Configuration states
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
+  const [whatsappNumber, setWhatsappNumber] = useState('50766666666');
+  const [whatsappMessage, setWhatsappMessage] = useState('Hola, me gustaría recibir más información sobre mi cita en el Tribunal Electoral.');
+
+  const fetchWhatsappConfig = async () => {
+    try {
+      const res = await fetch('/api/whatsapp/config');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.config) {
+          setWhatsappEnabled(data.config.habilitado ?? true);
+          setWhatsappNumber(data.config.numero || '50766666666');
+          setWhatsappMessage(data.config.mensaje || '');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching whatsapp config in App component:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchWhatsappConfig();
+
+    const handleConfigChanged = () => {
+      fetchWhatsappConfig();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('whatsapp_config_changed', handleConfigChanged);
+      return () => {
+        window.removeEventListener('whatsapp_config_changed', handleConfigChanged);
+      };
+    }
+  }, []);
 
   // Load from LocalStorage on mount & Sync with server
   useEffect(() => {
@@ -528,6 +565,20 @@ export default function App() {
       >
         <Shield className="w-5 h-5 shrink-0" />
       </button>
+
+      {/* Botón flotante de WhatsApp (Esquina inferior derecha) */}
+      {whatsappEnabled && (
+        <a
+          href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(whatsappMessage)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-5 right-5 z-50 bg-green-600 hover:bg-green-500 text-white p-3.5 rounded-full shadow-lg transition-all duration-200 transform hover:scale-110 active:scale-95 cursor-pointer print:hidden flex items-center justify-center border border-green-500 shadow-green-950/20"
+          title="Contacto Directo WhatsApp"
+          aria-label="Contacto Directo WhatsApp"
+        >
+          <MessageCircle className="w-5 h-5 shrink-0" />
+        </a>
+      )}
       
     </div>
   );
