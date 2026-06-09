@@ -467,62 +467,6 @@ export default function App() {
             /* WIZARD CARD WRAPPER */
             <div className="bg-white border border-slate-200 rounded shadow-sm p-4 md:p-6 space-y-6">
                
-              {/* Step indicator visuals */}
-              {currentStep < 4 && (
-                <div className="border-b border-slate-100 pb-5" aria-label="Progreso de agendamiento">
-                  <div className="flex items-center justify-between max-w-md mx-auto relative px-4">
-                    
-                    {/* Background indicator line */}
-                    <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 -z-0">
-                      <div 
-                        className="h-full bg-emerald-500 transition-all duration-300" 
-                        style={{ width: `${(currentStep - 1) * 50}%` }}
-                      ></div>
-                    </div>
- 
-                    {/* Step 1 badge */}
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(1)}
-                      className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
-                      title="Ir al Paso 1: Selección de Trámite"
-                    >
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(1)}`}>
-                        {currentStep > 1 ? '✓' : '1'}
-                      </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Trámite</span>
-                    </button>
-
-                    {/* Step 2 badge */}
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(2)}
-                      className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
-                      title="Ir al Paso 2: Datos Personales"
-                    >
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(2)}`}>
-                        {currentStep > 2 ? '✓' : '2'}
-                      </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Datos</span>
-                    </button>
-
-                    {/* Step 3 badge */}
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(3)}
-                      className="flex flex-col items-center gap-1.5 relative z-10 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1"
-                      title="Ir al Paso 3: Agendamiento de Cita"
-                    >
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:scale-110 ${getStepIndicatorStyle(3)}`}>
-                        3
-                      </div>
-                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">Fecha</span>
-                    </button>
-
-                  </div>
-                </div>
-              )}
-
               {/* Step Routing Switcher */}
               <AnimatePresence mode="wait">
                 <motion.div

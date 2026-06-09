@@ -1290,7 +1290,15 @@ async function startServer() {
   const PORT = 3000;
 
   // Middleware to parse requests
-  app.use(express.json());
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Create uploads directory if it does not exist and serve it as static files
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
 
   // Check and seed Supabase schema on start
   await initializeSupabaseTables();
@@ -2034,6 +2042,99 @@ async function startServer() {
       return res.json({ success, config });
     } catch (e: any) {
       console.error("Error saving CMS config:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // API to upload an asset/image via base64 data
+  app.post("/api/upload", async (req, res) => {
+    try {
+      const { filename, base64Data } = req.body;
+      if (!base64Data) {
+        return res.status(400).json({ success: false, error: "No se proporcionó información de la imagen (datos base64)." });
+      }
+
+      let fileBuffer: Buffer;
+      let cleanedFilename = "image-" + Date.now() + ".png";
+
+      if (filename) {
+        // Sanitize the filename to avoid traversal or bad chars
+        cleanedFilename = String(filename)
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9_.-]/g, "-");
+        // Ensure unique prefix to avoid duplicate name clashes and cache conflicts
+        cleanedFilename = `${Date.now()}-${cleanedFilename}`;
+      }
+
+      if (base64Data.includes(";base64,")) {
+        const parts = base64Data.split(";base64,");
+        const rawBase64 = parts[1];
+        fileBuffer = Buffer.from(rawBase64, "base64");
+      } else {
+        fileBuffer = Buffer.from(base64Data, "base64");
+      }
+
+      const filePath = path.join(process.cwd(), "uploads", cleanedFilename);
+      fs.writeFileSync(filePath, fileBuffer);
+
+      return res.json({
+        success: true,
+        url: `/uploads/${cleanedFilename}`,
+        filename: cleanedFilename,
+        size: fileBuffer.length
+      });
+    } catch (e: any) {
+      console.error("Error saving uploaded image asset:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // API to list all uploaded images/assets
+  app.get("/api/uploads/list", async (req, res) => {
+    try {
+      const uDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uDir)) {
+        return res.json({ success: true, files: [] });
+      }
+      const files = fs.readdirSync(uDir);
+      const fileInfos = files
+        .filter(file => !file.startsWith('.'))
+        .map(file => {
+          const fPath = path.join(uDir, file);
+          const stat = fs.statSync(fPath);
+          return {
+            filename: file,
+            url: `/uploads/${file}`,
+            size: stat.size,
+            mtime: stat.mtime
+          };
+        })
+        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+      return res.json({ success: true, files: fileInfos });
+    } catch (e: any) {
+      console.error("Error listing files inside uploads/ directory:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // API to delete an uploaded image asset
+  app.delete("/api/uploads/:filename", async (req, res) => {
+    try {
+      const { filename } = req.params;
+      if (!filename || filename.includes("/") || filename.includes("..")) {
+        return res.status(400).json({ success: false, error: "Nombre de archivo inválido." });
+      }
+      const fPath = path.join(process.cwd(), "uploads", filename);
+      if (fs.existsSync(fPath)) {
+        fs.unlinkSync(fPath);
+        return res.json({ success: true, message: `Archivo ${filename} eliminado con éxito de la base de datos de almacenamiento local.` });
+      } else {
+        return res.status(404).json({ success: false, error: "El archivo no existe." });
+      }
+    } catch (e: any) {
+      console.error("Error deleting image from uploads/ directory:", e);
       return res.status(500).json({ success: false, error: e.message });
     }
   });

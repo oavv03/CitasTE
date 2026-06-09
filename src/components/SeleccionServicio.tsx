@@ -505,13 +505,7 @@ export default function SeleccionServicio({
           </div>
         )}
 
-        {/* Informative Footer */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-start gap-3">
-          <Info className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-slate-500 leading-relaxed font-medium">
-            <strong>¿Sabía usted?</strong> Los trámites de Extranjería (PE) han sido reubicados dentro de la opción de <strong>Cedulación</strong>. Del mismo modo, los trámites para Panameños en el Extranjero se encuentran consolidados dentro de <strong>Registro Civil</strong>.
-          </p>
-        </div>
+
       </div>
     );
   }

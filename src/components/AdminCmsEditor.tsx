@@ -14,7 +14,10 @@ import {
   Globe, 
   FileCode,
   Edit2,
-  Trash
+  Trash,
+  Upload,
+  Copy,
+  Check
 } from 'lucide-react';
 import { CmsConfig } from '../types';
 
@@ -35,6 +38,138 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
   const [newSection, setNewSection] = useState({ id: '', name: '', description: '' });
   const [newPage, setNewPage] = useState({ id: '', title: '', slug: '', content: '' });
   const [newImage, setNewImage] = useState({ id: '', name: '', url: '', category: '' });
+
+  // States for local storage uploads
+  const [localFiles, setLocalFiles] = useState<Array<{ filename: string; url: string; size: number; mtime: string }>>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [copiedFilename, setCopiedFilename] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Load local uploaded files from fast server storage
+  const loadLocalFiles = async () => {
+    setLoadingFiles(true);
+    try {
+      const res = await fetch('/api/uploads/list');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.files) {
+          setLocalFiles(data.files);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching uploaded files from express storage:', err);
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLocalFiles();
+  }, []);
+
+  const handleUploadFile = async (file: File) => {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showStatus('El archivo seleccionado debe ser una imagen válida (JPG, PNG, WEBP, SVG, GIF).', 'error');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showStatus('La imagen excede el límite de 10 Megabytes.', 'error');
+      return;
+    }
+
+    setUploadingFile(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filename: file.name,
+              base64Data
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.url) {
+              showStatus('¡Imagen subida exitosamente al almacenamiento rápido local!', 'success');
+              
+              // Automatically register/fill the config name and ID inputs
+              const sanitizedId = file.name
+                .toLowerCase()
+                .replace(/[^a-z0-9_]/g, '_')
+                .substring(0, 20) + '_' + Math.floor(Math.random() * 100);
+              
+              const sanitizedName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+              
+              setNewImage(prev => ({
+                ...prev,
+                url: data.url,
+                id: sanitizedId,
+                name: sanitizedName
+              }));
+              
+              // Reload visual bank list
+              loadLocalFiles();
+            } else {
+              showStatus('Error de subida: ' + (data.error || 'No se recibió la confirmación.'), 'error');
+            }
+          } else {
+            showStatus('Error en el servidor al subir la imagen.', 'error');
+          }
+        } catch (err: any) {
+          console.error('Upload call error:', err);
+          showStatus('Error de conexión al cargar el archivo.', 'error');
+        } finally {
+          setUploadingFile(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('File reader error:', err);
+      showStatus('No se pudo procesar la lectura local del archivo.', 'error');
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteLocalFile = async (filename: string) => {
+    if (!confirm(`¿Está seguro de que desea eliminar permanentemente este archivo '${filename}' del almacenamiento local?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/uploads/${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        showStatus('Archivo eliminado del almacenamiento.', 'success');
+        loadLocalFiles();
+      } else {
+        const data = await res.json();
+        showStatus('Error al eliminar archivo: ' + (data.error || 'Desconocido'), 'error');
+      }
+    } catch (err: any) {
+      console.error('Error deleting local file:', err);
+      showStatus('Error de conexión al intentar eliminar el archivo.', 'error');
+    }
+  };
+
+  const handleCopyUrl = (url: string, filename: string) => {
+    const fullUrl = window.location.origin + url;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedFilename(filename);
+    setTimeout(() => {
+      setCopiedFilename(null);
+    }, 2000);
+  };
 
   // Load current configuration
   const loadCmsConfig = async () => {
@@ -735,92 +870,278 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
               Banco y Galería de Imágenes Oficiales
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {config.images.map((img) => (
-                <div key={img.id} className="bg-slate-950 border border-slate-800 p-3 rounded flex gap-4 relative">
-                  <div className="h-16 w-16 bg-slate-900 rounded border border-slate-850 shrink-0 flex items-center justify-center overflow-hidden">
-                    <img src={img.url} alt={img.name} className="h-full w-full object-contain" referrerPolicy="no-referrer" />
-                  </div>
+            {/* SECTION A: FAST INTERACTIVE STORAGE UPLOADER */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-lg space-y-4 shadow-sm">
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                  <Upload className="w-4 h-4 text-emerald-500 animate-pulse" />
+                  Almacenamiento Rápido de Imágenes (Storage Local)
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Suba imágenes directamente a nuestro servidor de alta velocidad para acelerar su carga, optimizar el rendimiento del portal y obtener enlaces estáticos instantáneos.
+                </p>
+              </div>
 
-                  <div className="flex-1 space-y-1 min-w-0 pr-6">
-                    <span className="text-[10px] font-mono font-bold text-amber-500 uppercase tracking-wide">Img-ID: #{img.id}</span>
-                    <h5 className="text-xs font-bold text-white truncate">{img.name}</h5>
-                    <p className="text-[10px] font-mono text-slate-500 truncate" title={img.url}>{img.url}</p>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) handleUploadFile(file);
+                }}
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition duration-200 ${
+                  isDragging
+                    ? 'border-emerald-500 bg-emerald-950/20'
+                    : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="local-file-uploader"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadFile(file);
+                  }}
+                />
+                
+                <div className="flex flex-col items-center justify-center space-y-2">
+                  <div className="p-3 bg-slate-900 rounded-full border border-slate-800 text-slate-400">
+                    <Upload className="w-5 h-5 text-emerald-500" />
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteImage(img.id)}
-                    className="absolute top-2 right-2 text-red-500 hover:text-red-400 p-1 rounded hover:bg-red-950/20 transition cursor-pointer"
-                    title="Eliminar Imagen"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  
+                  {uploadingFile ? (
+                    <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+                      <RefreshCw className="w-4 h-4 animate-spin text-emerald-500" />
+                      Procesando y optimizando imagen en el servidor...
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-slate-200">
+                        Suelte su imagen aquí o{' '}
+                        <label
+                          htmlFor="local-file-uploader"
+                          className="text-emerald-400 hover:text-emerald-300 underline cursor-pointer font-bold"
+                        >
+                          busque en su dispositivo
+                        </label>
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        Formatos soportados: PNG, JPG, JPEG, WEBP, SVG, GIF (Máx 10 MB)
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ))}
+              </div>
+
+              {/* LIST OF CURRENTLY UPLOADED STATIC FILES */}
+              <div className="space-y-2.5">
+                <h5 className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  Archivos en Almacenamiento Rápido ({localFiles.length})
+                </h5>
+
+                {loadingFiles ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-500 py-4 justify-center">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Listando banco de imágenes local...
+                  </div>
+                ) : localFiles.length === 0 ? (
+                  <div className="text-center py-6 bg-slate-950 rounded border border-slate-850 text-[11px] text-slate-500">
+                    No hay imágenes cargadas en el storage local rápido todavía. ¡Suba su primera imagen arriba!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {localFiles.map((file) => (
+                      <div
+                        key={file.filename}
+                        className="bg-slate-950 border border-slate-850 hover:border-slate-800 rounded p-2.5 flex flex-col justify-between space-y-2"
+                      >
+                        <div className="flex gap-2.5 items-start">
+                          <div className="h-12 w-12 bg-slate-900 border border-slate-800 rounded overflow-hidden flex items-center justify-center shrink-0">
+                            <img
+                              src={file.url}
+                              alt={file.filename}
+                              className="h-full w-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="text-[11px] font-bold text-white truncate font-sans"
+                              title={file.filename}
+                            >
+                              {file.filename.split('-').slice(1).join('-') || file.filename}
+                            </p>
+                            <p className="text-[9px] font-mono text-slate-500 mt-0.5">
+                              {(file.size / 1024).toFixed(1)} KB | {new Date(file.mtime).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-1.5 pt-1.5 border-t border-slate-900">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyUrl(file.url, file.filename)}
+                            className="flex-1 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-300 rounded py-1 px-1.5 text-[9px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                            title="Copiar enlace completo"
+                          >
+                            {copiedFilename === file.filename ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-500" />
+                                <span className="text-emerald-400">¡Copiado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Copiar Enlace</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewImage((prev) => ({
+                                ...prev,
+                                url: file.url,
+                                id: file.filename
+                                  .toLowerCase()
+                                  .replace(/[^a-z0-9_]/g, '_')
+                                  .substring(0, 20),
+                                name: file.filename.split('-').slice(1).join('-').split('.')[0] || 'Imagen Subida'
+                              }));
+                              showStatus('El enlace de la imagen ha sido ingresado al formulario de registro básico inferior.', 'success');
+                            }}
+                            className="bg-emerald-950/45 hover:bg-emerald-900/35 border border-emerald-900/30 text-emerald-400 font-bold rounded py-1 px-2 text-[9px] transition cursor-pointer shrink-0"
+                            title="Usar imagen en el formulario de abajo"
+                          >
+                            Usar URL
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteLocalFile(file.filename)}
+                            className="bg-red-950/20 hover:bg-red-900/20 border border-red-900/10 text-red-400 hover:text-red-300 rounded py-1 px-1.5 text-[9px] transition cursor-pointer shrink-0"
+                            title="Eliminar permanentemente del disco del servidor"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Form to add image */}
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-4">
-              <h4 className="text-xs font-bold text-slate-350 uppercase flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5 text-emerald-500" />
-                Subir / Enlazar Nueva Imagen de Marca
+            {/* SECTION B: IMAGES REFERENCED IN CONFIGURATION */}
+            <div className="space-y-3.5">
+              <h4 className="text-xs font-bold text-slate-350 uppercase tracking-widest">
+                Galería y Referencias Activas en la Configuración
               </h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {config.images.map((img) => (
+                  <div key={img.id} className="bg-slate-950 border border-slate-800 p-3 rounded flex gap-4 relative">
+                    <div className="h-16 w-16 bg-slate-900 rounded border border-slate-850 shrink-0 flex items-center justify-center overflow-hidden">
+                      <img src={img.url} alt={img.name} className="h-full w-full object-contain" referrerPolicy="no-referrer" />
+                    </div>
+
+                    <div className="flex-1 space-y-1 min-w-0 pr-6">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono font-bold text-amber-500 uppercase tracking-wide">Img-ID: #{img.id}</span>
+                        {img.url.startsWith('/uploads/') && (
+                          <span className="text-[8px] bg-emerald-950 text-emerald-400 border border-emerald-900 px-1 py-0.5 rounded font-bold uppercase">Fast Load</span>
+                        )}
+                      </div>
+                      <h5 className="text-xs font-bold text-white truncate">{img.name}</h5>
+                      <p className="text-[10px] font-mono text-slate-500 truncate" title={img.url}>{img.url}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteImage(img.id)}
+                      className="absolute top-2 right-2 text-red-500 hover:text-red-400 p-1 rounded hover:bg-red-950/20 transition cursor-pointer"
+                      title="Eliminar del catálogo de configuración del sitio"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Form to add image */}
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-4">
+                <h4 className="text-xs font-bold text-slate-350 uppercase flex items-center gap-1">
+                  <Plus className="w-3.5 h-3.5 text-emerald-500" />
+                  Registrar Referencia de Imagen en Configuración
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 uppercase font-bold">Identificación (ID único)</label>
+                    <input
+                      type="text"
+                      value={newImage.id}
+                      onChange={(e) => setNewImage({ ...newImage, id: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none"
+                      placeholder="ej: banner_promocional"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 uppercase font-bold">Nombre Ilustrativo</label>
+                    <input
+                      type="text"
+                      value={newImage.name}
+                      onChange={(e) => setNewImage({ ...newImage, name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-white focus:outline-none"
+                      placeholder="ej: Foto Banner Principal"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 uppercase font-bold">Categoría o Ubicación</label>
+                    <input
+                      type="text"
+                      value={newImage.category || ''}
+                      onChange={(e) => setNewImage({ ...newImage, category: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-white focus:outline-none"
+                      placeholder="ej: Cabecera, Botones"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold">Identificación (ID único)</label>
+                  <label className="text-[10px] text-slate-400 uppercase font-bold">Dirección Web Completa (Url de la Imagen)</label>
                   <input
                     type="text"
-                    value={newImage.id}
-                    onChange={(e) => setNewImage({ ...newImage, id: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                    value={newImage.url}
+                    onChange={(e) => setNewImage({ ...newImage, url: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none"
-                    placeholder="ej: banner_promocional"
+                    placeholder="https://servidor.dominio/carpeta/imagen.jpg o enlace fast-load"
                   />
+                  <p className="text-[9px] text-slate-500 mt-0.5">
+                    Consejo: Puede subir una imagen en la sección Almacenamiento de arriba, presionar "Usar URL" y se autocompletará este campo al instante con la configuración optimizada.
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold">Nombre Ilustrativo</label>
-                  <input
-                    type="text"
-                    value={newImage.name}
-                    onChange={(e) => setNewImage({ ...newImage, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-white focus:outline-none"
-                    placeholder="ej: Foto Banner Principal"
-                  />
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleAddImage}
+                    className="bg-amber-600 hover:bg-amber-500 text-slate-950 text-[10px] uppercase font-bold px-3 py-2 rounded transition cursor-pointer"
+                  >
+                    Registrar Imagen
+                  </button>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold">Categoría o Ubicación</label>
-                  <input
-                    type="text"
-                    value={newImage.category || ''}
-                    onChange={(e) => setNewImage({ ...newImage, category: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-white focus:outline-none"
-                    placeholder="ej: Cabecera, Botones"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase font-bold">Dirección Web Completa (Url de la Imagen)</label>
-                <input
-                  type="text"
-                  value={newImage.url}
-                  onChange={(e) => setNewImage({ ...newImage, url: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none"
-                  placeholder="https://servidor.dominio/carpeta/imagen.jpg"
-                />
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={handleAddImage}
-                  className="bg-amber-600 hover:bg-amber-500 text-slate-950 text-[10px] uppercase font-bold px-3 py-2 rounded transition cursor-pointer"
-                >
-                  Registrar Imagen
-                </button>
               </div>
             </div>
 
