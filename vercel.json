@@ -6,7 +6,7 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/((?!assets/|vite\\.svg|favicon\\.ico).*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]
