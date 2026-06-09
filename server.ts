@@ -16,6 +16,7 @@ const EXTRANJERIA_CONFIG_PATH = path.join(process.cwd(), "extranjeria-config.jso
 const TARDIA_CONFIG_PATH = path.join(process.cwd(), "tardia-config.json");
 const WHATSAPP_CONFIG_PATH = path.join(process.cwd(), "whatsapp-config.json");
 const USERS_DB_PATH = path.join(process.cwd(), "users-db.json");
+const CMS_CONFIG_PATH = path.join(process.cwd(), "cms-config.json");
 
 // ==========================================
 // SUPABASE DATABASE WORKFLOW CONFIGS & INITIALIZER
@@ -391,6 +392,134 @@ function saveTardiaConfig(config: TardiaConfig): void {
   } catch (error) {
     console.error("Error writing tardia config DB:", error);
   }
+}
+
+interface CmsConfig {
+  siteTitle: string;
+  siteSubtitle: string;
+  logoUrl: string;
+  primaryColor: string;
+  customTexts: { [key: string]: string };
+  sections: Array<{ id: string; name: string; description: string; icon?: string }>;
+  pages: Array<{ id: string; title: string; slug: string; content: string; path?: string }>;
+  images: Array<{ id: string; name: string; url: string; category?: string }>;
+}
+
+const DEFAULT_CMS_CONFIG: CmsConfig = {
+  siteTitle: "Portal de Trámites",
+  siteSubtitle: "Tribunal Electoral de Panamá",
+  logoUrl: "https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png",
+  primaryColor: "#0f172a",
+  customTexts: {
+    welcomeTitle: "Bienvenido al Portal de Trámites y Citas",
+    welcomeSubtitle: "Agende y verifique sus citas oficiales de manera ágil y digital.",
+    footerText: "© 2026 Tribunal Electoral de Panamá. Todos los derechos reservados.",
+    helpContact: "Línea gratuita de atención: 311 o +507 507-8000"
+  },
+  sections: [
+    { id: "registro_civil", name: "Registro Civil", description: "Certificados de nacimiento, matrimonio, defunción y otros trámites del estado civil de las personas." },
+    { id: "cedulacion", name: "Cedulación", description: "Trámites relacionados con la obtención, renovación, y duplicados de cédulas de identidad personal." },
+    { id: "organizacion_electoral", name: "Organización Electoral", description: "Cambios de residencia electoral, inscripciones a partidos políticos, y más." },
+    { id: "extranjeria", name: "Trámites de Extranjería", description: "Procesamiento de cédulas de identidad para ciudadanos extranjeros (PE) y certificaciones." },
+    { id: "panamenos_extranjero", name: "Panameños en el Extranjero", description: "Inscripción de hechos vitales y trámites consulares de identidad para ciudadanos residentes en el exterior." }
+  ],
+  pages: [
+    { id: "home", title: "Inicio", slug: "inicio", content: "Página principal del Portal del Tribunal Electoral para el agendamiento de citas en línea." },
+    { id: "requisitos", title: "Requisitos Generales", slug: "requisitos", content: "Detalles completos de los requisitos necesarios para cada uno de los trámites que ofrece la institución." },
+    { id: "contacto", title: "Contacto y Oficinas", slug: "contacto", content: "Consulte nuestras sucursales y números de contacto en todas las provincias de la República." }
+  ],
+  images: [
+    { id: "logo", name: "Logo Principal", url: "https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png" }
+  ]
+};
+
+let resolvedCmsTable: string | null = null;
+async function getCmsTableName(): Promise<string> {
+  if (resolvedCmsTable) return resolvedCmsTable;
+  if (!isSupabaseConfigured || !supabase) {
+    resolvedCmsTable = "cms_config";
+    return "cms_config";
+  }
+  const candidates = ["cms_config", "cmsconfig", "site_config", "settings"];
+  for (const table of candidates) {
+    try {
+      const { error } = await supabase.from(table).select("id").limit(1);
+      if (!error || (error.message && !error.message.includes("Could not find") && !error.message.includes("does not exist") && !error.message.includes("public." + table))) {
+        console.log(`[Supabase Detector] Detected cms table name: '${table}'`);
+        resolvedCmsTable = table;
+        return table;
+      }
+    } catch (e) {}
+  }
+  resolvedCmsTable = "cms_config";
+  return "cms_config";
+}
+
+async function getCmsConfig(): Promise<CmsConfig> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const tbl = await getCmsTableName();
+      const { data, error } = await supabase.from(tbl).select("*").eq("id", "site_settings").single();
+      if (!error && data) {
+        const loaded: any = data.config_data;
+        const configObj = typeof loaded === "string" ? JSON.parse(loaded) : loaded;
+        if (configObj && configObj.siteTitle) {
+          return configObj;
+        }
+      }
+    } catch (e) {
+      console.warn("Error loading CMS settings from Supabase, falling back to local file:", e);
+    }
+  }
+
+  try {
+    if (!fs.existsSync(CMS_CONFIG_PATH)) {
+      fs.writeFileSync(CMS_CONFIG_PATH, JSON.stringify(DEFAULT_CMS_CONFIG, null, 2), "utf8");
+      return DEFAULT_CMS_CONFIG;
+    }
+    const data = fs.readFileSync(CMS_CONFIG_PATH, "utf8");
+    const parsed = JSON.parse(data);
+    return {
+      siteTitle: parsed.siteTitle || DEFAULT_CMS_CONFIG.siteTitle,
+      siteSubtitle: parsed.siteSubtitle || DEFAULT_CMS_CONFIG.siteSubtitle,
+      logoUrl: parsed.logoUrl || DEFAULT_CMS_CONFIG.logoUrl,
+      primaryColor: parsed.primaryColor || DEFAULT_CMS_CONFIG.primaryColor,
+      customTexts: parsed.customTexts || DEFAULT_CMS_CONFIG.customTexts,
+      sections: Array.isArray(parsed.sections) ? parsed.sections : DEFAULT_CMS_CONFIG.sections,
+      pages: Array.isArray(parsed.pages) ? parsed.pages : DEFAULT_CMS_CONFIG.pages,
+      images: Array.isArray(parsed.images) ? parsed.images : DEFAULT_CMS_CONFIG.images
+    };
+  } catch (error) {
+    console.error("Error reading cms config file:", error);
+  }
+  return DEFAULT_CMS_CONFIG;
+}
+
+async function saveCmsConfig(config: CmsConfig): Promise<boolean> {
+  try {
+    fs.writeFileSync(CMS_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  } catch (error) {
+    console.error("Error writing cms config file:", error);
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const tbl = await getCmsTableName();
+      const { error } = await supabase.from(tbl).upsert({
+        id: "site_settings",
+        config_data: config,
+        updated_at: new Date().toISOString()
+      });
+      if (error) {
+        console.warn("Supabase upsert for CMS configs returned error:", error.message);
+        return false;
+      }
+      return true;
+    } catch (e: any) {
+      console.error("Error saving CMS to Supabase:", e.message || e);
+    }
+  }
+  return true;
 }
 
 interface WhatsappConfig {
@@ -1881,6 +2010,30 @@ async function startServer() {
       return res.json({ success: true, config: updatedConfig });
     } catch (e: any) {
       console.error("Error saving whatsapp config:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get("/api/cms/config", async (req, res) => {
+    try {
+      const config = await getCmsConfig();
+      return res.json({ success: true, config });
+    } catch (e: any) {
+      console.error("Error fetching CMS config:", e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/cms/config", async (req, res) => {
+    try {
+      const config = req.body;
+      if (!config || typeof config !== "object") {
+        return res.status(400).json({ success: false, error: "Configuración inválida" });
+      }
+      const success = await saveCmsConfig(config);
+      return res.json({ success, config });
+    } catch (e: any) {
+      console.error("Error saving CMS config:", e);
       return res.status(500).json({ success: false, error: e.message });
     }
   });

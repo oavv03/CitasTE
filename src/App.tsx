@@ -88,6 +88,7 @@ export default function App() {
   const [whatsappEnabled, setWhatsappEnabled] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState('50766666666');
   const [whatsappMessage, setWhatsappMessage] = useState('Hola, me gustaría recibir más información sobre mi cita en el Tribunal Electoral.');
+  const [cmsConfig, setCmsConfig] = useState<any>(null);
 
   const fetchWhatsappConfig = async () => {
     try {
@@ -105,17 +106,43 @@ export default function App() {
     }
   };
 
+  const fetchCmsConfig = async () => {
+    try {
+      const res = await fetch('/api/cms/config');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.config) {
+          setCmsConfig(data.config);
+          
+          // Also sync global custom layout styles if set
+          if (data.config.primaryColor) {
+            document.documentElement.style.setProperty('--primary-theme-color', data.config.primaryColor);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching CMS config:', err);
+    }
+  };
+
   useEffect(() => {
     fetchWhatsappConfig();
+    fetchCmsConfig();
 
     const handleConfigChanged = () => {
       fetchWhatsappConfig();
     };
 
+    const handleCmsChanged = () => {
+      fetchCmsConfig();
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('whatsapp_config_changed', handleConfigChanged);
+      window.addEventListener('cms_config_changed', handleCmsChanged);
       return () => {
         window.removeEventListener('whatsapp_config_changed', handleConfigChanged);
+        window.removeEventListener('cms_config_changed', handleCmsChanged);
       };
     }
   }, []);
@@ -399,18 +426,25 @@ export default function App() {
         <div className="flex-1 bg-white"></div>
       </div>
 
+
+
       {/* Hero Announcement (Brief Context Panel) */}
       {activeTab !== 'admin' && (
-        <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-12 px-4 text-center space-y-6 print:hidden flex flex-col items-center justify-center">
+        <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-12 px-4 text-center space-y-4 print:hidden flex flex-col items-center justify-center transition-all duration-300">
           <img
-            src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png"
-            alt="Tribunal Electoral de Panamá"
-            className="h-32 md:h-44 w-auto object-contain mx-auto"
+            src={cmsConfig?.logoUrl || "https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png"}
+            alt={cmsConfig?.siteTitle || "Tribunal Electoral de Panamá"}
+            className="h-32 md:h-40 w-auto object-contain mx-auto"
             referrerPolicy="no-referrer"
           />
-          <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight max-w-3xl mx-auto leading-tight">
-            Bienvenido al portal de citas del Tribunal Electoral
+          <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight max-w-4xl mx-auto leading-tight">
+            {cmsConfig?.customTexts?.welcomeTitle || "Bienvenido al portal de citas del Tribunal Electoral"}
           </h2>
+          {(cmsConfig?.customTexts?.welcomeSubtitle || cmsConfig?.siteSubtitle) && (
+            <p className="text-xs md:text-base text-slate-200 max-w-2xl mx-auto opacity-90 font-medium">
+              {cmsConfig?.customTexts?.welcomeSubtitle || cmsConfig?.siteSubtitle || "Solicitud y agendamiento de citas en línea rápidos y seguros"}
+            </p>
+          )}
         </section>
       )}
 
@@ -571,10 +605,15 @@ export default function App() {
       <footer className="bg-slate-800 text-slate-400 text-xs py-6 mt-12 border-t border-slate-900 print:hidden">
         <div className="max-w-6xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-center md:text-left space-y-1">
-            <span className="font-bold text-white block">Tribunal Electoral de Panamá</span>
+            <span className="font-bold text-white block">{cmsConfig?.siteTitle || "Tribunal Electoral de Panamá"}</span>
             <p className="text-[11px]">
-              © {new Date().getFullYear()} – Portal oficial institucional de Citas Tecnológicas. Todos los derechos reservados.
+              {cmsConfig?.customTexts?.footerText || `© ${new Date().getFullYear()} – Portal oficial institucional de Citas Tecnológicas. Todos los derechos reservados.`}
             </p>
+            {cmsConfig?.customTexts?.helpContact && (
+              <p className="text-[10px] text-slate-500 font-mono">
+                {cmsConfig?.customTexts?.helpContact}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-4 text-[11px] justify-center items-center">
             <span className="hover:text-white cursor-pointer transition">Términos de Uso</span>

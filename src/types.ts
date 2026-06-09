@@ -76,3 +76,15 @@ export interface AdminUser {
   fechaCreacion: string;
 }
 
+export interface CmsConfig {
+  siteTitle: string;
+  siteSubtitle: string;
+  logoUrl: string;
+  primaryColor: string;
+  customTexts: { [key: string]: string };
+  sections: Array<{ id: string; name: string; description: string; icon?: string }>;
+  pages: Array<{ id: string; title: string; slug: string; content: string; path?: string }>;
+  images: Array<{ id: string; name: string; url: string; category?: string }>;
+}
+
+

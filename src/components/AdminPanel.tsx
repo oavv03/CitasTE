@@ -37,6 +37,7 @@ import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursa
 import { SUCURSALES_TE, SERVICIOS_TRIBUNAL, saveTramiteMutation, saveSucursalMutation } from '../data';
 import ExtranjeriaController from './ExtranjeriaController';
 import TardiaController from './TardiaController';
+import AdminCmsEditor from './AdminCmsEditor';
 
 interface AdminPanelProps {
   citas: Cita[];
@@ -2075,6 +2076,19 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                 >
                   <Tv className="w-4 h-4 shrink-0 text-amber-500" />
                   <span>Pantalla de Turnos</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('cms' as any)}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === ('cms' as any)
+                      ? 'bg-emerald-600/15 text-emerald-500 border border-emerald-500/30 shadow-inner'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Edit3 className="w-4 h-4 shrink-0 text-emerald-500" />
+                  <span>Editor de Contenidos (CMS)</span>
                 </button>
               </>
             )}
@@ -4375,6 +4389,15 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
             {activeSubTab === 'pantalla' && (
               <div className="space-y-6 animate-fade-in font-sans">
                 <ExtranjeriaController currentRole="super" forceSubRole="pantalla" />
+              </div>
+            )}
+
+            {/* TAB CONTENT: CMS EDITOR CONTROLS */}
+            {activeSubTab === ('cms' as any) && currentRole === 'super' && (
+              <div className="space-y-6 animate-fade-in">
+                <AdminCmsEditor onConfigSaved={() => {
+                  window.dispatchEvent(new CustomEvent('cms_config_changed'));
+                }} />
               </div>
             )}
 
