@@ -27,7 +27,47 @@ import DashboardCitas from './components/DashboardCitas';
 import AdminPanel from './components/AdminPanel';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'agendar' | 'mis-citas' | 'admin'>('agendar');
+  const [activeTab, setActiveTab] = useState<'agendar' | 'mis-citas' | 'admin'>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/admin' || path === '/admin/') {
+        return 'admin';
+      }
+      if (path === '/mis-citas' || path === '/mis-citas/') {
+        return 'mis-citas';
+      }
+    }
+    return 'agendar';
+  });
+
+  const setTabWithUrl = (tab: 'agendar' | 'mis-citas' | 'admin') => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const newPath = tab === 'admin' ? '/admin' : tab === 'mis-citas' ? '/mis-citas' : '/';
+      window.history.pushState(null, '', newPath);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path === '/admin' || path === '/admin/') {
+        setActiveTab('admin');
+      } else if (path === '/mis-citas' || path === '/mis-citas/') {
+        setActiveTab('mis-citas');
+      } else {
+        setActiveTab('agendar');
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', handlePopState);
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, []);
+
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Core Booking wizard state
@@ -259,7 +299,7 @@ export default function App() {
   const handleSelectCita = (cita: Cita) => {
     setActiveCita(cita);
     setCurrentStep(4);
-    setActiveTab('agendar');
+    setTabWithUrl('agendar');
   };
 
   // Reset booking form and return to dashboard or Step 1
@@ -315,7 +355,7 @@ export default function App() {
     saveCitas(updated);
     setActiveCita(nuevaCita);
     setCurrentStep(4);
-    setActiveTab('agendar');
+    setTabWithUrl('agendar');
   };
 
   // Skip step-by-step helper
@@ -360,17 +400,19 @@ export default function App() {
       </div>
 
       {/* Hero Announcement (Brief Context Panel) */}
-      <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-12 px-4 text-center space-y-6 print:hidden flex flex-col items-center justify-center">
-        <img
-          src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png"
-          alt="Tribunal Electoral de Panamá"
-          className="h-32 md:h-44 w-auto object-contain mx-auto"
-          referrerPolicy="no-referrer"
-        />
-        <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight max-w-3xl mx-auto leading-tight">
-          Bienvenido al portal de citas del Tribunal Electoral
-        </h2>
-      </section>
+      {activeTab !== 'admin' && (
+        <section className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-12 px-4 text-center space-y-6 print:hidden flex flex-col items-center justify-center">
+          <img
+            src="https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/06/Logo-TE-aniversario-256x256px-blanco-02.png"
+            alt="Tribunal Electoral de Panamá"
+            className="h-32 md:h-44 w-auto object-contain mx-auto"
+            referrerPolicy="no-referrer"
+          />
+          <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight max-w-3xl mx-auto leading-tight">
+            Bienvenido al portal de citas del Tribunal Electoral
+          </h2>
+        </section>
+      )}
 
       {/* Main content body with Side informational columns or Full-width Admin Panel */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 block">
@@ -380,7 +422,7 @@ export default function App() {
             <AdminPanel 
               citas={citasList} 
               onUpdateCitas={saveCitas}
-              onClose={() => setActiveTab('agendar')}
+              onClose={() => setTabWithUrl('agendar')}
             />
           </div>
         ) : (
@@ -491,7 +533,7 @@ export default function App() {
                       cita={activeCita}
                       onDone={() => {
                         resetFlow();
-                        setActiveTab('mis-citas');
+                        setTabWithUrl('mis-citas');
                       }}
                       onCancelCita={handleCancelCita}
                       onDeleteCita={handleDeleteCita}
@@ -513,7 +555,7 @@ export default function App() {
                 onDeleteCita={handleDeleteCita}
                 onNavigateToBooking={() => {
                   resetFlow();
-                  setActiveTab('agendar');
+                  setTabWithUrl('agendar');
                 }}
               />
             </div>
@@ -534,37 +576,23 @@ export default function App() {
               © {new Date().getFullYear()} – Portal oficial institucional de Citas Tecnológicas. Todos los derechos reservados.
             </p>
           </div>
-          <div className="flex flex-wrap gap-4 text-[11px] justify-center">
+          <div className="flex flex-wrap gap-4 text-[11px] justify-center items-center">
             <span className="hover:text-white cursor-pointer transition">Términos de Uso</span>
             <span>•</span>
             <span className="hover:text-white cursor-pointer transition">Políticas de Privacidad</span>
             <span>•</span>
             <span className="hover:text-white cursor-pointer transition">Presidencia de la República</span>
+            <span>•</span>
+            <button 
+              type="button" 
+              onClick={() => setTabWithUrl('admin')}
+              className="hover:text-white font-semibold cursor-pointer transition flex items-center gap-1 text-slate-300"
+            >
+              <span>Acceso Administrativo</span>
+            </button>
           </div>
         </div>
       </footer>
-
-      {/* Botón flotante de Panel Admin (Esquina inferior izquierda, solo escudo) */}
-      <button
-        type="button"
-        id="admin-tab-button"
-        onClick={() => {
-          if (activeTab === 'admin') {
-            setActiveTab('agendar');
-          } else {
-            setActiveTab('admin');
-          }
-        }}
-        className={`fixed bottom-5 left-5 z-50 p-3 rounded-full shadow-lg border transition-all duration-200 transform hover:scale-110 active:scale-95 cursor-pointer print:hidden flex items-center justify-center ${
-          activeTab === 'admin'
-            ? 'bg-amber-600 border-amber-500 text-white shadow-amber-900/20'
-            : 'bg-white border-slate-200 text-blue-700 hover:text-blue-800 hover:bg-slate-50 shadow-slate-900/10'
-        }`}
-        title="Panel de Administración"
-        aria-label="Panel de Administración"
-      >
-        <Shield className="w-5 h-5 shrink-0" />
-      </button>
 
       {/* Botón flotante de WhatsApp (Esquina inferior derecha) */}
       {whatsappEnabled && (
