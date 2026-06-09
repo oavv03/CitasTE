@@ -9,12 +9,14 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
     subServicios: [
       {
         id: 'rc_nacimiento',
-        nombre: 'Certificado de Nacimiento (Con o Sin Timbres)',
+        nombre: 'Certificado de Nacimiento',
         descripcion: 'Expedición de certificados oficiales para trámites escolares, legales o de viaje.',
         requisitos: [
-          'Suministrar el número de cédula del titular o tomo, asiento y folio del nacimiento.',
-          'Costo de B/. 3.00 (con timbres fiscales de uso común).',
-          'Nombres completos de los padres.'
+          'Proporcionar al funcionario el número de inscripción de nacimiento del titular (cédula) o el número de cédula de los padres.',
+          'Costo de B/. 5.00',
+          'Tercera persona:',
+          'Número de cédula del solicitante.',
+          'Nota de autorización por parte del solicitante notariada.'
         ]
       },
       {
@@ -22,9 +24,9 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         nombre: 'Certificado de Matrimonio',
         descripcion: 'Documento que certifica el enlace de matrimonio inscrito legalmente.',
         requisitos: [
-          'Número de cédula de ambos contrayentes o tomo/folio de inscripción.',
-          'Costo de B/. 3.00 para uso nacional. Para uso internacional debe ser autenticado.',
-          'Fecha aproximada en que se celebró el acto.'
+          'Proporcionar al funcionario, de contar con la información, el número de cédula de cualquiera de los contrayentes.',
+          'Número de acta del matrimonio.',
+          'Costo (B/.5.00)'
         ]
       },
       {
@@ -32,9 +34,11 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         nombre: 'Certificado de Defunción',
         descripcion: 'Expedición de actas para trámites legales de herencias o procesos luctuosos.',
         requisitos: [
-          'Número de cédula del difunto y fecha exacta del deceso.',
-          'Identificación del solicitante con cédula de identidad personal.',
-          'Costo de B/. 3.00.'
+          'De contar con la información proporcionar al funcionario el número de cédula o inscripción de nacimiento de la persona, de quien se solicita el certificado de defunción.',
+          'Número de acta de defunción.',
+          'En caso de ser una persona no relacionada con el fallecido, aportar una autorización escrita por la familia de primer grado de consanguineidad y/o afinidad.',
+          'El Certificado de Defunción con Causa de Muerte, se expiden en las oficinas del Tribunal Electoral.',
+          'Costo B/5.00'
         ]
       },
       {
