@@ -578,6 +578,45 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
               </div>
 
               <div className="col-span-1 md:col-span-2 border-t border-slate-800 pt-4 space-y-4">
+                <h4 className="text-xs font-bold text-slate-350 uppercase tracking-widest">Textos de la Sección "Visítanos"</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Etiqueta/Badge de Sección</label>
+                    <input
+                      type="text"
+                      value={config.customTexts?.visitanosBadge || ''}
+                      onChange={(e) => handleCustomTextChange('visitanosBadge', e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-medium text-white focus:outline-none focus:border-slate-700"
+                      placeholder="Ejemplo: Visítanos"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Título de la Sección</label>
+                    <input
+                      type="text"
+                      value={config.customTexts?.visitanosTitle || ''}
+                      onChange={(e) => handleCustomTextChange('visitanosTitle', e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-medium text-white focus:outline-none focus:border-slate-700"
+                      placeholder="Ejemplo: Visitas Guiadas al Tribunal Electoral"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Descripción Corta</label>
+                    <input
+                      type="text"
+                      value={config.customTexts?.visitanosDescription || ''}
+                      onChange={(e) => handleCustomTextChange('visitanosDescription', e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-medium text-white focus:outline-none focus:border-slate-700"
+                      placeholder="Ejemplo: Regístrese para conocer la historia y espacios institucionales."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-1 md:col-span-2 border-t border-slate-800 pt-4 space-y-4">
                 <h4 className="text-xs font-bold text-slate-350 uppercase tracking-widest">Textos de Pie de Página (Footer) y Soporte</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ServicioCategoriaId, CategoriaServicio } from '../types';
+import { ServicioCategoriaId, CategoriaServicio, CmsConfig } from '../types';
 import { SERVICIOS_TRIBUNAL } from '../data';
 import { 
   IdCard, 
@@ -17,7 +17,10 @@ import {
   AlertTriangle,
   Search,
   X,
-  Building2
+  Building2,
+  MapPin,
+  Users,
+  Calendar
 } from 'lucide-react';
 import VisitasGuiadasForm from './VisitasGuiadasForm';
 
@@ -33,6 +36,7 @@ interface SeleccionServicioProps {
   selectedSubServicioId: string | null;
   onBack?: () => void;
   onSelect: (categoria: ServicioCategoriaId, subServicioId: string) => void;
+  cmsConfig?: CmsConfig | null;
 }
 
 // Custom badges & descriptions based on Category IDs to look extremely realistic
@@ -108,6 +112,7 @@ export default function SeleccionServicio({
   selectedSubServicioId,
   onBack,
   onSelect,
+  cmsConfig,
 }: SeleccionServicioProps) {
   const getSubServicesForCategory = (catId: ServicioCategoriaId): any[] => {
     const mainCat = SERVICIOS_TRIBUNAL.find(c => c.id === catId);
@@ -408,7 +413,7 @@ export default function SeleccionServicio({
               <span className="text-[11px] text-slate-400 font-medium">Elige una de nuestras opciones</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {SERVICIOS_TRIBUNAL.filter(cat => ['registro_civil', 'cedulacion', 'organizacion_electoral'].includes(cat.id)).map((cat) => {
                 const meta = CATEGORY_META[cat.id] || {
                   themeColor: 'bg-blue-600',
@@ -462,45 +467,102 @@ export default function SeleccionServicio({
                   </button>
                 );
               })}
+            </div>
 
-              {/* Visitas Guiadas Card */}
-              <button
-                type="button"
+            {/* Sección Visítanos con Banner Identico a la Imagen */}
+            <div className="pt-10 border-t border-slate-100">
+              <div 
                 onClick={() => setShowVisitasGuiadas(true)}
-                className="text-left p-6 rounded-2xl border-2 border-slate-105 bg-white hover:border-indigo-300 shadow-sm transition-all duration-300 cursor-pointer flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md hover:scale-[1.015]"
+                className="group relative w-full bg-white border border-slate-150 rounded-2xl md:rounded-3xl shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer flex flex-col md:flex-row items-stretch select-none"
               >
-                <div className="space-y-5">
-                  {/* Icon & Mini-badge */}
-                  <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 bg-indigo-50 text-indigo-705 border border-indigo-100">
-                      <Building2 className="w-6 h-6" />
+                {/* Left Side: Visítanos Main Info */}
+                <div className="flex-1 p-6 md:p-8 flex flex-col justify-between space-y-6">
+                  <div className="space-y-4">
+                    {/* Header: Circle Icon + VISÍTANOS text */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-blue-900 flex items-center justify-center text-white shrink-0 shadow-sm">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <h3 className="text-xl md:text-2xl font-black tracking-widest text-blue-900 select-none uppercase">
+                        {cmsConfig?.customTexts?.visitanosBadge || "Visítanos"}
+                      </h3>
                     </div>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-750">
-                      Fomento Cívico
-                    </span>
-                  </div>
 
-                  {/* Title & description */}
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-black tracking-wide uppercase text-slate-700 group-hover:text-indigo-950 transition-colors">
-                      Visitas Guiadas
-                    </h4>
-                    <p className="text-xs text-slate-500 leading-snug line-clamp-3 font-medium">
-                      Regístrese para conocer la historia, funciones y espacios institucionales del Tribunal Electoral de Panamá (Exclusivamente en la Sede Principal).
+                    {/* Slogan/Description */}
+                    <p className="text-sm md:text-base font-bold text-slate-700 leading-normal max-w-xl">
+                      {cmsConfig?.customTexts?.visitanosTitle || "Conoce nuestra historia, funciones y espacios institucionales del Tribunal Electoral."}
                     </p>
                   </div>
+
+                  {/* Aesthetic Separation Line with Diamond */}
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="h-[1px] bg-blue-100 flex-1"></div>
+                    <div className="w-2 h-2 rotate-45 bg-blue-900/80 shrink-0"></div>
+                    <div className="h-[1px] bg-blue-100 flex-1"></div>
+                  </div>
+
+                  {/* Three pillars/columns from the image */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Pillar 1: Información */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-blue-900 flex items-center justify-center text-white shrink-0">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-black leading-tight text-blue-900 uppercase">Información</span>
+                        <span className="text-[9px] font-bold text-slate-500 leading-tight">sobre nuestra institución</span>
+                      </div>
+                    </div>
+
+                    {/* Pillar 2: Espacios */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-blue-900 flex items-center justify-center text-white shrink-0">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-black leading-tight text-blue-900 uppercase">Espacios</span>
+                        <span className="text-[9px] font-bold text-slate-500 leading-tight">institucionales para ti</span>
+                      </div>
+                    </div>
+
+                    {/* Pillar 3: Visitas guiadas */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-blue-900 flex items-center justify-center text-white shrink-0">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-black leading-tight text-blue-900 uppercase">Visitas guiadas</span>
+                        <span className="text-[9px] font-bold text-slate-500 leading-tight">para estudiantes y público</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Counter & Arrow Footer */}
-                <div className="pt-3 w-full border-t border-slate-150 mt-5 flex items-center justify-between text-[11px] font-bold">
-                  <span className="px-2.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-800 font-bold group-hover:bg-emerald-100 transition-all">
-                    Estudiantil / Grupal
-                  </span>
-                  <span className="transition-transform duration-300 group-hover:translate-x-1.5 text-slate-350 group-hover:text-indigo-750 font-extrabold flex items-center gap-1">
-                    Registrarse <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
+                {/* Vertical Divider for Desktop */}
+                <div className="hidden md:block w-[1px] bg-slate-100 self-stretch my-6"></div>
+
+                {/* Right Side: "Conócenos" Action Button */}
+                <div className="w-full md:w-[220px] bg-slate-50/50 p-6 md:p-8 flex flex-col justify-center items-center border-t md:border-t-0 border-slate-100 shrink-0">
+                  {/* Button "Conócenos" */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowVisitasGuiadas(true);
+                    }}
+                    className="w-full flex items-center justify-between px-5 py-3 bg-blue-900 text-white rounded-full font-black text-xs md:text-sm tracking-wide shadow-xs group-hover:bg-blue-950 transition-all duration-300 cursor-pointer hover:scale-[1.025]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span>Conócenos</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-400 font-normal">|</span>
+                      <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    </div>
+                  </button>
                 </div>
-              </button>
+              </div>
             </div>
           </div>
         )}

@@ -481,6 +481,7 @@ export default function App() {
                       selectedCategoria={selectedCategoria}
                       selectedSubServicioId={selectedSubServicioId}
                       onSelect={handleStep2Success}
+                      cmsConfig={cmsConfig}
                     />
                   )}
 
@@ -553,19 +554,8 @@ export default function App() {
             <p className="text-[11px]">
               {cmsConfig?.customTexts?.footerText || `© ${new Date().getFullYear()} – Portal oficial institucional de Citas Tecnológicas. Todos los derechos reservados.`}
             </p>
-            {cmsConfig?.customTexts?.helpContact && (
-              <p className="text-[10px] text-slate-500 font-mono">
-                {cmsConfig?.customTexts?.helpContact}
-              </p>
-            )}
           </div>
           <div className="flex flex-wrap gap-4 text-[11px] justify-center items-center">
-            <span className="hover:text-white cursor-pointer transition">Términos de Uso</span>
-            <span>•</span>
-            <span className="hover:text-white cursor-pointer transition">Políticas de Privacidad</span>
-            <span>•</span>
-            <span className="hover:text-white cursor-pointer transition">Presidencia de la República</span>
-            <span>•</span>
             <button 
               type="button" 
               onClick={() => setTabWithUrl('admin')}
