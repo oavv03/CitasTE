@@ -1133,6 +1133,52 @@ async function initializeSupabaseTables() {
       console.warn("[Supabase Seeder Warning] Error ensuring custom super users in Supabase:", usersErr.message || usersErr);
     }
 
+    // 4. Seed Citas (Appointments) if empty in Supabase
+    try {
+      const tblCitas = await getAppointmentsTableName();
+      const { data: existingCitas, error: citasError } = await supabase.from(tblCitas).select("identificacion").limit(1);
+      if (!citasError && (!existingCitas || existingCitas.length === 0)) {
+        console.log("[Supabase Seeder] 'citas' table is empty. Seeding appointments from local JSON...");
+        const localAppts = getAppointments();
+        for (const appt of localAppts) {
+          try {
+            await safeUpsertAppointment({
+              identificacion: appt.id,
+              codigo_transaccion: appt.codigoTransaccion,
+              fecha: appt.fecha,
+              tiempo: appt.hora,
+              fecha_creacion: appt.fechaCreacion,
+              estado: appt.estado,
+              sucursal_id: appt.subServicioId?.startsWith('ext_') ? 'pac_office' : 'anc_main',
+              sub_servicio_id: appt.subServicioId || "ced_primera_vez",
+              tipo_identificacion: appt.datosPersonales?.tipoIdentificacion || "Cedula",
+              identificacion_ciudadano: appt.identificacion,
+              ciudadano_identificacion: appt.identificacion,
+              fecha_nacimiento: appt.datosPersonales?.fechaNacimiento || "2000-01-01",
+              telefono: appt.telefono,
+              correo: appt.correo,
+              nombre_completo: appt.nombre || appt.datosPersonales?.nombreCompleto || "",
+              numero_seguimiento: appt.numeroSeguimiento || null,
+              primer_nombre: appt.datosPersonales?.primerNombre || null,
+              segundo_nombre: appt.datosPersonales?.segundoNombre || null,
+              primer_apellido: appt.datosPersonales?.primerApellido || null,
+              segundo_apellido: appt.datosPersonales?.segundoApellido || null,
+              pasaporte: appt.datosPersonales?.pasaporte || null,
+              nacionalidad: appt.datosPersonales?.nacionalidad || null,
+              numero_resolucion: appt.datosPersonales?.numeroResolucion || null,
+              fecha_resolucion: appt.datosPersonales?.fechaResolucion || null,
+              fecha_vencimiento: appt.datosPersonales?.fechaVencimiento || null
+            });
+          } catch (apptErr: any) {
+            console.warn(`[Supabase Seeder Warning] Failed to seed appointment ${appt.id}:`, apptErr.message || apptErr);
+          }
+        }
+        console.log("[Supabase Seeder] Appointments verified / seeded successfully.");
+      }
+    } catch (citasErr: any) {
+      console.warn("[Supabase Seeder Warning] Error checking or seeding appointments in Supabase:", citasErr.message || citasErr);
+    }
+
   } catch (err: any) {
     console.error("[Supabase Seeder Error] Exception during table initialization:", err.message || err);
   }
