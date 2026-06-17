@@ -17,6 +17,7 @@ export interface DatosPersonales {
   nacionalidad?: string;
   fechaResolucion?: string;
   numeroResolucion?: string;
+  fechaVencimiento?: string;
 }
 
 export type ServicioCategoriaId = 'extranjeria' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil' | 'panamenos_extranjero';

@@ -52,6 +52,9 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
   const [nacionalidad, setNacionalidad] = useState(initialData?.nacionalidad || '');
   const [fechaResolucion, setFechaResolucion] = useState(initialData?.fechaResolucion || '');
   const [numeroResolucion, setNumeroResolucion] = useState(initialData?.numeroResolucion || '');
+  const [fechaVencimiento, setFechaVencimiento] = useState(initialData?.fechaVencimiento || '');
+
+  const isRenovacion = selectedSubServicioId ? selectedSubServicioId.toLowerCase().includes('renovacion') : false;
 
   // Math Captcha state
   const [num1, setNum1] = useState(0);
@@ -287,6 +290,23 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
       }
     }
 
+    // Validation for Renewal: 6 months limit check
+    if (isRenovacion) {
+      if (!fechaVencimiento) {
+        newErrors.fechaVencimiento = 'La fecha de vencimiento de su cédula/documento actual es obligatoria';
+      } else {
+        const todayVal = new Date();
+        const expDate = new Date(fechaVencimiento);
+        
+        const limitDate = new Date();
+        limitDate.setMonth(limitDate.getMonth() + 6);
+        
+        if (expDate > limitDate) {
+          newErrors.fechaVencimiento = 'No cumple. El trámite de renovación de cédula solo puede realizarse con un máximo de 6 meses de anticipación a su vencimiento (o si está vencida).';
+        }
+      }
+    }
+
     // Verify Catcha math
     const correctAns = operativo === '+' ? num1 + num2 : num1 - num2;
     const userAns = parseInt(captchaRes, 10);
@@ -316,6 +336,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
       correo: correo.trim(),
       nombreCompleto: nombreCompleto.trim(),
       numeroSeguimiento: isPasadoEdad ? numeroSeguimiento.trim() : undefined,
+      fechaVencimiento: isRenovacion ? fechaVencimiento : undefined,
     });
   };
 
@@ -853,6 +874,35 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
             ) : (
               <span className="text-[11px] text-slate-550 font-medium mt-1">
                 Ingrese el número de expediente de trámite tardío que le fue asignado previamente por la Dirección General de Registro Civil o Cedulación.
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Fecha de Vencimiento para renovación */}
+        {isRenovacion && (
+          <div className="border-t border-slate-100 pt-5 mt-5 flex flex-col gap-1.5 animate-fade-in">
+            <label htmlFor="fecha_venc_id" className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 text-blue-900">
+              <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded animate-pulse">Requerido</span>
+              Fecha de Vencimiento de Cédula/Documento Actual <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              id="fecha_venc_id"
+              value={fechaVencimiento}
+              onChange={(e) => setFechaVencimiento(e.target.value)}
+              className={`h-11 w-full bg-slate-50 border ${
+                errors.fechaVencimiento ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-600 focus:border-blue-700'
+              } rounded px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 transition cursor-pointer`}
+            />
+            {errors.fechaVencimiento ? (
+              <div className="flex items-start gap-2 text-xs text-red-600 mt-2 font-semibold bg-red-50 p-3 rounded-lg border border-red-200/50">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" /> 
+                <span className="leading-snug">{errors.fechaVencimiento}</span>
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-500 font-medium mt-1">
+                La renovación de su cédula o carné de residente únicamente está autorizada si faltan 6 meses o menos para que expire (o si ya se encuentra caducado/a).
               </span>
             )}
           </div>
