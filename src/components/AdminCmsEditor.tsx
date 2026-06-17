@@ -617,6 +617,36 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
               </div>
 
               <div className="col-span-1 md:col-span-2 border-t border-slate-800 pt-4 space-y-4">
+                <h4 className="text-xs font-bold text-slate-350 uppercase tracking-widest">Validación de Citas de Renovación (Cédula/Residente)</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5 col-span-1">
+                    <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Meses Máximos de Anticipación</label>
+                    <input
+                      type="number"
+                      value={config.customTexts?.renovacionMesesAnticipacion || '6'}
+                      onChange={(e) => handleCustomTextChange('renovacionMesesAnticipacion', e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-medium text-white focus:outline-none focus:border-slate-700"
+                      placeholder="Ejemplo: 6"
+                      min="1"
+                      max="12"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 col-span-1 md:col-span-2">
+                    <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Mensaje de Error No Cumple</label>
+                    <input
+                      type="text"
+                      value={config.customTexts?.msgNoCumpleRenovacion || ''}
+                      onChange={(e) => handleCustomTextChange('msgNoCumpleRenovacion', e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-medium text-white focus:outline-none focus:border-slate-700"
+                      placeholder="Utilice {meses} como comodín para el número de meses."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-1 md:col-span-2 border-t border-slate-800 pt-4 space-y-4">
                 <h4 className="text-xs font-bold text-slate-350 uppercase tracking-widest">Textos de Pie de Página (Footer) y Soporte</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

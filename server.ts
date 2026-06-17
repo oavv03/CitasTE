@@ -417,7 +417,9 @@ const DEFAULT_CMS_CONFIG: CmsConfig = {
     helpContact: "Línea gratuita de atención: 311 o +507 507-8000",
     visitanosBadge: "Visítanos",
     visitanosTitle: "Visitas Guiadas al Tribunal Electoral",
-    visitanosDescription: "Regístrese para conocer la historia, funciones y espacios institucionales de la Sede Principal."
+    visitanosDescription: "Regístrese para conocer la historia, funciones y espacios institucionales de la Sede Principal.",
+    renovacionMesesAnticipacion: "6",
+    msgNoCumpleRenovacion: "No cumple. El trámite de renovación de cédula solo puede realizarse con un máximo de {meses} meses de anticipación a su vencimiento (o si está vencida)."
   },
   sections: [
     { id: "registro_civil", name: "Registro Civil", description: "Certificados de nacimiento, matrimonio, defunción y otros trámites del estado civil de las personas." },
@@ -1427,7 +1429,8 @@ async function startServer() {
             pasaporte: serverCita.datosPersonales?.pasaporte || null,
             nacionalidad: serverCita.datosPersonales?.nacionalidad || null,
             numero_resolucion: serverCita.datosPersonales?.numeroResolucion || null,
-            fecha_resolucion: serverCita.datosPersonales?.fechaResolucion || null
+            fecha_resolucion: serverCita.datosPersonales?.fechaResolucion || null,
+            fecha_vencimiento: serverCita.datosPersonales?.fechaVencimiento || null
           };
           try {
             await safeUpsertAppointment(row);

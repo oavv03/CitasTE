@@ -492,6 +492,7 @@ export default function App() {
                       onBack={() => setCurrentStep(1)}
                       selectedSubServicioId={selectedSubServicioId}
                       selectedCategoria={selectedCategoria}
+                      cmsConfig={cmsConfig}
                     />
                   )}
 

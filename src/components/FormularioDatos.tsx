@@ -30,9 +30,10 @@ interface FormularioDatosProps {
   onBack?: () => void;
   selectedSubServicioId?: string | null;
   selectedCategoria?: string | null;
+  cmsConfig?: any;
 }
 
-export default function FormularioDatos({ initialData, onSuccess, onBack, selectedSubServicioId, selectedCategoria }: FormularioDatosProps) {
+export default function FormularioDatos({ initialData, onSuccess, onBack, selectedSubServicioId, selectedCategoria, cmsConfig }: FormularioDatosProps) {
   const [tipoIdentificacion, setTipoIdentificacion] = useState<TipoIdentificacion>(
     initialData?.tipoIdentificacion || 'Cedula'
   );
@@ -290,7 +291,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
       }
     }
 
-    // Validation for Renewal: 6 months limit check
+    // Validation for Renewal: limit check configured by admin
     if (isRenovacion) {
       if (!fechaVencimiento) {
         newErrors.fechaVencimiento = 'La fecha de vencimiento de su cédula/documento actual es obligatoria';
@@ -298,11 +299,14 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
         const todayVal = new Date();
         const expDate = new Date(fechaVencimiento);
         
+        const limitMonths = parseInt(cmsConfig?.customTexts?.renovacionMesesAnticipacion || '6', 10) || 6;
         const limitDate = new Date();
-        limitDate.setMonth(limitDate.getMonth() + 6);
+        limitDate.setMonth(limitDate.getMonth() + limitMonths);
         
         if (expDate > limitDate) {
-          newErrors.fechaVencimiento = 'No cumple. El trámite de renovación de cédula solo puede realizarse con un máximo de 6 meses de anticipación a su vencimiento (o si está vencida).';
+          let customErrorMsg = cmsConfig?.customTexts?.msgNoCumpleRenovacion || 'No cumple. El trámite de renovación de cédula solo puede realizarse con un máximo de {meses} meses de anticipación a su vencimiento (o si está vencida).';
+          customErrorMsg = customErrorMsg.replace('{meses}', limitMonths.toString());
+          newErrors.fechaVencimiento = customErrorMsg;
         }
       }
     }
@@ -902,7 +906,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
               </div>
             ) : (
               <span className="text-[11px] text-slate-500 font-medium mt-1">
-                La renovación de su cédula o carné de residente únicamente está autorizada si faltan 6 meses o menos para que expire (o si ya se encuentra caducado/a).
+                La renovación de su cédula o carné de residente únicamente está autorizada si faltan {cmsConfig?.customTexts?.renovacionMesesAnticipacion || "6"} meses o menos para que expire (o si ya se encuentra caducado/a).
               </span>
             )}
           </div>
