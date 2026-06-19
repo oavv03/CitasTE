@@ -46,12 +46,18 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanelProps) {
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    return typeof window !== 'undefined' && !!sessionStorage.getItem('admin_token');
+  });
+  const [username, setUsername] = useState(() => {
+    return typeof window !== 'undefined' ? (sessionStorage.getItem('admin_username') || '') : '';
+  });
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   
-  const [currentRole, setCurrentRole] = useState<AdminRole>('sencillo');
+  const [currentRole, setCurrentRole] = useState<AdminRole>(() => {
+    return typeof window !== 'undefined' ? (sessionStorage.getItem('admin_role') as AdminRole || 'sencillo') : 'sencillo';
+  });
   const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites' | 'extranjeria' | 'pantalla' | 'usuarios'>('tabla');
   const [eyeTheme, setEyeTheme] = useState<'slate' | 'warm' | 'sepia' | 'forest' | 'light'>(() => {
     try {
@@ -99,7 +105,12 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
-      const res = await fetch('/api/users');
+      const token = sessionStorage.getItem('admin_token') || '';
+      const res = await fetch('/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.users) {
@@ -115,7 +126,9 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
   // Load users on mount and trigger every time admin panel renders or logs in
   React.useEffect(() => {
-    fetchUsers();
+    if (isAdminLoggedIn) {
+      fetchUsers();
+    }
   }, [isAdminLoggedIn]);
 
   const handleSaveUser = async (e: React.FormEvent) => {
@@ -136,9 +149,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
         nombre: userFormNombre.trim()
       };
 
+      const token = sessionStorage.getItem('admin_token') || '';
       const response = await fetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
 
@@ -168,8 +185,12 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     setUserSuccess('');
 
     try {
+      const token = sessionStorage.getItem('admin_token') || '';
       const response = await fetch(`/api/users/${usernameToDelete}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       const result = await response.json();
       if (response.ok && result.success) {
@@ -276,10 +297,12 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     setWhatsappSaving(true);
     setWhatsappMessageStatus('');
     try {
+      const token = sessionStorage.getItem('admin_token') || '';
       const res = await fetch('/api/whatsapp/config', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           numero: whatsappNumber,
@@ -818,65 +841,38 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     document.body.removeChild(link);
   };
 
-  // Quick Demo Credentials info
-  const handleQuickLogin = (role: AdminRole) => {
-    setCurrentRole(role);
-    setIsAdminLoggedIn(true);
-    setLoginError('');
-    if (role.startsWith('extranjeria')) {
-      setActiveSubTab('extranjeria');
-    } else if (role.startsWith('pasado_edad')) {
-      setActiveSubTab('pasado_edad' as any);
-    } else {
-      setActiveSubTab('tabla');
-    }
-  };
-
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const lcUser = username.trim().toLowerCase();
-
-    // Check against dynamically fetched list
-    const foundUser = users.find(u => u.username.toLowerCase() === lcUser && u.password === password);
-    if (foundUser) {
-      setCurrentRole(foundUser.role);
-      setIsAdminLoggedIn(true);
-      setLoginError('');
-      if (foundUser.role.startsWith('extranjeria')) {
-        setActiveSubTab('extranjeria');
-      } else if (foundUser.role.startsWith('pasado_edad')) {
-        setActiveSubTab('pasado_edad' as any);
+    setLoginError('');
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        sessionStorage.setItem('admin_token', data.token);
+        sessionStorage.setItem('admin_role', data.user.role);
+        sessionStorage.setItem('admin_username', data.user.username);
+        
+        setCurrentRole(data.user.role);
+        setIsAdminLoggedIn(true);
+        setLoginError('');
+        
+        if (data.user.role.startsWith('extranjeria')) {
+          setActiveSubTab('extranjeria');
+        } else if (data.user.role.startsWith('pasado_edad')) {
+          setActiveSubTab('pasado_edad' as any);
+        } else {
+          setActiveSubTab('tabla');
+        }
       } else {
-        setActiveSubTab('tabla');
+        setLoginError(data.error || 'Credenciales incorrectas. Verifique sus datos o ingrese con las credenciales asignadas.');
       }
-      return;
-    }
-
-    if (lcUser === 'adminmini' && password === 'admin1234') {
-      setCurrentRole('sencillo');
-      setIsAdminLoggedIn(true);
-      setActiveSubTab('tabla');
-      setLoginError('');
-    } else if (
-      (lcUser === 'adminte' || lcUser === 'oscargave3003' || lcUser === 'oscargave3003@gmail.com') && 
-      password === 'Value1234'
-    ) { 
-      setCurrentRole('super');
-      setIsAdminLoggedIn(true);
-      setActiveSubTab('tabla');
-      setLoginError('');
-    } else if (lcUser === 'migra26' && password === '12345678') {
-      setCurrentRole('extranjeria');
-      setIsAdminLoggedIn(true);
-      setActiveSubTab('extranjeria');
-      setLoginError('');
-    } else if ((username.trim() === 'adminPEdad' || lcUser === 'adminpedad') && password === 'PasaDodeEdad2026') {
-      setCurrentRole('pasado_edad');
-      setIsAdminLoggedIn(true);
-      setActiveSubTab('pasado_edad' as any);
-      setLoginError('');
-    } else {
-      setLoginError('Credenciales incorrectas. Verifique sus datos o ingrese con las credenciales asignadas.');
+    } catch (err) {
+      console.error('Error logging in:', err);
+      setLoginError('No se pudo establecer comunicación segura con el servidor de autenticación.');
     }
   };
 
@@ -1886,7 +1882,12 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
             <button
               type="button"
-              onClick={() => setIsAdminLoggedIn(false)}
+              onClick={() => {
+                sessionStorage.removeItem('admin_token');
+                sessionStorage.removeItem('admin_role');
+                sessionStorage.removeItem('admin_username');
+                setIsAdminLoggedIn(false);
+              }}
               className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-3 py-1 rounded transition"
             >
               Cerrar Sesión
@@ -4315,7 +4316,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                                 </td>
                                 <td className="p-3.5 font-mono">
                                   <div className="text-slate-200">Usuario: <strong className="text-slate-100 font-extrabold bg-slate-900 px-1 py-0.5 rounded border border-slate-800">{u.username}</strong></div>
-                                  <div className="text-slate-400 mt-1">Clave: <strong className="text-slate-200 font-normal bg-slate-900 px-1 py-0.5 rounded border border-slate-800 select-all font-mono">{u.password}</strong></div>
+                                  <div className="text-slate-400 mt-1">Clave: <strong className="text-slate-200 font-normal bg-slate-900 px-1 py-0.5 rounded border border-slate-800 select-all font-mono">••••••••</strong></div>
                                 </td>
                                 <td className="p-3.5">
                                   <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded border ${

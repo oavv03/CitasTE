@@ -50,7 +50,12 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
   const loadLocalFiles = async () => {
     setLoadingFiles(true);
     try {
-      const res = await fetch('/api/uploads/list');
+      const token = sessionStorage.getItem('admin_token') || '';
+      const res = await fetch('/api/uploads/list', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.files) {
@@ -87,10 +92,12 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
       reader.onload = async () => {
         const base64Data = reader.result as string;
         try {
+          const token = sessionStorage.getItem('admin_token') || '';
           const res = await fetch('/api/upload', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
               filename: file.name,
@@ -146,8 +153,12 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
       return;
     }
     try {
+      const token = sessionStorage.getItem('admin_token') || '';
       const res = await fetch(`/api/uploads/${encodeURIComponent(filename)}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (res.ok) {
         showStatus('Archivo eliminado del almacenamiento.', 'success');
@@ -206,10 +217,12 @@ export default function AdminCmsEditor({ onConfigSaved }: AdminCmsEditorProps) {
     if (!updatedConfig) return;
     setSaving(true);
     try {
+      const token = sessionStorage.getItem('admin_token') || '';
       const res = await fetch('/api/cms/config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(updatedConfig),
       });

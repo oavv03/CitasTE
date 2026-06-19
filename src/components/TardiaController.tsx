@@ -338,9 +338,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     localStorage.setItem('tardia_hora_fin', tardiaHoraFin);
     
     try {
+      const token = sessionStorage.getItem('admin_token') || '';
       const res = await fetch('/api/tardia/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           capacidadTotalDia: tardiaCapacidadTotal,
           intervalo: tardiaIntervalo,

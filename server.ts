@@ -316,6 +316,11 @@ function saveUsers(users: ServerUser[]): void {
   }
 }
 
+let cachedCmsConfig: CmsConfig | null = null;
+let cachedExtranjeriaConfig: ExtranjeriaConfig | null = null;
+let cachedTardiaConfig: TardiaConfig | null = null;
+let cachedWhatsappConfig: WhatsappConfig | null = null;
+
 interface ExtranjeriaConfig {
   capacidad: number;
   intervalo: number;
@@ -331,9 +336,11 @@ const DEFAULT_EXTRANJERIA_CONFIG: ExtranjeriaConfig = {
 };
 
 function getExtranjeriaConfig(): ExtranjeriaConfig {
+  if (cachedExtranjeriaConfig) return cachedExtranjeriaConfig;
   try {
     if (!fs.existsSync(EXTRANJERIA_CONFIG_PATH)) {
       fs.writeFileSync(EXTRANJERIA_CONFIG_PATH, JSON.stringify(DEFAULT_EXTRANJERIA_CONFIG, null, 2), "utf8");
+      cachedExtranjeriaConfig = DEFAULT_EXTRANJERIA_CONFIG;
       return DEFAULT_EXTRANJERIA_CONFIG;
     }
     const data = fs.readFileSync(EXTRANJERIA_CONFIG_PATH, "utf8");
@@ -343,6 +350,7 @@ function getExtranjeriaConfig(): ExtranjeriaConfig {
       parsed.capacidad = 2;
       fs.writeFileSync(EXTRANJERIA_CONFIG_PATH, JSON.stringify(parsed, null, 2), "utf8");
     }
+    cachedExtranjeriaConfig = parsed;
     return parsed;
   } catch (error) {
     console.error("Error reading extranjeria config DB:", error);
@@ -351,10 +359,23 @@ function getExtranjeriaConfig(): ExtranjeriaConfig {
 }
 
 function saveExtranjeriaConfig(config: ExtranjeriaConfig): void {
+  cachedExtranjeriaConfig = config;
   try {
     fs.writeFileSync(EXTRANJERIA_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch (error) {
     console.error("Error writing extranjeria config DB:", error);
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    getCmsTableName().then(tbl => {
+      supabase!.from(tbl).upsert({
+        id: "extranjeria_settings",
+        config_data: config,
+        updated_at: new Date().toISOString()
+      }).then(({ error }) => {
+        if (error) console.error("Error saving Extranjería config to Supabase:", error.message);
+      });
+    }).catch(err => console.error("Error detecting table name for Extranjería config:", err));
   }
 }
 
@@ -373,13 +394,16 @@ const DEFAULT_TARDIA_CONFIG: TardiaConfig = {
 };
 
 function getTardiaConfig(): TardiaConfig {
+  if (cachedTardiaConfig) return cachedTardiaConfig;
   try {
     if (!fs.existsSync(TARDIA_CONFIG_PATH)) {
       fs.writeFileSync(TARDIA_CONFIG_PATH, JSON.stringify(DEFAULT_TARDIA_CONFIG, null, 2), "utf8");
+      cachedTardiaConfig = DEFAULT_TARDIA_CONFIG;
       return DEFAULT_TARDIA_CONFIG;
     }
     const data = fs.readFileSync(TARDIA_CONFIG_PATH, "utf8");
-    return JSON.parse(data);
+    cachedTardiaConfig = JSON.parse(data);
+    return cachedTardiaConfig!;
   } catch (error) {
     console.error("Error reading tardia config DB:", error);
   }
@@ -387,10 +411,23 @@ function getTardiaConfig(): TardiaConfig {
 }
 
 function saveTardiaConfig(config: TardiaConfig): void {
+  cachedTardiaConfig = config;
   try {
     fs.writeFileSync(TARDIA_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch (error) {
     console.error("Error writing tardia config DB:", error);
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    getCmsTableName().then(tbl => {
+      supabase!.from(tbl).upsert({
+        id: "tardia_settings",
+        config_data: config,
+        updated_at: new Date().toISOString()
+      }).then(({ error }) => {
+        if (error) console.error("Error saving Tardía config to Supabase:", error.message);
+      });
+    }).catch(err => console.error("Error detecting table name for Tardía config:", err));
   }
 }
 
@@ -461,6 +498,8 @@ async function getCmsTableName(): Promise<string> {
 }
 
 async function getCmsConfig(): Promise<CmsConfig> {
+  if (cachedCmsConfig) return cachedCmsConfig;
+
   if (isSupabaseConfigured && supabase) {
     try {
       const tbl = await getCmsTableName();
@@ -469,6 +508,7 @@ async function getCmsConfig(): Promise<CmsConfig> {
         const loaded: any = data.config_data;
         const configObj = typeof loaded === "string" ? JSON.parse(loaded) : loaded;
         if (configObj && configObj.siteTitle) {
+          cachedCmsConfig = configObj;
           return configObj;
         }
       }
@@ -480,11 +520,12 @@ async function getCmsConfig(): Promise<CmsConfig> {
   try {
     if (!fs.existsSync(CMS_CONFIG_PATH)) {
       fs.writeFileSync(CMS_CONFIG_PATH, JSON.stringify(DEFAULT_CMS_CONFIG, null, 2), "utf8");
+      cachedCmsConfig = DEFAULT_CMS_CONFIG;
       return DEFAULT_CMS_CONFIG;
     }
     const data = fs.readFileSync(CMS_CONFIG_PATH, "utf8");
     const parsed = JSON.parse(data);
-    return {
+    cachedCmsConfig = {
       siteTitle: parsed.siteTitle || DEFAULT_CMS_CONFIG.siteTitle,
       siteSubtitle: parsed.siteSubtitle || DEFAULT_CMS_CONFIG.siteSubtitle,
       logoUrl: parsed.logoUrl || DEFAULT_CMS_CONFIG.logoUrl,
@@ -494,6 +535,7 @@ async function getCmsConfig(): Promise<CmsConfig> {
       pages: Array.isArray(parsed.pages) ? parsed.pages : DEFAULT_CMS_CONFIG.pages,
       images: Array.isArray(parsed.images) ? parsed.images : DEFAULT_CMS_CONFIG.images
     };
+    return cachedCmsConfig;
   } catch (error) {
     console.error("Error reading cms config file:", error);
   }
@@ -501,6 +543,7 @@ async function getCmsConfig(): Promise<CmsConfig> {
 }
 
 async function saveCmsConfig(config: CmsConfig): Promise<boolean> {
+  cachedCmsConfig = config;
   try {
     fs.writeFileSync(CMS_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch (error) {
@@ -540,18 +583,21 @@ const DEFAULT_WHATSAPP_CONFIG: WhatsappConfig = {
 };
 
 function getWhatsappConfig(): WhatsappConfig {
+  if (cachedWhatsappConfig) return cachedWhatsappConfig;
   try {
     if (!fs.existsSync(WHATSAPP_CONFIG_PATH)) {
       fs.writeFileSync(WHATSAPP_CONFIG_PATH, JSON.stringify(DEFAULT_WHATSAPP_CONFIG, null, 2), "utf8");
+      cachedWhatsappConfig = DEFAULT_WHATSAPP_CONFIG;
       return DEFAULT_WHATSAPP_CONFIG;
     }
     const data = fs.readFileSync(WHATSAPP_CONFIG_PATH, "utf8");
     const parsed = JSON.parse(data);
-    return {
+    cachedWhatsappConfig = {
       numero: typeof parsed.numero === "string" ? parsed.numero : DEFAULT_WHATSAPP_CONFIG.numero,
       mensaje: typeof parsed.mensaje === "string" ? parsed.mensaje : DEFAULT_WHATSAPP_CONFIG.mensaje,
       habilitado: typeof parsed.habilitado === "boolean" ? parsed.habilitado : DEFAULT_WHATSAPP_CONFIG.habilitado
     };
+    return cachedWhatsappConfig;
   } catch (error) {
     console.error("Error reading whatsapp config DB:", error);
   }
@@ -559,10 +605,23 @@ function getWhatsappConfig(): WhatsappConfig {
 }
 
 function saveWhatsappConfig(config: WhatsappConfig): void {
+  cachedWhatsappConfig = config;
   try {
     fs.writeFileSync(WHATSAPP_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch (error) {
     console.error("Error writing whatsapp config DB:", error);
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    getCmsTableName().then(tbl => {
+      supabase!.from(tbl).upsert({
+        id: "whatsapp_settings",
+        config_data: config,
+        updated_at: new Date().toISOString()
+      }).then(({ error }) => {
+        if (error) console.error("Error saving WhatsApp config to Supabase:", error.message);
+      });
+    }).catch(err => console.error("Error detecting table name for WhatsApp config:", err));
   }
 }
 
@@ -946,10 +1005,103 @@ async function getDBExtranjeriaRecords(): Promise<ExtranjeriaRecord[]> {
   return getExtranjeriaRecords();
 }
 
+async function loadConfigsFromSupabase() {
+  if (!isSupabaseConfigured || !supabase) return;
+
+  try {
+    const tbl = await getCmsTableName();
+    
+    // 1. Load CMS config
+    try {
+      const { data: cmsData } = await supabase.from(tbl).select("*").eq("id", "site_settings").single();
+      if (cmsData) {
+        const loaded = cmsData.config_data;
+        cachedCmsConfig = typeof loaded === "string" ? JSON.parse(loaded) : loaded;
+        console.log("[Supabase Seeder] Loaded CMS site_settings from Supabase.");
+      } else {
+        console.log("[Supabase Seeder] site_settings absent in Supabase. Backfilling from local config...");
+        const local = await getCmsConfig();
+        await supabase.from(tbl).upsert({
+          id: "site_settings",
+          config_data: local,
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (e: any) {
+      console.warn("[Supabase Seeder] Unable to load/upsert site_settings:", e.message || e);
+    }
+
+    // 2. Load Extranjería config
+    try {
+      const { data: extData } = await supabase.from(tbl).select("*").eq("id", "extranjeria_settings").single();
+      if (extData) {
+        const loaded = extData.config_data;
+        cachedExtranjeriaConfig = typeof loaded === "string" ? JSON.parse(loaded) : loaded;
+        console.log("[Supabase Seeder] Loaded Extranjería config from Supabase.");
+      } else {
+        console.log("[Supabase Seeder] extranjeria_settings absent in Supabase. Backfilling from local config...");
+        const local = getExtranjeriaConfig();
+        await supabase.from(tbl).upsert({
+          id: "extranjeria_settings",
+          config_data: local,
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (e: any) {
+      console.warn("[Supabase Seeder] Unable to load/upsert extranjeria_settings:", e.message || e);
+    }
+
+    // 3. Load Tardía config
+    try {
+      const { data: tarData } = await supabase.from(tbl).select("*").eq("id", "tardia_settings").single();
+      if (tarData) {
+        const loaded = tarData.config_data;
+        cachedTardiaConfig = typeof loaded === "string" ? JSON.parse(loaded) : loaded;
+        console.log("[Supabase Seeder] Loaded Tardía config from Supabase.");
+      } else {
+        console.log("[Supabase Seeder] tardia_settings absent in Supabase. Backfilling from local config...");
+        const local = getTardiaConfig();
+        await supabase.from(tbl).upsert({
+          id: "tardia_settings",
+          config_data: local,
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (e: any) {
+      console.warn("[Supabase Seeder] Unable to load/upsert tardia_settings:", e.message || e);
+    }
+
+    // 4. Load WhatsApp config
+    try {
+      const { data: waData } = await supabase.from(tbl).select("*").eq("id", "whatsapp_settings").single();
+      if (waData) {
+        const loaded = waData.config_data;
+        cachedWhatsappConfig = typeof loaded === "string" ? JSON.parse(loaded) : loaded;
+        console.log("[Supabase Seeder] Loaded WhatsApp config from Supabase.");
+      } else {
+        console.log("[Supabase Seeder] whatsapp_settings absent in Supabase. Backfilling from local config...");
+        const local = getWhatsappConfig();
+        await supabase.from(tbl).upsert({
+          id: "whatsapp_settings",
+          config_data: local,
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (e: any) {
+      console.warn("[Supabase Seeder] Unable to load/upsert whatsapp_settings:", e.message || e);
+    }
+  } catch (e: any) {
+    console.error("[Supabase Seeder Error] Failed during loadConfigsFromSupabase:", e.message || e);
+  }
+}
+
 async function initializeSupabaseTables() {
   if (!isSupabaseConfigured || !supabase) return;
 
   console.log("[Supabase Seeder] Checking and initializing database seeds...");
+  
+  // Load and cache settings from Supabase (backed by cms_config table)
+  await loadConfigsFromSupabase();
 
   try {
     // 1. Seed sucursales
@@ -1336,6 +1488,47 @@ function renderStatusPage(
   `;
 }
 
+interface ActiveSession {
+  username: string;
+  role: string;
+  timestamp: number;
+}
+
+const activeSessions: Record<string, ActiveSession> = {};
+
+async function verifySession(req: any): Promise<boolean> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return false;
+    }
+    const token = authHeader.substring(7).trim();
+    if (!token) return false;
+    
+    const session = activeSessions[token];
+    if (!session) return false;
+    
+    // session expiration (12 hours)
+    const twelveHours = 12 * 60 * 60 * 1000;
+    if (Date.now() - session.timestamp > twelveHours) {
+      delete activeSessions[token];
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function verifyAdminSession(req: any, res: any, next: any) {
+  const isValid = await verifySession(req);
+  if (!isValid) {
+    return res.status(401).json({ success: false, error: "Sesión inválida o expirada. Por favor inicie sesión de nuevo." });
+  }
+  next();
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -1397,6 +1590,75 @@ async function startServer() {
       const transparentPixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
       res.setHeader("Content-Type", "image/png");
       res.send(transparentPixel);
+    }
+  });
+
+  // Endpoints for Admin authentication session creation
+  app.post("/api/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ success: false, error: "Usuario y contraseña requeridos." });
+      }
+
+      const lcUser = String(username).trim().toLowerCase();
+      const users = await getDBUsers();
+      
+      const foundUser = users.find(u => u.username.toLowerCase() === lcUser && u.password === password);
+      
+      if (foundUser) {
+        const token = "session_" + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        activeSessions[token] = {
+          username: foundUser.username,
+          role: foundUser.role,
+          timestamp: Date.now()
+        };
+        return res.json({
+          success: true,
+          token,
+          user: {
+            username: foundUser.username,
+            role: foundUser.role,
+            nombre: foundUser.nombre
+          }
+        });
+      }
+
+      // Hardcoded fallback accounts for backward-compatibility in case table/seeding isn't fully operational
+      const fallbackAdmins = [
+        { u: "adminmini", p: "admin1234", r: "sencillo", n: "Administrador Mini" },
+        { u: "adminte", p: "Value1234", r: "super", n: "Super Admin Tribal" },
+        { u: "oscargave3003", p: "Value1234", r: "super", n: "Oscar Super Admin" },
+        { u: "oscargave3003@gmail.com", p: "Value1234", r: "super", n: "Oscar Super Admin Email" },
+        { u: "migra26", p: "12345678", r: "extranjeria", n: "Inmigración / Extranjería" },
+        { u: "adminpedad", p: "PasaDodeEdad2026", r: "pasado_edad", n: "Administrador VID" },
+        { u: "adminpe_sup", p: "1234", r: "pasado_edad_supervisor", n: "Supervisor VID" },
+        { u: "adminpe_op", p: "1234", r: "pasado_edad_admin", n: "Operador Seguimiento VID" }
+      ];
+
+      const fallbackMatch = fallbackAdmins.find(f => f.u.toLowerCase() === lcUser && f.p === password);
+      if (fallbackMatch) {
+        const token = "session_" + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        activeSessions[token] = {
+          username: fallbackMatch.u,
+          role: fallbackMatch.r,
+          timestamp: Date.now()
+        };
+        return res.json({
+          success: true,
+          token,
+          user: {
+            username: fallbackMatch.u,
+            role: fallbackMatch.r,
+            nombre: fallbackMatch.n
+          }
+        });
+      }
+
+      return res.status(401).json({ success: false, error: "Credenciales incorrectas." });
+    } catch (e: any) {
+      console.error("Error during /api/login:", e);
+      return res.status(500).json({ success: false, error: e.message });
     }
   });
 
@@ -1912,7 +2174,7 @@ async function startServer() {
   });
 
   // Endpoint to upload/overwrite foreign passport records (expecting parsed array of records)
-  app.post("/api/extranjeria/upload", async (req, res) => {
+  app.post("/api/extranjeria/upload", verifyAdminSession, async (req, res) => {
     try {
       const { records } = req.body;
       if (!Array.isArray(records)) {
@@ -1998,7 +2260,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/extranjeria/config", (req, res) => {
+  app.post("/api/extranjeria/config", verifyAdminSession, (req, res) => {
     try {
       const { capacidad, intervalo, horaInicio, horaFin } = req.body;
       
@@ -2027,7 +2289,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/tardia/config", (req, res) => {
+  app.post("/api/tardia/config", verifyAdminSession, (req, res) => {
     try {
       const { capacidadTotalDia, intervalo, horaInicio, horaFin } = req.body;
       
@@ -2056,7 +2318,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/whatsapp/config", (req, res) => {
+  app.post("/api/whatsapp/config", verifyAdminSession, (req, res) => {
     try {
       const { numero, mensaje, habilitado } = req.body;
       
@@ -2084,7 +2346,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/cms/config", async (req, res) => {
+  app.post("/api/cms/config", verifyAdminSession, async (req, res) => {
     try {
       const config = req.body;
       if (!config || typeof config !== "object") {
@@ -2099,7 +2361,7 @@ async function startServer() {
   });
 
   // API to upload an asset/image via base64 data
-  app.post("/api/upload", async (req, res) => {
+  app.post("/api/upload", verifyAdminSession, async (req, res) => {
     try {
       const { filename, base64Data } = req.body;
       if (!base64Data) {
@@ -2143,7 +2405,7 @@ async function startServer() {
   });
 
   // API to list all uploaded images/assets
-  app.get("/api/uploads/list", async (req, res) => {
+  app.get("/api/uploads/list", verifyAdminSession, async (req, res) => {
     try {
       const uDir = path.join(process.cwd(), "uploads");
       if (!fs.existsSync(uDir)) {
@@ -2172,7 +2434,7 @@ async function startServer() {
   });
 
   // API to delete an uploaded image asset
-  app.delete("/api/uploads/:filename", async (req, res) => {
+  app.delete("/api/uploads/:filename", verifyAdminSession, async (req, res) => {
     try {
       const { filename } = req.params;
       if (!filename || filename.includes("/") || filename.includes("..")) {
@@ -2384,7 +2646,22 @@ async function startServer() {
   app.get("/api/appointments", async (req, res) => {
     try {
       const appointments = await getDBAppointments();
-      return res.json({ success: true, appointments });
+      const isAdmin = await verifySession(req);
+      if (isAdmin) {
+        return res.json({ success: true, appointments });
+      } else {
+        // Scrub PII for public requests to ensure GDPR/privacy protection
+        const scrubbed = appointments.map(a => ({
+          id: a.id,
+          fecha: a.fecha,
+          hora: a.hora,
+          subServicioId: a.subServicioId,
+          categoriaNombre: a.categoriaNombre,
+          servicioCategoria: (a as any).servicioCategoria || a.categoriaNombre,
+          estado: a.estado
+        }));
+        return res.json({ success: true, appointments: scrubbed });
+      }
     } catch (e: any) {
       console.error("Error fetching all appointments:", e);
       res.status(500).json({ success: false, error: e.message });
@@ -3042,9 +3319,9 @@ async function startServer() {
   }
 
   // ==========================================
-  // GESTIÓN DE USUARIOS POR EL SUPER ADMIN
+  // GESTIÓN DE USUARIOS POR EL SUPER ADMIN (PROTEGIDO)
   // ==========================================
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", verifyAdminSession, async (req, res) => {
     try {
       const users = await getDBUsers();
       return res.json({ success: true, users });
@@ -3054,7 +3331,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/users", async (req, res) => {
+  app.post("/api/users", verifyAdminSession, async (req, res) => {
     try {
       const { username, password, role, nombre } = req.body;
       if (!username || !password || !role || !nombre) {
@@ -3106,7 +3383,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/users/:username", async (req, res) => {
+  app.delete("/api/users/:username", verifyAdminSession, async (req, res) => {
     try {
       const usernameToDelete = String(req.params.username).trim().toLowerCase();
       

@@ -302,7 +302,12 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   const fetchAppointments = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/appointments');
+      const token = sessionStorage.getItem('admin_token') || '';
+      const res = await fetch('/api/appointments', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await res.json();
       if (data && data.success && Array.isArray(data.appointments)) {
         const filtered = data.appointments.filter((app: any) => {
@@ -377,9 +382,13 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     localStorage.setItem('extranjeria_hora_fin', horaFin);
     
     try {
+      const token = sessionStorage.getItem('admin_token') || '';
       const res = await fetch('/api/extranjeria/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ capacidad, intervalo, horaInicio, horaFin })
       });
       const data = await res.json();
