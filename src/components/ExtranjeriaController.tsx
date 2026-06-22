@@ -50,10 +50,9 @@ const SELECT_TIMES_OPTIONS = [
 
 // Extranjeria Mandatory Documents Checklists
 const REQUISITOS_EXTRANJERIA = [
-  { id: 'pasaporte', name: 'Pasaporte Vigente con Sello de Entrada Reciente' },
-  { id: 'resolucion', name: 'Resolución SNM (Servicio Nacional de Migración) Aprobada' },
-  { id: 'carnet', name: 'Original y Copia del Carné de Trámite Temporal' },
-  { id: 'formulario', name: 'Formulario Oficial de Solicitud de Cédula de Extranjero' }
+  { id: 'nota_migracion', name: 'Nota de Migración' },
+  { id: 'carne_permanencia', name: 'Fotocopia de Carné de Permanencia' },
+  { id: 'fotocopia_pasaporte', name: 'Fotocopia de Pasaporte' }
 ];
 
 interface ExtranjeriaControllerProps {
@@ -472,9 +471,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
           telefono: newCitaTelefono.trim() || 'N/A'
         },
         requisitos: [
-          'Nota de migración',
-          'Fotocopia de carné de residente permanente',
-          'Fotocopia de pasaporte',
+          'Nota de Migración',
+          'Fotocopia de Carné de Permanencia',
+          'Fotocopia de Pasaporte',
           'B/. 100.00(en efectivo)'
         ]
       };
@@ -1631,7 +1630,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                       
                       {supervisorCheckedDocs.length < REQUISITOS_EXTRANJERIA.length ? (
                         <div className="p-3 bg-slate-900/80 rounded border border-slate-850 text-[10px] text-slate-450 font-bold uppercase text-center">
-                          🔒 Marque los 4 requisitos arriba para habilitar la asignación automática
+                          🔒 Marque los {REQUISITOS_EXTRANJERIA.length} requisitos arriba para habilitar la asignación automática
                         </div>
                       ) : (
                         <div className="space-y-3.5 animate-fade-in bg-slate-950/80 p-4 rounded-lg border border-slate-800">

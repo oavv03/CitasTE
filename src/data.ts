@@ -214,9 +214,9 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         nombre: 'Carné de residente permanente por primera vez',
         descripcion: 'Emisión del documento de identidad personal para extranjeros residentes permanentes.',
         requisitos: [
-          'Nota de migración',
-          'Fotocopia de carné de residente permanente',
-          'Fotocopia de pasaporte',
+          'Nota de Migración',
+          'Fotocopia de Carné de Permanencia',
+          'Fotocopia de Pasaporte',
           'B/. 100.00(en efectivo)',
           'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
           'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
