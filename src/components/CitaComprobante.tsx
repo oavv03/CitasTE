@@ -564,7 +564,7 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
           onClick={onDone}
           className="w-full sm:w-auto h-12 px-8 rounded bg-blue-700 hover:bg-blue-800 text-white font-bold uppercase tracking-wider text-xs shadow-lg shadow-blue-100 transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
         >
-          <span>Finalizar e Ir a mis Citas</span>
+          <span>Finalizar Trámite</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

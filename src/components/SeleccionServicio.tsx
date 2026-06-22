@@ -841,7 +841,7 @@ export default function SeleccionServicio({
           className="w-full sm:w-auto h-12 px-6 rounded-lg border border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-xs hover:bg-slate-50 transition cursor-pointer text-center flex items-center justify-center gap-2 bg-white"
         >
           <ArrowLeft className="w-4 h-4" />
-          Cambiar Departamento
+          Cambiar Sección
         </button>
 
         <button

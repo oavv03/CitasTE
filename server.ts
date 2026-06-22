@@ -14,7 +14,6 @@ const DB_PATH = path.join(process.cwd(), "appointments-db.json");
 const EXTRANJERIA_DB_PATH = path.join(process.cwd(), "extranjeria-db.json");
 const EXTRANJERIA_CONFIG_PATH = path.join(process.cwd(), "extranjeria-config.json");
 const TARDIA_CONFIG_PATH = path.join(process.cwd(), "tardia-config.json");
-const WHATSAPP_CONFIG_PATH = path.join(process.cwd(), "whatsapp-config.json");
 const USERS_DB_PATH = path.join(process.cwd(), "users-db.json");
 const CMS_CONFIG_PATH = path.join(process.cwd(), "cms-config.json");
 
@@ -319,7 +318,6 @@ function saveUsers(users: ServerUser[]): void {
 let cachedCmsConfig: CmsConfig | null = null;
 let cachedExtranjeriaConfig: ExtranjeriaConfig | null = null;
 let cachedTardiaConfig: TardiaConfig | null = null;
-let cachedWhatsappConfig: WhatsappConfig | null = null;
 
 interface ExtranjeriaConfig {
   capacidad: number;
@@ -570,60 +568,6 @@ async function saveCmsConfig(config: CmsConfig): Promise<boolean> {
   return true;
 }
 
-interface WhatsappConfig {
-  numero: string;
-  mensaje: string;
-  habilitado: boolean;
-}
-
-const DEFAULT_WHATSAPP_CONFIG: WhatsappConfig = {
-  numero: "50766666666",
-  mensaje: "Hola, me gustaría recibir más información sobre mi cita en el Tribunal Electoral.",
-  habilitado: true
-};
-
-function getWhatsappConfig(): WhatsappConfig {
-  if (cachedWhatsappConfig) return cachedWhatsappConfig;
-  try {
-    if (!fs.existsSync(WHATSAPP_CONFIG_PATH)) {
-      fs.writeFileSync(WHATSAPP_CONFIG_PATH, JSON.stringify(DEFAULT_WHATSAPP_CONFIG, null, 2), "utf8");
-      cachedWhatsappConfig = DEFAULT_WHATSAPP_CONFIG;
-      return DEFAULT_WHATSAPP_CONFIG;
-    }
-    const data = fs.readFileSync(WHATSAPP_CONFIG_PATH, "utf8");
-    const parsed = JSON.parse(data);
-    cachedWhatsappConfig = {
-      numero: typeof parsed.numero === "string" ? parsed.numero : DEFAULT_WHATSAPP_CONFIG.numero,
-      mensaje: typeof parsed.mensaje === "string" ? parsed.mensaje : DEFAULT_WHATSAPP_CONFIG.mensaje,
-      habilitado: typeof parsed.habilitado === "boolean" ? parsed.habilitado : DEFAULT_WHATSAPP_CONFIG.habilitado
-    };
-    return cachedWhatsappConfig;
-  } catch (error) {
-    console.error("Error reading whatsapp config DB:", error);
-  }
-  return DEFAULT_WHATSAPP_CONFIG;
-}
-
-function saveWhatsappConfig(config: WhatsappConfig): void {
-  cachedWhatsappConfig = config;
-  try {
-    fs.writeFileSync(WHATSAPP_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
-  } catch (error) {
-    console.error("Error writing whatsapp config DB:", error);
-  }
-
-  if (isSupabaseConfigured && supabase) {
-    getCmsTableName().then(tbl => {
-      supabase!.from(tbl).upsert({
-        id: "whatsapp_settings",
-        config_data: config,
-        updated_at: new Date().toISOString()
-      }).then(({ error }) => {
-        if (error) console.error("Error saving WhatsApp config to Supabase:", error.message);
-      });
-    }).catch(err => console.error("Error detecting table name for WhatsApp config:", err));
-  }
-}
 
 interface ExtranjeriaRecord {
   pasaporte: string;
@@ -1071,25 +1015,6 @@ async function loadConfigsFromSupabase() {
       console.warn("[Supabase Seeder] Unable to load/upsert tardia_settings:", e.message || e);
     }
 
-    // 4. Load WhatsApp config
-    try {
-      const { data: waData } = await supabase.from(tbl).select("*").eq("id", "whatsapp_settings").single();
-      if (waData) {
-        const loaded = waData.config_data;
-        cachedWhatsappConfig = typeof loaded === "string" ? JSON.parse(loaded) : loaded;
-        console.log("[Supabase Seeder] Loaded WhatsApp config from Supabase.");
-      } else {
-        console.log("[Supabase Seeder] whatsapp_settings absent in Supabase. Backfilling from local config...");
-        const local = getWhatsappConfig();
-        await supabase.from(tbl).upsert({
-          id: "whatsapp_settings",
-          config_data: local,
-          updated_at: new Date().toISOString()
-        });
-      }
-    } catch (e: any) {
-      console.warn("[Supabase Seeder] Unable to load/upsert whatsapp_settings:", e.message || e);
-    }
   } catch (e: any) {
     console.error("[Supabase Seeder Error] Failed during loadConfigsFromSupabase:", e.message || e);
   }
@@ -2308,33 +2233,6 @@ async function startServer() {
     }
   });
 
-  app.get("/api/whatsapp/config", (req, res) => {
-    try {
-      const config = getWhatsappConfig();
-      return res.json({ success: true, config });
-    } catch (e: any) {
-      console.error("Error fetching whatsapp settings:", e);
-      return res.status(500).json({ success: false, error: e.message });
-    }
-  });
-
-  app.post("/api/whatsapp/config", verifyAdminSession, (req, res) => {
-    try {
-      const { numero, mensaje, habilitado } = req.body;
-      
-      const updatedConfig: WhatsappConfig = {
-        numero: typeof numero === "string" ? numero.trim() : DEFAULT_WHATSAPP_CONFIG.numero,
-        mensaje: typeof mensaje === "string" ? mensaje.trim() : DEFAULT_WHATSAPP_CONFIG.mensaje,
-        habilitado: typeof habilitado === "boolean" ? habilitado : DEFAULT_WHATSAPP_CONFIG.habilitado
-      };
-
-      saveWhatsappConfig(updatedConfig);
-      return res.json({ success: true, config: updatedConfig });
-    } catch (e: any) {
-      console.error("Error saving whatsapp config:", e);
-      return res.status(500).json({ success: false, error: e.message });
-    }
-  });
 
   app.get("/api/cms/config", async (req, res) => {
     try {

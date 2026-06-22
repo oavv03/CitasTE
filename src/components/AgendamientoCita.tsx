@@ -250,13 +250,13 @@ export default function AgendamientoCita({
     return SUCURSALES_TE.find((s) => s.id === sucursalId);
   }, [sucursalId]);
 
-  // Set default calendar month to June 2026 or selected date's month
+  // Set default calendar month to current actual month/year or selected date's month
   const [currentMonth, setCurrentMonth] = useState(() => {
     if (selectedFecha) {
       const parsed = new Date(selectedFecha + 'T12:00:00');
       if (!isNaN(parsed.getTime())) return parsed.getMonth();
     }
-    return 5; // June (0-indexed)
+    return new Date().getMonth();
   });
 
   const [currentYear, setCurrentYear] = useState(() => {
@@ -264,7 +264,7 @@ export default function AgendamientoCita({
       const parsed = new Date(selectedFecha + 'T12:00:00');
       if (!isNaN(parsed.getTime())) return parsed.getFullYear();
     }
-    return 2026; // 2026
+    return new Date().getFullYear();
   });
 
   const MONTH_NAMES_ES = [
@@ -306,8 +306,15 @@ export default function AgendamientoCita({
 
     // Days in current month
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const todaySimulated = new Date('2026-06-05T00:00:00');
+    const todaySimulated = new Date();
+    todaySimulated.setHours(0, 0, 0, 0);
     const isTuesdayToSaturday = selectedSucursal.horario.toLowerCase().includes('martes a sábado');
+
+    const sysDateObj = new Date();
+    const sysYear = sysDateObj.getFullYear();
+    const sysMonth = sysDateObj.getMonth();
+    const sysDay = sysDateObj.getDate();
+    const todayFormattedString = `${sysYear}-${String(sysMonth + 1).padStart(2, '0')}-${String(sysDay).padStart(2, '0')}`;
 
     for (let day = 1; day <= daysInMonth; day++) {
       const yyyy = currentYear;
@@ -317,7 +324,7 @@ export default function AgendamientoCita({
 
       const targetDate = new Date(dateString + 'T00:00:00');
       const isPast = targetDate < todaySimulated;
-      const isToday = dateString === '2026-06-05';
+      const isToday = dateString === todayFormattedString;
 
       // Verify sucursal working day
       const dayOfWeek = targetDate.getDay();
@@ -389,7 +396,8 @@ export default function AgendamientoCita({
   }, [currentMonth, currentYear, selectedSucursal, isExtranjeria, isPastAgeTrámiteSelected, mergedBookings, tardiaConfig]);
 
   const handlePrevMonth = () => {
-    if (currentYear === 2026 && currentMonth <= 5) return;
+    const sysDate = new Date();
+    if (currentYear < sysDate.getFullYear() || (currentYear === sysDate.getFullYear() && currentMonth <= sysDate.getMonth())) return;
     if (currentMonth === 0) {
       setCurrentMonth(11);
       setCurrentYear(prev => prev - 1);
@@ -575,7 +583,7 @@ export default function AgendamientoCita({
                     <button
                       type="button"
                       onClick={handlePrevMonth}
-                      disabled={currentYear === 2026 && currentMonth <= 5}
+                      disabled={currentYear < new Date().getFullYear() || (currentYear === new Date().getFullYear() && currentMonth <= new Date().getMonth())}
                       className="p-1 px-2.5 rounded bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition text-xs font-black flex items-center gap-1"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
