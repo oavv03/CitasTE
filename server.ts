@@ -815,24 +815,37 @@ async function safeUpsertAppointment(row: any) {
 }
 
 async function getDBUsers(): Promise<ServerUser[]> {
+  const localUsers = getUsers();
   if (isSupabaseConfigured && supabase) {
     try {
       const tbl = await getUsersTableName();
       const { data, error } = await supabase.from(tbl).select("*");
       if (error) {
         console.error("Error reading users from Supabase:", error.message);
-        return getUsers(); 
+        return localUsers; 
       }
       if (data && data.length > 0) {
-        return data.map((row: any) => ({
+        const supabaseUsers = data.map((row: any) => ({
           username: row.nombre_usuario,
           password: row.hash_contrasena,
           role: row.role as any,
           nombre: row.nombre,
           fechaCreacion: row.fecha_creacion
         }));
+
+        const merged = [...localUsers];
+        supabaseUsers.forEach((su: any) => {
+          if (su.username) {
+            const idx = merged.findIndex(u => u.username.toLowerCase() === su.username.toLowerCase());
+            if (idx >= 0) {
+              merged[idx] = su;
+            } else {
+              merged.push(su);
+            }
+          }
+        });
+        return merged;
       } else {
-        const localUsers = getUsers();
         for (const u of localUsers) {
           try {
             await safeUpsertSupabase(tbl, {
@@ -847,13 +860,12 @@ async function getDBUsers(): Promise<ServerUser[]> {
             console.warn(`[Supabase Seeder Warning] Failed to seed user ${u.username}:`, e.message || e);
           }
         }
-        return localUsers;
       }
     } catch (err) {
       console.error("Catch in getDBUsers:", err);
     }
   }
-  return getUsers();
+  return localUsers;
 }
 
 async function getDBAppointments(): Promise<ServerCita[]> {
@@ -3242,17 +3254,26 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "El nombre de usuario debe tener al menos 3 caracteres." });
       }
 
-      const users = await getDBUsers();
-      const existingIdx = users.findIndex(u => u.username.toLowerCase() === cleanUsername);
+      const localUsers = getUsers();
+      const existingIdx = localUsers.findIndex(u => u.username.toLowerCase() === cleanUsername);
 
       const newUser: ServerUser = {
         username: cleanUsername,
         password: String(password).trim(),
         role: role,
         nombre: String(nombre).trim(),
-        fechaCreacion: existingIdx >= 0 ? users[existingIdx].fechaCreacion : new Date().toISOString()
+        fechaCreacion: existingIdx >= 0 ? localUsers[existingIdx].fechaCreacion : new Date().toISOString()
       };
 
+      // Always save to local JSON file
+      if (existingIdx >= 0) {
+        localUsers[existingIdx] = newUser;
+      } else {
+        localUsers.push(newUser);
+      }
+      saveUsers(localUsers);
+
+      // Save to Supabase as well if configured
       if (isSupabaseConfigured && supabase) {
         const newUserRow = {
           identificacion: cleanUsername,
@@ -3265,13 +3286,6 @@ async function startServer() {
         const tbl = await getUsersTableName();
         const { error } = await supabase.from(tbl).upsert(newUserRow);
         if (error) throw error;
-      } else {
-        if (existingIdx >= 0) {
-          users[existingIdx] = newUser;
-        } else {
-          users.push(newUser);
-        }
-        saveUsers(users);
       }
 
       return res.json({ success: true, user: newUser });
@@ -3290,23 +3304,19 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No es posible eliminar el Super Administrador principal (adminte)." });
       }
 
+      // Always delete from local database
+      const localUsers = getUsers();
+      const filteredUsers = localUsers.filter(u => u.username.toLowerCase() !== usernameToDelete);
+      saveUsers(filteredUsers);
+
+      // Also delete from Supabase if configured
       if (isSupabaseConfigured && supabase) {
         const tbl = await getUsersTableName();
         const { error } = await supabase.from(tbl).delete().eq("nombre_usuario", usernameToDelete);
         if (error) throw error;
-        return res.json({ success: true, message: `Usuario '${usernameToDelete}' eliminado exitosamente.` });
-      } else {
-        const users = getUsers();
-        const initialLength = users.length;
-        const filteredUsers = users.filter(u => u.username.toLowerCase() !== usernameToDelete);
-
-        if (filteredUsers.length === initialLength) {
-          return res.status(404).json({ success: false, error: "Usuario no encontrado." });
-        }
-
-        saveUsers(filteredUsers);
-        return res.json({ success: true, message: `Usuario '${usernameToDelete}' eliminado exitosamente.` });
       }
+
+      return res.json({ success: true, message: `Usuario '${usernameToDelete}' eliminado exitosamente.` });
     } catch (e: any) {
       console.error("Error deleting user:", e);
       return res.status(500).json({ success: false, error: e.message });
