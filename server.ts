@@ -2256,6 +2256,88 @@ async function startServer() {
     }
   });
 
+  app.get("/api/supabase-status", async (req, res) => {
+    try {
+      const statusResponse: any = {
+        isSupabaseConfigured,
+        supabaseUrl: supabaseUrl ? supabaseUrl.replace(/^(https?:\/\/)[^.]+(\.supabase\.co)/, "$1***$2") : "",
+        hasSupabaseKey: !!supabaseKey,
+        tables: {}
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        // Test appointments table
+        try {
+          const apptsTable = await getAppointmentsTableName();
+          const { error: apptsError } = await supabase.from(apptsTable).select("identificacion").limit(1);
+          statusResponse.tables.appointments = {
+            tableName: apptsTable,
+            connected: !apptsError,
+            error: apptsError ? apptsError.message : null
+          };
+        } catch (e: any) {
+          statusResponse.tables.appointments = { tableName: "otro", connected: false, error: e.message };
+        }
+
+        // Test users table
+        try {
+          const usersTable = await getUsersTableName();
+          const { error: usersError } = await supabase.from(usersTable).select("nombre_usuario").limit(1);
+          statusResponse.tables.users = {
+            tableName: usersTable,
+            connected: !usersError,
+            error: usersError ? usersError.message : null
+          };
+        } catch (e: any) {
+          statusResponse.tables.users = { tableName: "usuarios", connected: false, error: e.message };
+        }
+
+        // Test sucursales table
+        try {
+          const sucursalTable = await getSucursalesTableName();
+          const { error: sucError } = await supabase.from(sucursalTable).select("identificacion").limit(1);
+          statusResponse.tables.sucursales = {
+            tableName: sucursalTable,
+            connected: !sucError,
+            error: sucError ? sucError.message : null
+          };
+        } catch (e: any) {
+          statusResponse.tables.sucursales = { tableName: "sucursales", connected: false, error: e.message };
+        }
+
+        // Test servicios table
+        try {
+          const servTable = await getServiciosTableName();
+          const { error: servError } = await supabase.from(servTable).select("identificacion").limit(1);
+          statusResponse.tables.servicios = {
+            tableName: servTable,
+            connected: !servError,
+            error: servError ? servError.message : null
+          };
+        } catch (e: any) {
+          statusResponse.tables.servicios = { tableName: "servicios_subservicios", connected: false, error: e.message };
+        }
+
+        // Test extranjeria table
+        try {
+          const extTable = await getExtranjeriaTableName();
+          const { error: extError } = await supabase.from(extTable).select("pasaporte").limit(1);
+          statusResponse.tables.extranjeria = {
+            tableName: extTable,
+            connected: !extError,
+            error: extError ? extError.message : null
+          };
+        } catch (e: any) {
+          statusResponse.tables.extranjeria = { tableName: "extranjeria_records", connected: false, error: e.message };
+        }
+      }
+
+      return res.json(statusResponse);
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   app.post("/api/cms/config", verifyAdminSession, async (req, res) => {
     try {
       const config = req.body;

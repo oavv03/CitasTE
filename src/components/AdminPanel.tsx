@@ -31,11 +31,13 @@ import {
   Share2,
   Link,
   Check,
-  Tv
+  Tv,
+  Database
 } from 'lucide-react';
 import { Cita, DatosPersonales, ServicioCategoriaId, TipoIdentificacion, Sucursal, CategoriaServicio, SubServicio, ExtranjeriaRecord, AdminRole, AdminUser } from '../types';
 import { SUCURSALES_TE, SERVICIOS_TRIBUNAL, saveTramiteMutation, saveSucursalMutation } from '../data';
 import ExtranjeriaController from './ExtranjeriaController';
+import DatabaseDiagnostic from './DatabaseDiagnostic';
 import TardiaController from './TardiaController';
 import AdminCmsEditor from './AdminCmsEditor';
 
@@ -58,7 +60,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
   const [currentRole, setCurrentRole] = useState<AdminRole>(() => {
     return typeof window !== 'undefined' ? (sessionStorage.getItem('admin_role') as AdminRole || 'sencillo') : 'sencillo';
   });
-  const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites' | 'extranjeria' | 'pantalla' | 'usuarios'>('tabla');
+  const [activeSubTab, setActiveSubTab] = useState<'tabla' | 'stats' | 'config' | 'horarios' | 'tramites' | 'extranjeria' | 'pantalla' | 'usuarios' | 'database'>('tabla');
   const [eyeTheme, setEyeTheme] = useState<'slate' | 'warm' | 'sepia' | 'forest' | 'light'>(() => {
     try {
       return (localStorage.getItem('admin_eye_theme') as any) || 'slate';
@@ -2019,12 +2021,25 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                   onClick={() => setActiveSubTab('cms' as any)}
                   className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
                     activeSubTab === ('cms' as any)
-                      ? 'bg-emerald-600/15 text-emerald-500 border border-emerald-500/30 shadow-inner'
+                      ? 'bg-emerald-600/15 text-emerald-500 border border-emerald-500/30'
                       : 'text-slate-400 hover:text-white border border-transparent'
                   }`}
                 >
                   <Edit3 className="w-4 h-4 shrink-0 text-emerald-500" />
                   <span>Editor de Contenidos (CMS)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('database')}
+                  className={`flex-1 md:flex-initial flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold leading-none uppercase tracking-wide transition cursor-pointer text-left whitespace-nowrap ${
+                    activeSubTab === 'database'
+                      ? 'bg-emerald-600/15 text-emerald-500 border border-emerald-500/30 shadow-inner'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Database className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>Conector Supabase</span>
                 </button>
               </>
             )}
@@ -4269,6 +4284,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                 <AdminCmsEditor onConfigSaved={() => {
                   window.dispatchEvent(new CustomEvent('cms_config_changed'));
                 }} />
+              </div>
+            )}
+
+            {/* TAB CONTENT: DATABASE CONNECTION DIAGNOSTIC */}
+            {activeSubTab === 'database' && currentRole === 'super' && (
+              <div className="space-y-6 animate-fade-in">
+                <DatabaseDiagnostic />
               </div>
             )}
 
