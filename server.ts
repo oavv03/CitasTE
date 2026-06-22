@@ -2689,6 +2689,32 @@ async function startServer() {
     }
   });
 
+  // API to delete an appointment
+  app.delete("/api/appointments/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const appointments = await getDBAppointments();
+      const existingIdx = appointments.findIndex(a => a.id === id);
+      if (existingIdx < 0) {
+        return res.status(404).json({ success: false, error: "Cita no encontrada" });
+      }
+
+      if (isSupabaseConfigured && supabase) {
+        const tbl = await getAppointmentsTableName();
+        const { error } = await supabase.from(tbl).delete().eq("identificacion", id);
+        if (error) throw error;
+      } else {
+        const localAppointments = getAppointments();
+        const filtered = localAppointments.filter(a => a.id !== id);
+        saveAppointments(filtered);
+      }
+      return res.json({ success: true, message: "Cita eliminada correctamente" });
+    } catch (e: any) {
+      console.error("Error deleting appointment:", e);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // HTTP Endpoint to Confirm Attendance via Email Links
   app.get("/api/appointment/confirm", async (req, res) => {
     const code = req.query.code as string;

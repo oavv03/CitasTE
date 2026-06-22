@@ -32,7 +32,9 @@ import {
   Tv,
   Maximize,
   Minimize,
-  Info
+  Info,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { AdminRole } from '../types';
@@ -138,6 +140,107 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   
   // Supervisor custom period visibility filter
   const [supervisorPeriodFilter, setSupervisorPeriodFilter] = useState<'dia' | 'semana' | 'mes' | 'año'>('dia');
+
+  // Supervisor tabs / sub-views (control of queues vs. calendar & creation/deletion panel)
+  const [supervisorTab, setSupervisorTab] = useState<'flujo' | 'calendario'>('flujo');
+  const [calendarDate, setCalendarDate] = useState<Date>(new Date());
+  
+  // Parse today's date formatted as YYYY-MM-DD
+  const [selectedCalendarDateStr, setSelectedCalendarDateStr] = useState<string>(() => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  });
+
+  // Calendar translation names
+  const mesesNombres = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const diasSemanaNombres = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  // Calculate grid representation of month days
+  const monthDays = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    
+    // First day of the month
+    const firstDay = new Date(year, month, 1);
+    const firstDayIndex = firstDay.getDay(); // 0 is Sunday, 1 is Monday...
+    
+    // Total days in the current month
+    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    // Days in previous month to fill the first row
+    const totalDaysInPrevMonth = new Date(year, month, 0).getDate();
+    
+    const days: { dateStr: string; dayNum: number; isCurrentMonth: boolean; key: string }[] = [];
+    
+    // Fill in previous month's trailing days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const prevDay = totalDaysInPrevMonth - i;
+      const prevMonth = month === 0 ? 11 : month - 1;
+      const prevYear = month === 0 ? year - 1 : year;
+      const dStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: prevDay,
+        isCurrentMonth: false,
+        key: `prev-${prevDay}`
+      });
+    }
+    
+    // Fill in current month's days
+    for (let i = 1; i <= totalDaysInMonth; i++) {
+      const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: i,
+        isCurrentMonth: true,
+        key: `curr-${i}`
+      });
+    }
+    
+    // Fill in next month's leading days to make a perfect grid multiple of 7
+    const remaining = 42 - days.length; // 6 rows of 7 days
+    for (let i = 1; i <= remaining; i++) {
+      const nextMonth = month === 11 ? 0 : month + 1;
+      const nextYear = month === 11 ? year + 1 : year;
+      const dStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: i,
+        isCurrentMonth: false,
+        key: `next-${i}`
+      });
+    }
+    
+    return days;
+  }, [calendarDate]);
+
+  // Appointments grouped by date for fast lookup in calendars
+  const appointmentsByDate = useMemo(() => {
+    const g: Record<string, any[]> = {};
+    appointments.forEach(app => {
+      const d = app.fecha; // YYYY-MM-DD
+      if (d) {
+        if (!g[d]) g[d] = [];
+        g[d].push(app);
+      }
+    });
+    return g;
+  }, [appointments]);
+
+  // Form states for creating a new appointment
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newCitaNombre, setNewCitaNombre] = useState('');
+  const [newCitaPasaporte, setNewCitaPasaporte] = useState('');
+  const [newCitaNacionalidad, setNewCitaNacionalidad] = useState('');
+  const [newCitaCorreo, setNewCitaCorreo] = useState('');
+  const [newCitaTelefono, setNewCitaTelefono] = useState('');
+  const [newCitaFecha, setNewCitaFecha] = useState('');
+  const [newCitaHora, setNewCitaHora] = useState('08:00 AM');
 
   // Capacity / Schedule setups
   const [capacidad, setCapacidad] = useState<number>(() => {
@@ -331,6 +434,110 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       showStatus('Fallo de red al conectar con el servidor de citas.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateCitaSupervisor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCitaNombre.trim() || !newCitaPasaporte.trim() || !newCitaFecha || !newCitaHora) {
+      showStatus('Por favor, complete nombre, pasaporte, fecha y hora.', 'error');
+      return;
+    }
+
+    try {
+      const transactionId = 'EXT-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      const payload = {
+        id: transactionId,
+        correo: newCitaCorreo.trim() || 'extranjeria@te.gob.pa',
+        codigoTransaccion: transactionId,
+        servicioCategoria: 'extranjeria',
+        categoriaNombre: 'Trámites de Extranjería',
+        subServicioId: 'ext_primera_vez',
+        subServicioNombre: 'Carné de residente permanente por primera vez',
+        fecha: newCitaFecha,
+        hora: newCitaHora,
+        sucursalId: 'anc_main',
+        sucursalNombre: 'Sede Principal de Ancón (Extranjería)',
+        sucursalDireccion: 'Ciudad de Panamá, Ancón, Ave. Omar Torrijos Herrera',
+        estado: 'confirmada',
+        telefono: newCitaTelefono.trim() || 'N/A',
+        nombre: newCitaNombre.trim(),
+        datosPersonales: {
+          primerNombre: newCitaNombre.split(' ')[0] || '',
+          primerApellido: newCitaNombre.split(' ')[1] || '',
+          nombreCompleto: newCitaNombre.trim(),
+          pasaporte: newCitaPasaporte.trim(),
+          nacionalidad: newCitaNacionalidad.trim() || 'No especificada',
+          correo: newCitaCorreo.trim() || 'extranjeria@te.gob.pa',
+          telefono: newCitaTelefono.trim() || 'N/A'
+        },
+        requisitos: [
+          'Nota de migración',
+          'Fotocopia de carné de residente permanente',
+          'Fotocopia de pasaporte',
+          'B/. 100.00(en efectivo)'
+        ]
+      };
+
+      const res = await fetch('/api/register-appointment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showStatus('Cita de Extranjería creada con éxito.', 'success');
+        
+        // Reset form
+        setNewCitaNombre('');
+        setNewCitaPasaporte('');
+        setNewCitaNacionalidad('');
+        setNewCitaCorreo('');
+        setNewCitaTelefono('');
+        setNewCitaFecha('');
+        setShowCreateForm(false);
+
+        // Fetch list to sync
+        fetchAppointments();
+      } else {
+        showStatus(data.error || 'No se pudo crear la cita en el servidor.', 'error');
+      }
+    } catch (err: any) {
+      console.error(err);
+      showStatus('Error de red al registrar la cita.', 'error');
+    }
+  };
+
+  const handleDeleteCitaSupervisor = async (citaId: string) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar permanentemente esta cita de Extranjería? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      const token = sessionStorage.getItem('admin_token') || '';
+      const res = await fetch(`/api/appointments/${citaId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showStatus('Cita eliminada correctamente de manera permanente.', 'success');
+        
+        // Remove from selected supervisor if it was that one
+        if (selectedAppForSupervisor && selectedAppForSupervisor.id === citaId) {
+          setSelectedAppForSupervisor(null);
+        }
+
+        // Fetch list to sync
+        fetchAppointments();
+      } else {
+        showStatus(data.error || 'No se pudo eliminar la cita.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showStatus('Error de red al intentar eliminar la cita.', 'error');
     }
   };
 
@@ -1167,7 +1374,34 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Supervisor Sub Tabs */}
+          <div className="flex border-b border-slate-850 gap-1 overflow-x-auto pb-px">
+            <button
+              type="button"
+              onClick={() => setSupervisorTab('flujo')}
+              className={`px-5 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition whitespace-nowrap cursor-pointer ${
+                supervisorTab === 'flujo'
+                  ? 'border-amber-500 text-amber-500 bg-amber-500/5'
+                  : 'border-transparent text-slate-450 hover:text-slate-250 hover:bg-slate-900/40'
+              }`}
+            >
+              Control de Flujo / Asignaciones
+            </button>
+            <button
+              type="button"
+              onClick={() => setSupervisorTab('calendario')}
+              className={`px-5 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition whitespace-nowrap cursor-pointer ${
+                supervisorTab === 'calendario'
+                  ? 'border-amber-500 text-amber-500 bg-amber-500/5'
+                  : 'border-transparent text-slate-450 hover:text-slate-250 hover:bg-slate-900/40'
+              }`}
+            >
+              Calendario de Citas Extranjería 📅
+            </button>
+          </div>
+
+          {supervisorTab === 'flujo' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Left side: Casilleros and Controls */}
             <div className="lg:col-span-5 space-y-6">
@@ -1618,6 +1852,349 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
             </div>
 
           </div>
+          ) : (
+            /* CALENDAR VIEW */
+            <div className="space-y-6 animate-fade-in text-slate-100">
+              
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                
+                {/* 1. MONTHLY CALENDAR GRID CONTAINER (8 Columns) */}
+                <div className="xl:col-span-8 bg-slate-950 border border-slate-800 p-5 rounded-xl shadow-xl space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-900 pb-3">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-amber-500" />
+                        <span>Planeador y Calendario de Extranjería</span>
+                      </h4>
+                      <p className="text-[10px] text-slate-450 font-bold uppercase font-mono">
+                        Visualice la carga diaria, agende o elimine citas autorizadas
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prev = new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1);
+                          setCalendarDate(prev);
+                        }}
+                        className="bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-amber-500/50 p-2 rounded cursor-pointer transition font-bold"
+                      >
+                        &larr;
+                      </button>
+                      <span className="text-xs font-black uppercase tracking-wider text-amber-500 px-3 py-1 bg-amber-500/5 border border-amber-500/10 rounded font-mono">
+                        {mesesNombres[calendarDate.getMonth()]} {calendarDate.getFullYear()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1);
+                          setCalendarDate(next);
+                        }}
+                        className="bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-amber-500/50 p-2 rounded cursor-pointer transition font-bold"
+                      >
+                        &rarr;
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewCitaFecha(selectedCalendarDateStr);
+                          setShowCreateForm(!showCreateForm);
+                        }}
+                        className="ml-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10.5px] uppercase tracking-wider px-3.5 py-2 rounded transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Crear Cita</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Calendar main monthly grid */}
+                  <div className="space-y-2">
+                    {/* Weekday headers */}
+                    <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                      {diasSemanaNombres.map(dName => (
+                        <div key={`cal-hdr-${dName}`} className="py-1">
+                          {dName}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Day tiles */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {monthDays.map(day => {
+                        const isSelected = selectedCalendarDateStr === day.dateStr;
+                        const dayCitas = appointmentsByDate[day.dateStr] || [];
+                        const isToday = (() => {
+                          const t = new Date();
+                          const mm = String(t.getMonth() + 1).padStart(2, '0');
+                          const dd = String(t.getDate()).padStart(2, '0');
+                          return `${t.getFullYear()}-${mm}-${dd}` === day.dateStr;
+                        })();
+
+                        return (
+                          <button
+                            key={`tile-${day.key}`}
+                            type="button"
+                            onClick={() => setSelectedCalendarDateStr(day.dateStr)}
+                            className={`min-h-[75px] p-2 rounded-lg border transition text-left flex flex-col justify-between cursor-pointer ${
+                              isSelected 
+                                ? 'bg-amber-950/20 border-amber-500 shadow-md ring-1 ring-amber-500/35' 
+                                : day.isCurrentMonth
+                                  ? 'bg-slate-900/40 border-slate-850 hover:bg-slate-900/80 hover:border-slate-750'
+                                  : 'bg-slate-950 border-slate-900 opacity-30 hover:opacity-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span className={`text-[11px] font-mono font-bold leading-none ${
+                                isSelected ? 'text-amber-400 font-black' : isToday ? 'text-emerald-400 font-extrabold' : 'text-slate-200'
+                              }`}>
+                                {day.dayNum}
+                                {isToday && <span className="text-[7.5px] font-sans ml-1 text-emerald-500 uppercase font-black tracking-widest">(HOY)</span>}
+                              </span>
+                              
+                              {dayCitas.length > 0 && (
+                                <span className="bg-amber-500 text-slate-950 text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center font-mono">
+                                  {dayCitas.length}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Small preview list on day tile if space permit */}
+                            <div className="space-y-0.5 mt-1 overflow-hidden max-h-[36px] w-full hidden sm:block">
+                              {dayCitas.slice(0, 2).map((c: any) => (
+                                <div key={`prev-line-${c.id}`} className="text-[8px] font-bold text-slate-400 truncate tracking-tight uppercase leading-none font-sans">
+                                  • {c.nombre || c.datosPersonales?.nombreCompleto || 'Cita'}
+                                </div>
+                              ))}
+                              {dayCitas.length > 2 && (
+                                <div className="text-[7.5px] text-amber-500/80 font-mono leading-none">
+                                  +{dayCitas.length - 2} más
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. DATE DETAILS & ACTION PANEL (4 Columns) */}
+                <div className="xl:col-span-4 bg-slate-950 border border-slate-800 p-5 rounded-xl shadow-xl flex flex-col justify-between text-left gap-4 min-h-[500px]">
+                  
+                  {/* Collapsible / inline Form for creating new appointment */}
+                  {showCreateForm ? (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-900">
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block font-mono">Registro de Nueva Cita</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateForm(false)}
+                          className="text-xs text-slate-455 hover:text-white font-bold cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleCreateCitaSupervisor} className="space-y-3.5">
+                        <div className="space-y-1">
+                          <label className="text-[9.5px] font-extrabold uppercase text-slate-450 block">Nombre Completo del Ciudadano *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Juan Andrés Pérez"
+                            value={newCitaNombre}
+                            onChange={(e) => setNewCitaNombre(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 text-white p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9.5px] font-extrabold uppercase text-slate-450 block">No. Pasaporte *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Ej. PE981726"
+                              value={newCitaPasaporte}
+                              onChange={(e) => setNewCitaPasaporte(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 text-white p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono font-bold"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9.5px] font-extrabold uppercase text-slate-450 block">Nacionalidad</label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Venezolana"
+                              value={newCitaNacionalidad}
+                              onChange={(e) => setNewCitaNacionalidad(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 text-white p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-100"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9.5px] font-extrabold uppercase text-slate-450 block">Fecha Cita *</label>
+                            <input
+                              type="date"
+                              required
+                              value={newCitaFecha}
+                              onChange={(e) => setNewCitaFecha(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 text-white p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono text-slate-100 cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9.5px] font-extrabold uppercase text-slate-450 block">Hora Cita *</label>
+                            <select
+                              required
+                              value={newCitaHora}
+                              onChange={(e) => setNewCitaHora(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 text-white p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono text-slate-100 cursor-pointer"
+                            >
+                              <option value="07:00 AM">07:00 AM</option>
+                              <option value="07:30 AM">07:30 AM</option>
+                              <option value="08:00 AM">08:00 AM</option>
+                              <option value="08:30 AM">08:30 AM</option>
+                              <option value="09:00 AM">09:00 AM</option>
+                              <option value="09:30 AM">09:30 AM</option>
+                              <option value="10:00 AM">10:00 AM</option>
+                              <option value="10:30 AM">10:30 AM</option>
+                              <option value="11:00 AM">11:00 AM</option>
+                              <option value="11:30 AM">11:30 AM</option>
+                              <option value="12:00 PM">12:00 PM</option>
+                              <option value="12:30 PM">12:30 PM</option>
+                              <option value="01:00 PM">01:00 PM</option>
+                              <option value="01:30 PM">01:30 PM</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9.5px] font-extrabold uppercase text-slate-450 block">Correo Electrónico</label>
+                            <input
+                              type="email"
+                              placeholder="ejemplo@correo.com"
+                              value={newCitaCorreo}
+                              onChange={(e) => setNewCitaCorreo(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 text-white p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9.5px] font-extrabold uppercase text-slate-450 block">Teléfono / Celular</label>
+                            <input
+                              type="text"
+                              placeholder="+507 9999-9999"
+                              value={newCitaTelefono}
+                              onChange={(e) => setNewCitaTelefono(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 text-white p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider py-3 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>Agendar Cita Oficial</span>
+                        </button>
+                      </form>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block font-mono">Detalles del Día</span>
+                        <h4 className="text-sm font-black text-white flex items-center gap-1.5">
+                          <span>Citas para el {selectedCalendarDateStr}</span>
+                          <span className="bg-slate-900 px-2 py-0.5 rounded font-mono border border-slate-800 text-xs font-bold text-slate-350">
+                            {(appointmentsByDate[selectedCalendarDateStr] || []).length} cita(s)
+                          </span>
+                        </h4>
+                      </div>
+
+                      {/* List of appointments for selected day */}
+                      <div className="flex-1 mt-2 overflow-y-auto max-h-[380px] space-y-3.5 pr-1 divide-y divide-slate-850">
+                        {(appointmentsByDate[selectedCalendarDateStr] || []).length === 0 ? (
+                          <div className="h-full flex flex-col items-center justify-center py-10 text-center gap-2 text-slate-500">
+                            <Inbox className="w-8 h-8 text-slate-650" />
+                            <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Día sin citas</p>
+                            <p className="text-[10px] text-slate-550 leading-relaxed font-semibold max-w-[200px] mx-auto">
+                              No se encontraron reservas de Extranjería para este día en el sistema.
+                            </p>
+                          </div>
+                        ) : (
+                          (appointmentsByDate[selectedCalendarDateStr] || []).map((app: any) => {
+                            const stepStatus = appMetadata[app.id]?.estadoTicket || 'En Entrada';
+                            const pName = app.nombre || app.datosPersonales?.nombreCompleto || 'Ciudadano N/D';
+                            const passportVal = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
+                            
+                            return (
+                              <div key={`cal-det-${app.id}`} className="space-y-1.5 pt-3.5 first:pt-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-amber-500 font-mono font-black text-xs">{app.id}</span>
+                                      <span className="text-[9px] bg-slate-900 text-slate-400 border border-slate-800 px-1 rounded font-mono font-bold leading-none py-0.5">
+                                        {app.hora}
+                                      </span>
+                                    </div>
+                                    <h5 className="font-extrabold text-white text-[11px] uppercase truncate max-w-[170px]">
+                                      {pName}
+                                    </h5>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCitaSupervisor(app.id)}
+                                    className="p-1 px-1.5 rounded bg-red-950/45 hover:bg-red-900 border border-red-900/40 text-red-400 hover:text-white transition cursor-pointer"
+                                    title="Eliminar cita permanentemente"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                <div className="text-[9.5px] text-slate-455 space-y-0.5 font-sans leading-relaxed">
+                                  <div>PAS: <span className="font-mono text-slate-350">{passportVal}</span></div>
+                                  <div>Contacto: <span className="font-mono text-slate-350">{app.telefono || 'N/D'}</span> | <span className="text-slate-350">{app.correo || 'N/D'}</span></div>
+                                  <div className="flex items-center gap-1.5 pt-0.5">
+                                    <span className="text-[8.5px] font-black uppercase text-slate-500">Estado:</span>
+                                    <span className={`text-[8px] font-bold uppercase px-1.5 py-0.2 rounded font-mono border ${
+                                      app.estado === 'cancelada' 
+                                        ? 'bg-red-950/20 text-red-400 border-red-900/30' 
+                                        : stepStatus === 'realizada' 
+                                          ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/30' 
+                                          : 'bg-amber-950/25 text-amber-500 border-amber-800/30'
+                                    }`}>
+                                      {app.estado === 'cancelada' ? 'Cancelada' : stepStatus === 'realizada' ? 'Atendido' : 'Confirmada'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Info footer box */}
+                      <div className="p-3.5 bg-slate-900/60 rounded-lg border border-slate-800 text-[9.5px] text-slate-400 leading-normal font-medium mt-1">
+                        🔒 **Control Reservado**: La creación y eliminación de citas actualiza la base de datos central de Extranjería en tiempo real.
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+          )}
 
         </div>
       )}

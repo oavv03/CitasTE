@@ -22,10 +22,14 @@ import {
   FileSpreadsheet,
   ChevronDown,
   Lock,
-  ChevronUp
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { Cita, AdminRole } from '../types';
+import { Cita, AdminRole, TipoIdentificacion } from '../types';
+import { SUCURSALES_TE } from '../data';
 
 interface TardiaControllerProps {
   citas: Cita[];
@@ -105,10 +109,28 @@ export default function TardiaController({
   const [tardiaHoraFin, setTardiaHoraFin] = useState<string>('11:30 AM');
   const [showConfirmTardiaSave, setShowConfirmTardiaSave] = useState(false);
 
+  // NEW STATE VARIABLES FOR INTERACTIVE SUPERVISOR CALENDAR
+  const [superViewMode, setSuperViewMode] = useState<'table' | 'calendar'>('table');
+  const [calendarView, setCalendarView] = useState<'mes' | 'semana' | 'dia'>('mes');
+  const [calendarDate, setCalendarDate] = useState<Date>(() => new Date('2026-05-27T12:00:00'));
+  const [selectedCalendarDateStr, setSelectedCalendarDateStr] = useState<string>('2026-05-27');
+
   // STATES FOR FILTERING AND LISTING COMPLETED CITAS (superit)
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'confirmada' | 'cancelada' | 'realizada'>('todos');
   const [exportLoading, setExportLoading] = useState<string | null>(null);
+
+  // EXTRA POWERS FOR SUPERVISORS (Crear Cita variables)
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newCitaNombre, setNewCitaNombre] = useState('');
+  const [newCitaTipoIdent, setNewCitaTipoIdent] = useState<TipoIdentificacion>('Cedula');
+  const [newCitaIdent, setNewCitaIdent] = useState('');
+  const [newCitaFechaNac, setNewCitaFechaNac] = useState('');
+  const [newCitaCorreo, setNewCitaCorreo] = useState('');
+  const [newCitaTelefono, setNewCitaTelefono] = useState('');
+  const [newCitaSucursal, setNewCitaSucursal] = useState('anc_main');
+  const [newCitaFecha, setNewCitaFecha] = useState('2026-05-27');
+  const [newCitaHora, setNewCitaHora] = useState('08:00 AM');
 
   // Sync configuration from server on mount
   useEffect(() => {
@@ -142,8 +164,173 @@ export default function TardiaController({
     const realizadas = allTardiaCitas.filter(c => c.estado === 'realizada').length;
     const confirmadas = allTardiaCitas.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
     const canceladas = allTardiaCitas.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
-    return { total, realizadas, confirmadas, canceladas };
+    const especiales = allTardiaCitas.filter(c => c.creadaPorSupervisor === true).length;
+    return { total, realizadas, confirmadas, canceladas, especiales };
   }, [allTardiaCitas]);
+
+  // CALENDAR ARRAYS AND MEMOS for pasados de edad (VID)
+  const mesesNombres = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  
+  const diasSemanaNombres = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  const monthDays = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    
+    // First day of the month
+    const firstDay = new Date(year, month, 1);
+    const firstDayIndex = firstDay.getDay(); // 0 is Sunday, 1 is Monday...
+    
+    // Total days in the current month
+    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    // Days in previous month to fill the first row
+    const totalDaysInPrevMonth = new Date(year, month, 0).getDate();
+    
+    const days: { dateStr: string; dayNum: number; isCurrentMonth: boolean; key: string }[] = [];
+    
+    // Fill in previous month's trailing days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const prevDay = totalDaysInPrevMonth - i;
+      const prevMonth = month === 0 ? 11 : month - 1;
+      const prevYear = month === 0 ? year - 1 : year;
+      const dStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: prevDay,
+        isCurrentMonth: false,
+        key: `prev-${prevDay}`
+      });
+    }
+    
+    // Fill in current month's days
+    for (let i = 1; i <= totalDaysInMonth; i++) {
+      const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: i,
+        isCurrentMonth: true,
+        key: `curr-${i}`
+      });
+    }
+    
+    // Fill in next month's leading days to make a perfect grid multiple of 7
+    const remaining = 42 - days.length; // 6 rows of 7 days
+    for (let i = 1; i <= remaining; i++) {
+      const nextMonth = month === 11 ? 0 : month + 1;
+      const nextYear = month === 11 ? year + 1 : year;
+      const dStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: i,
+        isCurrentMonth: false,
+        key: `next-${i}`
+      });
+    }
+    
+    return days;
+  }, [calendarDate]);
+
+  const weekDays = useMemo(() => {
+    // Let's find the Monday of the current week of calendarDate
+    const current = new Date(calendarDate.getTime());
+    const day = current.getDay();
+    const diff = current.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    const monday = new Date(current.setDate(diff));
+    
+    const days: { dateStr: string; label: string; dateObj: Date }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getTime() + i * 24 * 60 * 60 * 1000);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const dateNum = d.getDate();
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dateNum).padStart(2, '0')}`;
+      days.push({
+        dateStr,
+        label: `${diasSemanaNombres[d.getDay()]} ${dateNum}`,
+        dateObj: d
+      });
+    }
+    return days;
+  }, [calendarDate]);
+
+  // Appointments grouped by date for fast lookup
+  const citationsByDate = useMemo(() => {
+    const g: Record<string, Cita[]> = {};
+    allTardiaCitas.forEach(cita => {
+      const d = cita.fecha; // YYYY-MM-DD
+      if (!g[d]) g[d] = [];
+      g[d].push(cita);
+    });
+    return g;
+  }, [allTardiaCitas]);
+
+  const monthAppointments = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    return allTardiaCitas.filter(c => {
+      try {
+        const d = new Date(c.fecha + 'T00:00:00');
+        return d.getFullYear() === year && d.getMonth() === month;
+      } catch (err) {
+        return false;
+      }
+    });
+  }, [allTardiaCitas, calendarDate]);
+
+  const weekAppointments = useMemo(() => {
+    if (weekDays.length === 0) return [];
+    const minDateStr = weekDays[0].dateStr;
+    const maxDateStr = weekDays[6].dateStr;
+    return allTardiaCitas.filter(c => {
+      return c.fecha >= minDateStr && c.fecha <= maxDateStr;
+    });
+  }, [allTardiaCitas, weekDays]);
+
+  const dayAppointments = useMemo(() => {
+    return allTardiaCitas.filter(c => c.fecha === selectedCalendarDateStr);
+  }, [allTardiaCitas, selectedCalendarDateStr]);
+
+  const handlePrevDate = () => {
+    const newD = new Date(calendarDate.getTime());
+    if (calendarView === 'mes') {
+      newD.setMonth(newD.getMonth() - 1);
+    } else if (calendarView === 'semana') {
+      newD.setDate(newD.getDate() - 7);
+    } else {
+      newD.setDate(newD.getDate() - 1);
+      const y = newD.getFullYear();
+      const m = newD.getMonth() + 1;
+      const d = newD.getDate();
+      setSelectedCalendarDateStr(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    }
+    setCalendarDate(newD);
+  };
+
+  const handleNextDate = () => {
+    const newD = new Date(calendarDate.getTime());
+    if (calendarView === 'mes') {
+      newD.setMonth(newD.getMonth() + 1);
+    } else if (calendarView === 'semana') {
+      newD.setDate(newD.getDate() + 7);
+    } else {
+      newD.setDate(newD.getDate() + 1);
+      const y = newD.getFullYear();
+      const m = newD.getMonth() + 1;
+      const d = newD.getDate();
+      setSelectedCalendarDateStr(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    }
+    setCalendarDate(newD);
+  };
+
+  const handleGoToToday = () => {
+    const today = new Date('2026-05-27T12:00:00');
+    setCalendarDate(today);
+    setSelectedCalendarDateStr('2026-05-27');
+  };
 
   // Handle Generate Expedientes Followup code (adminpedad role)
   const handleGenerateExpediente = (e: React.FormEvent) => {
@@ -373,6 +560,64 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       return c;
     });
     onUpdateCitas(updated);
+  };
+
+  // Supervisor delete citation action
+  const handleDeleteCita = (citaId: string) => {
+    if (window.confirm('¿Está seguro de que desea eliminar permanentemente esta cita de la base de datos? Esta acción no se puede deshacer.')) {
+      const updated = citas.filter(c => c.id !== citaId);
+      onUpdateCitas(updated);
+    }
+  };
+
+  // Supervisor create new citation action
+  const handleCreateCita = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCitaNombre.trim() || !newCitaIdent.trim() || !newCitaFecha || !newCitaHora) {
+      alert('Por favor complete los campos obligatorios: Nombre, Identificación, Fecha y Hora.');
+      return;
+    }
+
+    const shortYearMonthDay = newCitaFecha.replace(/-/g, '');
+    const randId = Math.floor(1000 + Math.random() * 9000);
+    const transCode = `PAS-${Math.floor(100000 + Math.random() * 900000)}`;
+    const trackNum = `Nº${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newAppointment: Cita = {
+      id: `TE-${shortYearMonthDay}-${randId}`,
+      datosPersonales: {
+        tipoIdentificacion: newCitaTipoIdent,
+        identificacion: newCitaIdent.trim(),
+        fechaNacimiento: newCitaFechaNac,
+        telefono: newCitaTelefono.trim(),
+        correo: newCitaCorreo.trim(),
+        nombreCompleto: newCitaNombre.trim(),
+        numeroSeguimiento: trackNum
+      },
+      servicioCategoria: 'cedulacion',
+      subServicioId: 'ced_pasados_edad',
+      sucursalId: newCitaSucursal,
+      fecha: newCitaFecha,
+      hora: newCitaHora,
+      codigoTransaccion: transCode,
+      fechaCreacion: new Date().toISOString(),
+      estado: 'confirmada',
+      creadaPorSupervisor: true
+    };
+
+    onUpdateCitas([...citas, newAppointment]);
+    alert(`¡Éxito! Cita para ${newCitaNombre.trim()} creada de forma exitosa para el ${newCitaFecha} a las ${newCitaHora}.`);
+    
+    // Reset form fields
+    setNewCitaNombre('');
+    setNewCitaIdent('');
+    setNewCitaFechaNac('');
+    setNewCitaCorreo('');
+    setNewCitaTelefono('');
+    setNewCitaSucursal('anc_main');
+    setNewCitaFecha('2026-05-27');
+    setNewCitaHora('08:00 AM');
+    setShowCreateForm(false);
   };
 
   // Dynamic filter lists for citations in Supervisor view based on search/filters
@@ -700,7 +945,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
         <div className="space-y-6 animate-fade-in text-slate-100">
           
           {/* STATS COUNT */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             
             <div className="bg-slate-950/80 p-5 rounded-lg border border-slate-850 shadow-lg flex flex-col justify-between">
               <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-450 block">Total de citas</span>
@@ -730,13 +975,229 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-450 block">Citas Canceladas</span>
               <div className="flex items-end justify-between mt-2.5">
                 <span className="text-2xl font-black font-mono tracking-tight text-red-400">{stats.canceladas}</span>
-                <span className="text-[9px] text-red-500 bg-red-950/50 px-1.5 py-0.5 rounded border border-red-900/40 font-bold">Cancelada</span>
+                <span className="text-[9px] text-red-500 bg-red-950/50 px-1.5 py-0.5 rounded border border-red-900/40 font-bold">Canceladas</span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/80 p-5 rounded-lg border border-amber-950/40 shadow-lg flex flex-col justify-between col-span-2 lg:col-span-1 ring-1 ring-amber-500/10">
+              <span className="text-[9.5px] font-black uppercase tracking-widest text-amber-500 block">★ Citas Especiales</span>
+              <div className="flex items-end justify-between mt-2.5">
+                <span className="text-2xl font-black font-mono tracking-tight text-amber-400">{stats.especiales}</span>
+                <span className="text-[9px] text-amber-500 bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-900/40 font-bold">Manuales (Súper)</span>
               </div>
             </div>
 
           </div>
 
-          <div className="flex flex-col gap-6">
+          {/* MODE SWITCHER & CREATION TOGGLE */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-850 max-w-sm w-full sm:w-auto shadow-xl">
+              <button
+                type="button"
+                onClick={() => setSuperViewMode('table')}
+                className={`flex-1 text-center py-2 px-5 rounded-lg text-xs font-extrabold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                  superViewMode === 'table'
+                    ? 'bg-blue-600 text-white shadow-md font-black'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                Tabla de Citas
+              </button>
+              <button
+                type="button"
+                onClick={() => setSuperViewMode('calendar')}
+                className={`flex-1 text-center py-2 px-5 rounded-lg text-xs font-extrabold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                  superViewMode === 'calendar'
+                    ? 'bg-blue-600 text-white shadow-md font-black'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                Calendario Planeador
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setNewCitaFecha(selectedCalendarDateStr);
+                setShowCreateForm(!showCreateForm);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider px-5 py-3 rounded-xl shadow-lg border border-emerald-500/30 flex items-center gap-2 transition duration-150 cursor-pointer w-full sm:w-auto justify-center"
+            >
+              <Plus className="w-4.5 h-4.5" />
+              <span>{showCreateForm ? 'Cerrar Formulario' : 'Crear Nueva Cita Pasados de Edad'}</span>
+            </button>
+          </div>
+
+          {/* CREATION FORM CARD */}
+          {showCreateForm && (
+            <div className="bg-slate-950 p-6 rounded-xl border border-slate-850 shadow-2xl space-y-4 animate-fade-in">
+              <div className="border-b border-slate-900 pb-3">
+                <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider flex items-center gap-2">
+                  <Plus className="w-4.5 h-4.5 text-indigo-500" />
+                  Formulario de Reserva Manual por el Supervisor
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  Ingrese los datos personales del ciudadano que ha superado el límite de edad para ingresarle una cita presencial de forma inmediata.
+                </p>
+              </div>
+
+              <form onSubmit={handleCreateCita} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                
+                {/* Nombre de ciudadano */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Nombre Completo <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Roberto Alexander Herrera"
+                    value={newCitaNombre}
+                    onChange={(e) => setNewCitaNombre(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 placeholder-slate-600"
+                  />
+                </div>
+
+                {/* Tipo de identificación */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Tipo de Documento</label>
+                  <select
+                    value={newCitaTipoIdent}
+                    onChange={(e) => setNewCitaTipoIdent(e.target.value as any)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 uppercase font-mono"
+                  >
+                    <option value="Cedula">Cédula de Identidad</option>
+                    <option value="CedulaJuvenil">Cédula Juvenil</option>
+                    <option value="Extranjero">Carné de Extranjero</option>
+                    <option value="Pasaporte">Pasaporte Oficial</option>
+                  </select>
+                </div>
+
+                {/* Identificación / Cédula */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Número de Identidad / Cédula <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. 8-902-124 o PE-12-345"
+                    value={newCitaIdent}
+                    onChange={(e) => setNewCitaIdent(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-600"
+                  />
+                </div>
+
+                {/* Fecha de nacimiento */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Fecha de Nacimiento</label>
+                  <input
+                    type="date"
+                    value={newCitaFechaNac}
+                    onChange={(e) => setNewCitaFechaNac(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+
+                {/* Correo */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    placeholder="ejemplo@dominio.com"
+                    value={newCitaCorreo}
+                    onChange={(e) => setNewCitaCorreo(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-600"
+                  />
+                </div>
+
+                {/* Teléfono */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Teléfono / Celular</label>
+                  <input
+                    type="tel"
+                    placeholder="Ej. 6555-1234"
+                    value={newCitaTelefono}
+                    onChange={(e) => setNewCitaTelefono(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-600"
+                  />
+                </div>
+
+                {/* Sucursal selection */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Sucursal Regional del Tribunal Electoral</label>
+                  <select
+                    value={newCitaSucursal}
+                    onChange={(e) => setNewCitaSucursal(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 font-semibold"
+                  >
+                    {SUCURSALES_TE.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.provincia} - {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Fecha Cita */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Fecha para la Atención <span className="text-red-500">*</span></label>
+                  <input
+                    type="date"
+                    required
+                    value={newCitaFecha}
+                    onChange={(e) => setNewCitaFecha(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+
+                {/* Hora Cita */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-slate-400 font-bold block">Horario Asignado <span className="text-red-500">*</span></label>
+                  <select
+                    value={newCitaHora}
+                    onChange={(e) => setNewCitaHora(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  >
+                    <option value="08:00 AM">08:00 AM</option>
+                    <option value="08:30 AM">08:30 AM</option>
+                    <option value="09:00 AM">09:00 AM</option>
+                    <option value="09:30 AM">09:30 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="10:30 AM">10:30 AM</option>
+                    <option value="11:00 AM">11:00 AM</option>
+                    <option value="11:30 AM">11:30 AM</option>
+                    <option value="12:00 PM">12:00 PM</option>
+                    <option value="12:30 PM">12:30 PM</option>
+                    <option value="01:00 PM">01:00 PM</option>
+                    <option value="01:30 PM">01:30 PM</option>
+                    <option value="02:00 PM">02:00 PM</option>
+                    <option value="02:30 PM">02:30 PM</option>
+                    <option value="03:00 PM">03:00 PM</option>
+                    <option value="03:30 PM">03:30 PM</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateForm(false)}
+                    className="bg-slate-900 hover:bg-slate-800 text-slate-350 font-semibold px-5 py-2.5 rounded border border-slate-800 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold uppercase tracking-wide px-6 py-2.5 rounded shadow-md border border-emerald-500/20 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Confirmar Crear Cita</span>
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          )}
+
+          {superViewMode === 'table' ? (
+            <div className="flex flex-col gap-6">
             
             {/* LEFT: DOWNLOAD REPORTS FOR COMPLETED CITAS BY PERIOD */}
             <div className="w-full bg-slate-950 p-5 rounded-xl border border-slate-850 shadow-xl space-y-4 order-2">
@@ -955,7 +1416,14 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                               <div className="text-[10.5px] text-slate-400 font-extrabold">{cita.hora}</div>
                             </td>
                             <td className="p-3 font-semibold space-y-0.5">
-                              <div className="text-white text-xs">{citizen.nombreCompleto || 'N/A'}</div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-white text-xs">{citizen.nombreCompleto || 'N/A'}</span>
+                                {cita.creadaPorSupervisor && (
+                                  <span className="bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-wider shadow-inner font-mono">
+                                    ★ Cita Especial
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-slate-450 text-[10.5px] font-mono">{citizen.identificacion}</div>
                             </td>
                             <td className="p-3 font-mono text-[10px] space-y-0.5">
@@ -1015,6 +1483,15 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                                     <span>Reestablecer</span>
                                   </button>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCita(cita.id)}
+                                  className="bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white px-2 py-1 rounded text-[10px] font-bold border border-red-900/30 hover:border-transparent transition flex items-center gap-0.5 cursor-pointer"
+                                  title="Eliminar Cita de la Base"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Eliminar</span>
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1028,9 +1505,410 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
             </div>
 
           </div>
+        ) : (
+          <div className="space-y-6 animate-fade-in pb-10">
+          
+          {/* CALENDAR CONTROLS HEADER */}
+          <div className="bg-slate-950 p-5 rounded-xl border border-slate-850 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+            
+            {/* Switch view level (Month, Week, Day) */}
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 shadow">
+              <button
+                type="button"
+                onClick={() => setCalendarView('mes')}
+                className={`text-[11px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded transition cursor-pointer ${
+                  calendarView === 'mes'
+                    ? 'bg-blue-600 text-white shadow font-extrabold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Ver por Mes
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalendarView('semana')}
+                className={`text-[11px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded transition cursor-pointer ${
+                  calendarView === 'semana'
+                    ? 'bg-blue-600 text-white shadow font-extrabold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Ver por Semana
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalendarView('dia')}
+                className={`text-[11px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded transition cursor-pointer ${
+                  calendarView === 'dia'
+                    ? 'bg-blue-600 text-white shadow font-extrabold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Ver por Día
+              </button>
+            </div>
+
+            {/* Navigation: Prev, Month/Period Title, Next, Hoy */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handlePrevDate}
+                className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <span className="text-sm font-black uppercase tracking-wide text-white min-w-[200px] text-center font-mono">
+                {calendarView === 'mes' && `${mesesNombres[calendarDate.getMonth()]} ${calendarDate.getFullYear()}`}
+                {calendarView === 'semana' && `${weekDays[0].dateStr} al ${weekDays[6].dateStr}`}
+                {calendarView === 'dia' && `Día: ${selectedCalendarDateStr}`}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleNextDate}
+                className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGoToToday}
+                className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition cursor-pointer"
+              >
+                Hoy
+              </button>
+            </div>
+
+            <div className="text-[11.5px] text-blue-400 font-bold bg-slate-900 px-3 py-1.5 rounded border border-slate-850/80 font-mono flex items-center gap-1.5 shadow-inner">
+              <CalendarDays className="w-4 h-4 text-blue-500" />
+              {calendarView === 'mes' && `${monthAppointments.length} citas en mes`}
+              {calendarView === 'semana' && `${weekAppointments.length} citas en semana`}
+              {calendarView === 'dia' && `${dayAppointments.length} citas este día`}
+            </div>
+          </div>
+
+          {/* CALENDAR BODY CONTAINERS */}
+          {calendarView === 'mes' && (
+            <div className="bg-slate-950 p-5 rounded-xl border border-slate-850 shadow-xl space-y-4">
+              <div className="border-b border-slate-900/60 pb-2.5">
+                <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">Distribución Mensual Informativa</h4>
+                <span className="text-[10px] text-slate-500 block">Pulse un día para inspeccionar el listado detallado de ciudadanos planificados.</span>
+              </div>
+
+              {/* Grid header */}
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {diasSemanaNombres.map(dName => (
+                  <div key={dName} className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-1 font-mono">
+                    {dName}
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid days */}
+              <div className="grid grid-cols-7 gap-2">
+                {monthDays.map(item => {
+                  const dayCits = citationsByDate[item.dateStr] || [];
+                  const isSelected = selectedCalendarDateStr === item.dateStr;
+                  const isToday = item.dateStr === '2026-05-27';
+                  
+                  const confirmadas = dayCits.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
+                  const realizadas = dayCits.filter(c => c.estado === 'realizada').length;
+                  const canceladas = dayCits.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
+
+                  return (
+                    <div
+                      key={item.key}
+                      onClick={() => {
+                        setSelectedCalendarDateStr(item.dateStr);
+                      }}
+                      className={`min-h-[90px] p-2.5 rounded-lg border flex flex-col justify-between transition relative cursor-pointer ${
+                        item.isCurrentMonth ? 'bg-slate-900/50' : 'bg-slate-950/20 opacity-35 border-transparent pointer-events-none'
+                      } ${
+                        isSelected 
+                          ? 'border-blue-500 ring-1 ring-blue-500 bg-slate-900/85 shadow-lg' 
+                          : isToday
+                            ? 'border-amber-600 bg-slate-900'
+                            : 'border-slate-850 hover:bg-slate-900 hover:border-slate-750'
+                      }`}
+                    >
+                      {/* Day number & Today label */}
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[12px] font-black font-mono ${
+                          isSelected ? 'text-blue-400' : isToday ? 'text-amber-500' : 'text-slate-355'
+                        }`}>
+                          {item.dayNum}
+                        </span>
+                        {isToday && (
+                          <span className="text-[7.5px] bg-amber-500/10 text-amber-500 border border-amber-500/25 font-black uppercase px-1 rounded">
+                            Hoy
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Day appointments summary count */}
+                      <div className="space-y-1">
+                        {dayCits.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            {confirmadas > 0 && (
+                              <span className="text-[8px] font-mono leading-none bg-blue-950/90 text-blue-400 font-extrabold px-1.5 py-0.5 rounded border border-blue-900/30 truncate">
+                                ★ {confirmadas} Pend.
+                              </span>
+                            )}
+                            {realizadas > 0 && (
+                              <span className="text-[8px] font-mono leading-none bg-emerald-950/90 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded border border-emerald-900/30 truncate">
+                                ✓ {realizadas} Real.
+                              </span>
+                            )}
+                            {canceladas > 0 && (
+                              <span className="text-[8px] font-mono leading-none bg-red-955/85 text-red-400 font-extrabold px-1.5 py-0.5 rounded border border-red-900/25 truncate">
+                                ✗ {canceladas} Canc.
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[8px] text-slate-600 font-mono italic block text-center py-1">
+                            Sin citas
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Indicator dots */}
+                      {dayCits.length > 0 && (
+                        <div className="absolute top-1.5 right-1.5 flex gap-0.5">
+                          <span className={`h-1 w-1 rounded-full ${confirmadas > 0 ? 'bg-blue-400' : 'bg-transparent'}`}></span>
+                          <span className={`h-1 w-1 rounded-full ${realizadas > 0 ? 'bg-emerald-400' : 'bg-transparent'}`}></span>
+                          <span className={`h-1 w-1 rounded-full ${canceladas > 0 ? 'bg-red-400' : 'bg-transparent'}`}></span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {calendarView === 'semana' && (
+            <div className="bg-slate-950 p-5 rounded-xl border border-slate-850 shadow-xl space-y-4">
+              <div className="border-b border-slate-900/60 pb-2.5">
+                <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">Cronograma de Citas de la Semana</h4>
+                <span className="text-[10px] text-slate-500 block">Distribución de atenciones por días hábiles de la semana activa.</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+                {weekDays.map(item => {
+                  const dayCits = citationsByDate[item.dateStr] || [];
+                  const isSelected = selectedCalendarDateStr === item.dateStr;
+                  const isToday = item.dateStr === '2026-05-27';
+                  const confirmadas = dayCits.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
+                  const realizadas = dayCits.filter(c => c.estado === 'realizada').length;
+                  const canceladas = dayCits.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
+
+                  return (
+                    <div
+                      key={item.dateStr}
+                      onClick={() => setSelectedCalendarDateStr(item.dateStr)}
+                      className={`p-4 rounded-xl border transition cursor-pointer text-left space-y-3 flex flex-col justify-between ${
+                        isSelected 
+                          ? 'border-blue-500 bg-slate-900 ring-1 ring-blue-500 shadow-lg' 
+                          : isToday
+                            ? 'border-amber-600 bg-slate-900/60'
+                            : 'border-slate-850 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                            {item.label.split(' ')[0]}
+                          </span>
+                          {isToday && (
+                            <span className="text-[7px] bg-amber-500/15 text-amber-500 border border-amber-500/25 font-black uppercase px-1 rounded">
+                              Hoy
+                            </span>
+                          )}
+                        </div>
+                        <h5 className="text-lg font-black font-mono text-white mt-1">
+                          {item.label.split(' ')[1]}
+                        </h5>
+                      </div>
+
+                      <div className="space-y-1.5 bg-slate-950/65 p-2 rounded-lg border border-slate-900">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400">
+                          <span>Total:</span>
+                          <strong className="text-white font-mono font-black">{dayCits.length}</strong>
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] text-slate-500">
+                          <span>Confirmadas:</span>
+                          <strong className="text-blue-400 font-mono">{confirmadas}</strong>
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] text-slate-500">
+                          <span>Completadas:</span>
+                          <strong className="text-emerald-400 font-mono">{realizadas}</strong>
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] text-slate-500">
+                          <span>Canceladas:</span>
+                          <strong className="text-red-400 font-mono">{canceladas}</strong>
+                        </div>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCalendarDateStr(item.dateStr)}
+                        className="w-full text-center py-1.5 rounded bg-slate-950 hover:bg-slate-800 text-[9px] font-black uppercase tracking-widest text-slate-300 border border-slate-900 cursor-pointer transition"
+                      >
+                        Ver Ciudadanos
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* DETALLES DE CITAS DEL DÍA SELECCIONADO */}
+          <div id="inspector-citas-dia" className="bg-slate-950 rounded-xl border border-slate-850 overflow-hidden shadow-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-900/60 pb-3">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                  <Clock className="w-4.5 h-4.5 text-blue-500 animate-pulse" />
+                  <span>Inspección de Turnos del Día: <span className="text-blue-400 font-mono font-black">{selectedCalendarDateStr}</span></span>
+                </h4>
+                <p className="text-[11.5px] text-slate-500 leading-relaxed mt-0.5">
+                  Visualice y gestione individualmente cada una de las citas de pasados de edad reservadas para esta fecha.
+                </p>
+              </div>
+              <div className="bg-blue-600/15 text-blue-400 border border-blue-900/40 text-[10px] font-black uppercase px-2.5 py-1 rounded shadow mt-2 sm:mt-0 font-mono">
+                {dayAppointments.length} Registros Encontrados
+              </div>
+            </div>
+
+            {dayAppointments.length === 0 ? (
+              <div className="bg-slate-900/30 border border-dashed border-slate-850 p-16 text-center rounded-lg text-slate-500 text-[11px]">
+                <Calendar className="w-10 h-10 text-slate-850/60 mx-auto mb-2" />
+                <span>No hay ciudadanos agendados para el {selectedCalendarDateStr}. Seleccione otra fecha del planeador.</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {dayAppointments.map(cita => {
+                  const citizen = cita.datosPersonales;
+                  const isRealizada = cita.estado === 'realizada';
+                  const isCancelada = cita.estado === 'cancelada' || cita.estado === 'no_asistire';
+                  const isConfirmada = !isRealizada && !isCancelada;
+
+                  return (
+                    <div 
+                      key={cita.id} 
+                      className={`p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3.5 relative overflow-hidden ${
+                        isRealizada 
+                          ? 'bg-emerald-950/15 border-emerald-900/45 shadow' 
+                          : isCancelada 
+                            ? 'bg-red-950/15 border-red-900/25 opacity-70' 
+                            : 'bg-slate-900 border-slate-800 hover:border-slate-755 shadow'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-950 pb-2">
+                        <span className="text-[10px] font-mono font-black text-slate-500">
+                          REF: {cita.id}
+                        </span>
+                        <div>
+                          {isRealizada ? (
+                            <span className="bg-emerald-950 text-emerald-400 border border-emerald-100/40 text-[8px] font-black uppercase px-2 py-0.5 rounded font-mono">
+                              Realizada
+                            </span>
+                          ) : isCancelada ? (
+                            <span className="bg-red-950 text-red-400 border border-red-100/40 text-[8px] font-black uppercase px-2 py-0.5 rounded font-mono">
+                              Cancelada
+                            </span>
+                          ) : (
+                            <span className="bg-blue-950 text-blue-400 border border-blue-105/40 text-[8px] font-black uppercase px-2 py-0.5 rounded font-mono">
+                              Confirmada
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Citizen metadata */}
+                      <div className="space-y-1.5 text-xs text-slate-355">
+                        <div className="text-xs font-black text-white uppercase leading-tight flex items-center justify-between gap-1.5 flex-wrap">
+                          <span>{citizen.nombreCompleto || 'Sin nombre'}</span>
+                          {cita.creadaPorSupervisor && (
+                            <span className="bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[8px] font-black uppercase px-2 py-0.5 rounded tracking-wider shadow-inner font-mono inline-block">
+                              ★ Cita Especial
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-mono text-[10.5px] text-slate-450 flex items-center gap-1.5">
+                          <span className="text-slate-500 text-[8px] font-black uppercase tracking-wider block">ID/Cédula:</span>
+                          <span className="text-slate-300 font-bold">{citizen.identificacion}</span>
+                        </div>
+                        <div className="font-mono text-[10.5px] text-slate-450 flex items-center gap-1.5">
+                          <span className="text-slate-500 text-[8px] font-black uppercase tracking-wider block">Atención:</span>
+                          <span className="text-emerald-400 font-black">{cita.hora}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-450 space-y-0.5 pt-2 border-t border-slate-950/30 font-mono">
+                          <p className="truncate"><span className="font-bold text-slate-500">Email:</span> {citizen.correo}</p>
+                          <p><span className="font-bold text-slate-500">Móvil:</span> {citizen.telefono}</p>
+                        </div>
+                      </div>
+
+                       {/* Actions panel */}
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-950/40">
+                        {!isRealizada && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateCitaStatus(cita.id, 'realizada')}
+                            className="flex-1 bg-emerald-600/15 hover:bg-emerald-600 text-emerald-405 hover:text-white py-1.5 rounded text-[10px] font-bold border border-emerald-500/20 hover:border-transparent transition flex items-center justify-center gap-0.5 cursor-pointer shadow-sm text-center font-mono"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Realizada</span>
+                          </button>
+                        )}
+                        {!isCancelada && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`¿Está seguro de cancelar la cita del ciudadano ${citizen.nombreCompleto}?`)) {
+                                handleUpdateCitaStatus(cita.id, 'cancelada');
+                              }
+                            }}
+                            className="flex-1 bg-red-655/15 hover:bg-red-655 text-red-400 hover:text-white py-1.5 rounded text-[10px] font-bold border border-red-555/20 hover:border-transparent transition flex items-center justify-center gap-0.5 cursor-pointer shadow-sm text-center font-mono"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Cancelar</span>
+                          </button>
+                        )}
+                        {(isRealizada || isCancelada) && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateCitaStatus(cita.id, 'confirmada')}
+                            className="flex-1 bg-slate-950 hover:bg-slate-800 text-slate-300 py-1.5 rounded text-[10px] font-bold border border-slate-850 transition flex items-center justify-center gap-0.5 cursor-pointer text-center font-mono"
+                          >
+                            <span>Reactivar</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCita(cita.id)}
+                          className="bg-red-950/45 hover:bg-red-600 text-red-400 hover:text-white px-2 py-1.5 rounded text-[10px] font-bold border border-red-900/30 hover:border-transparent transition flex items-center justify-center gap-0.5 cursor-pointer shadow-sm font-mono flex-1 min-w-[70px]"
+                          title="Eliminar Cita permanentemente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
         </div>
       )}
+
+      </div>
+    )}
 
       {/* VISTA 2: OPERATOR (adminpedad) */}
       {activePersona === 'adminpedad' && (

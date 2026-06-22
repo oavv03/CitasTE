@@ -57,6 +57,7 @@ export interface Cita {
   codigoTransaccion: string;
   fechaCreacion: string;
   estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire' | 'realizada';
+  creadaPorSupervisor?: boolean;
 }
 
 export interface ExtranjeriaRecord {
