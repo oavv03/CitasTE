@@ -120,6 +120,14 @@ export default function TardiaController({
   const [statusFilter, setStatusFilter] = useState<'todos' | 'confirmada' | 'cancelada' | 'realizada'>('todos');
   const [exportLoading, setExportLoading] = useState<string | null>(null);
 
+  // New Date Range State for reports
+  const [reportStartDate, setReportStartDate] = useState<string>(() => {
+    return '2026-05-01';
+  });
+  const [reportEndDate, setReportEndDate] = useState<string>(() => {
+    return '2026-05-31';
+  });
+
   // EXTRA POWERS FOR SUPERVISORS (Crear Cita variables)
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newCitaNombre, setNewCitaNombre] = useState('');
@@ -643,58 +651,21 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     });
   }, [allTardiaCitas, searchQuery, statusFilter]);
 
-  // DATE PERIOD CONSOLDIATOR ROUTINES FOR DOWNLOADING "REALIZADAS" Y "CONFIRMADAS"
-  // Filter helper for exact period of realized or confirmed appointments
-  const getCompletedCitasForPeriod = (period: 'dia' | 'semana' | 'mes' | 'año') => {
-    const now = new Date();
-    // In our system base environment, let's treat the date 2026-05-27 as "today"
-    const todayStr = '2026-05-27'; 
-    const todayDate = new Date(todayStr + 'T12:00:00');
-
+  // Filter helper for exact period of appointments based on date range
+  const getCitasByDateRange = (startStr: string, endStr: string) => {
     return allTardiaCitas.filter(c => {
-      // Must be marked as realized (completed) or confirmed (pending/active)
-      if (c.estado !== 'realizada' && c.estado !== 'confirmada' && c.estado !== 'asistire') return false;
-
-      try {
-        const appointmentDate = new Date(c.fecha + 'T00:00:00');
-        
-        if (period === 'dia') {
-          return c.fecha === todayStr;
-        }
-        
-        if (period === 'semana') {
-          // Current Week Range (Monday to Sunday) based on 2026-05-27 (Wednesday)
-          // Mon: 2026-05-25, Sun: 2026-05-31
-          const startOfWeek = new Date('2026-05-25T00:00:00');
-          const endOfWeek = new Date('2026-05-31T23:59:59');
-          return appointmentDate >= startOfWeek && appointmentDate <= endOfWeek;
-        }
-        
-        if (period === 'mes') {
-          // May 2026
-          return appointmentDate.getMonth() === 4 && appointmentDate.getFullYear() === 2026;
-        }
-        
-        if (period === 'año') {
-          return appointmentDate.getFullYear() === 2026;
-        }
-      } catch (err) {
-        return false;
-      }
-      return false;
+      if (!c.fecha) return false;
+      return c.fecha >= startStr && c.fecha <= endStr;
     });
   };
 
   // TRIGGER PDF GENERATION REPORT FOR PERIOD
-  const handleDownloadReportPDF = (period: 'dia' | 'semana' | 'mes' | 'año') => {
-    setExportLoading(period);
+  const handleDownloadReportPDF = (startStr: string, endStr: string) => {
+    setExportLoading('pdf');
 
     setTimeout(() => {
-      const records = getCompletedCitasForPeriod(period);
-      const periodLabel = period === 'dia' ? 'HOY (27 de Mayo, 2026)' 
-                        : period === 'semana' ? 'ESTA SEMANA (25 - 31 Mayo)' 
-                        : period === 'mes' ? 'ESTE MES (Mayo 2026)' 
-                        : 'ESTE AÑO (2026)';
+      const records = getCitasByDateRange(startStr, endStr);
+      const periodLabel = `Desde ${startStr} Hasta ${endStr}`;
 
       const doc = new jsPDF({
         orientation: 'portrait',
@@ -731,13 +702,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.setTextColor(15, 23, 42);
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(10.5);
-      doc.text(`PERIODO CONSOLIDADO: ${periodLabel.toUpperCase()}`, 20, currentY);
+      doc.text(`INTERVALO DE FECHAS: ${periodLabel.toUpperCase()}`, 20, currentY);
       
       currentY += 6;
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(71, 85, 105);
-      doc.text(`Constancia firmada para auditar las citas presenciales de pasados de edad que han sido marcadas como "Realizadas" o "Confirmadas" en el sistema.`, 20, currentY, { maxWidth: 170 });
+      doc.text(`Constancia generada para la auditoría de citas operativas registradas en el sistema para ciudadanos rezagados (pasados de edad).`, 20, currentY, { maxWidth: 170 });
 
       currentY += 12;
 
@@ -780,7 +751,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       if (records.length === 0) {
         doc.setDrawColor(226, 232, 240);
         doc.rect(20, currentY, 170, 12, 'D');
-        doc.text('No se encontraron registros de citas realizadas dentro de este lapso temporal.', 25, currentY + 8);
+        doc.text('No se encontraron registros de citas dentro de este lapso temporal.', 25, currentY + 8);
         currentY += 15;
       } else {
         records.forEach((rec, idx) => {
@@ -801,9 +772,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
           doc.text(sTruncated, 137, currentY + 6);
           
           doc.setFont('Helvetica', 'bold');
-          if (rec.estado === 'realizada') {
-            doc.setTextColor(5, 150, 105);
-            doc.text('REALIZADA', 172, currentY + 6);
+          const est = (rec.estado || 'CONFIRMADA').toUpperCase();
+          if (est === 'REALIZADA' || est === 'COMPLETADA' || est === 'ATENDIDO') {
+            doc.setTextColor(16, 124, 65);
+            doc.text('ATENDIDO', 172, currentY + 6);
+          } else if (est === 'CANCELADA' || est === 'NO_ASISTIRE' || est === 'CANCELADO') {
+            doc.setTextColor(185, 28, 28);
+            doc.text('CANCELADA', 172, currentY + 6);
           } else {
             doc.setTextColor(29, 78, 216); // Blue
             doc.text('CONFIRMADA', 172, currentY + 6);
@@ -829,14 +804,14 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.text(`Id Atención: SEGUIMIENTO-PE-2026`, 22, currentY + 9);
       doc.text(`Fecha Impresión: ${new Date().toISOString()}`, 122, currentY + 9);
 
-      doc.save(`Reporte_Citas_VID_${period}.pdf`);
+      doc.save(`Reporte_Citas_VID_${startStr}_a_${endStr}.pdf`);
       setExportLoading(null);
     }, 600);
   };
 
   // TRIGGER CSV GENERATION REPORT FOR PERIOD
-  const handleDownloadReportCSV = (period: 'dia' | 'semana' | 'mes' | 'año') => {
-    const records = getCompletedCitasForPeriod(period);
+  const handleDownloadReportCSV = (startStr: string, endStr: string) => {
+    const records = getCitasByDateRange(startStr, endStr);
     const headers = ['ID Cita', 'Fecha', 'Hora', 'Nombre Ciudadano', 'Identificacion', 'Correo', 'Telefono', 'Sucursal', 'Estado'];
     
     const rows = records.map(rec => [
@@ -861,7 +836,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Reporte_Citas_VID_${period}.csv`);
+    link.setAttribute("download", `Reporte_Citas_VID_${startStr}_a_${endStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1212,127 +1187,68 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               {/* REPORT CARDS */}
               <div className="space-y-3.5 pt-1">
                 
-                {/* Period 1: Día */}
-                <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800 flex items-center justify-between gap-3 shadow-inner">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-205 block">Citas de Hoy (Día)</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">Filtradas al 27 de Mayo, 2026</span>
+                <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-xl space-y-4">
+                  {/* Date Input Range Selector */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                    <div className="space-y-1">
+                      <label className="text-[10.5px] font-black uppercase tracking-wider text-slate-450 block font-mono">
+                        Intervalo de Fecha Desde
+                      </label>
+                      <input
+                        type="date"
+                        value={reportStartDate}
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500 transition"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="text-[10.5px] font-black uppercase tracking-wider text-slate-450 block font-mono">
+                        Intervalo de Fecha Hasta
+                      </label>
+                      <input
+                        type="date"
+                        value={reportEndDate}
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500 transition"
+                      />
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportPDF('dia')}
-                      disabled={exportLoading !== null}
-                      className="bg-emerald-950 border border-emerald-900/80 hover:bg-emerald-900 hover:border-emerald-700/80 text-emerald-400 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      {exportLoading === 'dia' ? (
-                        <RefreshCw className="w-3 h-3 text-emerald-400 animate-spin" />
-                      ) : (
-                        <FileText className="w-3 h-3" />
-                      )}
-                      <span>PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportCSV('dia')}
-                      className="bg-slate-950 border border-slate-850 hover:bg-slate-800 text-slate-300 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      <FileSpreadsheet className="w-3 h-3" />
-                      <span>CSV</span>
-                    </button>
-                  </div>
-                </div>
 
-                {/* Period 2: Semana */}
-                <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800 flex items-center justify-between gap-3 shadow-inner">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-205 block">Esta Semana</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">Del 25 al 31 de Mayo, 2026</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportPDF('semana')}
-                      disabled={exportLoading !== null}
-                      className="bg-emerald-950 border border-emerald-900/80 hover:bg-emerald-900 hover:border-emerald-700/80 text-emerald-400 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      {exportLoading === 'semana' ? (
-                        <RefreshCw className="w-3 h-3 text-emerald-400 animate-spin" />
-                      ) : (
-                        <FileText className="w-3 h-3" />
-                      )}
-                      <span>PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportCSV('semana')}
-                      className="bg-slate-950 border border-slate-850 hover:bg-slate-800 text-slate-300 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      <FileSpreadsheet className="w-3 h-3" />
-                      <span>CSV</span>
-                    </button>
-                  </div>
-                </div>
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-850">
+                    <div className="text-left space-y-0.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block font-mono">
+                        Citas Encontradas (VID)
+                      </span>
+                      <p className="text-xl font-mono font-black text-white">
+                        {getCitasByDateRange(reportStartDate, reportEndDate).length} <span className="text-xs font-sans font-medium text-slate-400">citas registradas</span>
+                      </p>
+                    </div>
 
-                {/* Period 3: Mes */}
-                <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800 flex items-center justify-between gap-3 shadow-inner">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-205 block">Este Mes</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">Mes Completo: Mayo 2026</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportPDF('mes')}
-                      disabled={exportLoading !== null}
-                      className="bg-emerald-950 border border-emerald-900/80 hover:bg-emerald-900 hover:border-emerald-700/80 text-emerald-400 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      {exportLoading === 'mes' ? (
-                        <RefreshCw className="w-3 h-3 text-emerald-400 animate-spin" />
-                      ) : (
-                        <FileText className="w-3 h-3" />
-                      )}
-                      <span>PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportCSV('mes')}
-                      className="bg-slate-950 border border-slate-850 hover:bg-slate-800 text-slate-300 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      <FileSpreadsheet className="w-3 h-3" />
-                      <span>CSV</span>
-                    </button>
-                  </div>
-                </div>
+                    <div className="grid grid-cols-2 gap-2 w-full sm:w-auto shrink-0 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadReportPDF(reportStartDate, reportEndDate)}
+                        disabled={exportLoading !== null}
+                        className="bg-emerald-950 hover:bg-emerald-900 border border-emerald-900 px-4 py-2 text-[10px] font-extrabold uppercase text-emerald-400 rounded flex items-center justify-center gap-1.5 cursor-pointer transition"
+                      >
+                        {exportLoading === 'pdf' ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5" />
+                        )}
+                        <span>PDF</span>
+                      </button>
 
-                {/* Period 4: Año */}
-                <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800 flex items-center justify-between gap-3 shadow-inner">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-205 block">Este Año</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">Ejercicio Fiscal: Año 2026</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportPDF('año')}
-                      disabled={exportLoading !== null}
-                      className="bg-emerald-950 border border-emerald-900/80 hover:bg-emerald-900 hover:border-emerald-700/80 text-emerald-400 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      {exportLoading === 'año' ? (
-                        <RefreshCw className="w-3 h-3 text-emerald-400 animate-spin" />
-                      ) : (
-                        <FileText className="w-3 h-3" />
-                      )}
-                      <span>PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadReportCSV('año')}
-                      className="bg-slate-950 border border-slate-850 hover:bg-slate-800 text-slate-300 text-[10px] font-bold px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer"
-                    >
-                      <FileSpreadsheet className="w-3 h-3" />
-                      <span>CSV</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadReportCSV(reportStartDate, reportEndDate)}
+                        className="bg-slate-950 hover:bg-slate-800 border border-slate-800 px-4 py-2 text-[10px] font-extrabold uppercase text-slate-300 rounded flex items-center justify-center gap-1.5 cursor-pointer transition"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-blue-450" />
+                        <span>CSV</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
