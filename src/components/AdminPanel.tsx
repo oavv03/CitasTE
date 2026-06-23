@@ -4192,11 +4192,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
       {/* FOOTER BAR FOR CREDIT/SPECS */}
       <div className="bg-slate-950 p-2.5 border-t border-slate-850 text-center text-[10px] text-slate-500 font-mono tracking-wide leading-none flex flex-wrap gap-2 justify-center">
-        <span>ESTADO: SISTEMA EN LÍNEA</span>
-        <span>|</span>
-        <span>VERSION: PLATINUM MIGRATION 2.4.6</span>
-        <span>|</span>
-        <span>CERRADO CON LLAVE BIOMÉTRICA DE 256 BITS</span>
+        <span>Agendate 1.1.0</span>
       </div>
 
       {/* EDIT MODAL OVERLAY */}

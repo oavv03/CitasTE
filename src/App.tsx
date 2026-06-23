@@ -154,6 +154,50 @@ export default function App() {
           })
           .catch(err => console.warn('Could not sync appointments with server DB:', err));
         }
+      } else {
+        // Seed default appointments, including a special supervisor appointment and a regular one
+        const seedCitas: Cita[] = [
+          {
+            id: "TE-SP-20260527-7777",
+            datosPersonales: {
+              tipoIdentificacion: 'Cedula',
+              identificacion: '8-111-2222',
+              fechaNacimiento: '1978-11-05',
+              telefono: '6222-3333',
+              correo: 'roberto.alvarado@example.com',
+              numeroSeguimiento: 'NºSP-26-888-999'
+            },
+            servicioCategoria: 'cedulacion',
+            subServicioId: 'ced_pasados_edad',
+            sucursalId: 'anc_main',
+            fecha: '2026-05-27',
+            hora: '09:30 AM',
+            codigoTransaccion: 'PAS-SP-500200',
+            fechaCreacion: new Date().toISOString(),
+            estado: 'confirmada',
+            creadaPorSupervisor: true
+          },
+          {
+            id: "TE-20260530-1001",
+            datosPersonales: {
+              tipoIdentificacion: 'Cedula',
+              identificacion: '8-945-904',
+              fechaNacimiento: '1995-10-15',
+              telefono: '6612-3456',
+              correo: 'oscargave3003@gmail.com'
+            },
+            servicioCategoria: 'cedulacion',
+            subServicioId: 'ced_primera_vez',
+            sucursalId: 'anc_main',
+            fecha: '2026-05-30',
+            hora: '10:00 AM',
+            codigoTransaccion: '2605-MOCK77',
+            fechaCreacion: new Date().toISOString(),
+            estado: 'confirmada'
+          }
+        ];
+        setCitasList(seedCitas);
+        localStorage.setItem('te_panama_citas', JSON.stringify(seedCitas));
       }
     } catch (e) {
       console.warn('Could not read te_panama_citas from localStorage', e);

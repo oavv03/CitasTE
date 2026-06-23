@@ -99,7 +99,42 @@ export default function TardiaController({
     if (stored) {
       try { return JSON.parse(stored); } catch (e) { return []; }
     }
-    return [];
+    // Return seed as default if no storage is set
+    return [
+      {
+        id: "NºSP-26-888-999",
+        number: "NºSP-26-888-999",
+        citizenName: "Roberto Carlos Alvarado",
+        identificacion: "8-111-2222",
+        fechaNacimiento: "1978-11-05",
+        correo: "roberto.alvarado@example.com",
+        telefono: "6222-3333",
+        notes: "Creado de forma automática por el Supervisor/SuperIT al programar cita directa.",
+        fechaCreacion: new Date().toISOString()
+      },
+      {
+        id: "Nº26-123-456",
+        number: "Nº26-123-456",
+        citizenName: "Oscar González G.",
+        identificacion: "8-999-9999",
+        fechaNacimiento: "1975-04-12",
+        correo: "oscargave3003@gmail.com",
+        telefono: "6123-4567",
+        notes: "Expediente de prueba pre-autorizado por la Dirección de Registro Civil",
+        fechaCreacion: new Date().toISOString()
+      },
+      {
+        id: "Nº54-474-325",
+        number: "Nº54-474-325",
+        citizenName: "Ana María Espinoza",
+        identificacion: "4-789-1234",
+        fechaNacimiento: "1980-08-30",
+        correo: "ana.espinoza@example.com",
+        telefono: "6987-6543",
+        notes: "Filiación biométrica tardía aprobada",
+        fechaCreacion: new Date().toISOString()
+      }
+    ];
   });
 
   // STATES FOR PLANNING OPERATION CONFIG (adminpedad)
@@ -588,16 +623,19 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
 
     const shortYearMonthDay = newCitaFecha.replace(/-/g, '');
     const randId = Math.floor(1000 + Math.random() * 9000);
-    const transCode = `PAS-${Math.floor(100000 + Math.random() * 900000)}`;
     
-    // Generate identical tracking format for the expediente
+    // Special supervisor nomenclature: "PAS-SP-" prefix for the transaction/appointment code
+    const transCode = `PAS-SP-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    // Special supervisor nomenclature: "NºSP-" prefix for the expediente tracking number
     const part1 = Math.floor(10 + Math.random() * 90);
     const part2 = Math.floor(100 + Math.random() * 900);
     const part3 = Math.floor(100 + Math.random() * 900);
-    const trackNum = `Nº${part1}-${part2}-${part3}`;
+    const trackNum = `NºSP-${part1}-${part2}-${part3}`;
 
     const newAppointment: Cita = {
-      id: `TE-${shortYearMonthDay}-${randId}`,
+      // Special supervisor nomenclature: "TE-SP-" prefix for the appointment/citation ID
+      id: `TE-SP-${shortYearMonthDay}-${randId}`,
       datosPersonales: {
         tipoIdentificacion: newCitaTipoIdent,
         identificacion: newCitaIdent.trim(),

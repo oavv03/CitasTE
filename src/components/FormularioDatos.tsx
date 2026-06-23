@@ -91,6 +91,17 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
       if (!stored) {
         const seed = [
           {
+            id: "NºSP-26-888-999",
+            number: "NºSP-26-888-999",
+            citizenName: "Roberto Carlos Alvarado",
+            identificacion: "8-111-2222",
+            fechaNacimiento: "1978-11-05",
+            correo: "roberto.alvarado@example.com",
+            telefono: "6222-3333",
+            notes: "Creado de forma automática por el Supervisor/SuperIT al programar cita directa.",
+            fechaCreacion: new Date().toISOString()
+          },
+          {
             id: "Nº26-123-456",
             number: "Nº26-123-456",
             citizenName: "Oscar González G.",
