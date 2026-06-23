@@ -418,8 +418,8 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     // Summary Box
     doc.setFillColor(248, 250, 252); // Slate 50
     doc.setDrawColor(226, 232, 240); // Slate 200
-    doc.setLineWidth(0.2);
-    doc.rect(10, currentY, 190, 22, 'FD');
+    doc.setLineWidth(0.25);
+    doc.rect(10, currentY, 190, 28, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -427,18 +427,27 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.text('RESUMEN DE CARGA OPERATIVA', 15, currentY + 6);
 
     doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(71, 85, 105);
     
     const countConfirmadas = filtered.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
     const countOtras = filtered.length - countConfirmadas;
 
-    doc.text(`• Total Citas Registradas: ${filtered.length}`, 15, currentY + 12);
-    doc.text(`• Citas Confirmadas: ${countConfirmadas}`, 75, currentY + 12);
-    doc.text(`• Otras / Canceladas: ${countOtras}`, 135, currentY + 12);
+    doc.text(`• Total Citas Registradas: ${filtered.length}`, 15, currentY + 11);
+    doc.text(`• Citas Confirmadas: ${countConfirmadas}`, 75, currentY + 11);
+    doc.text(`• Otras / Canceladas: ${countOtras}`, 135, currentY + 11);
     
-    doc.text('Este reporte contiene información confidencial sensitiva regulada conforme a las directivas de Registro Civil.', 15, currentY + 18);
-    currentY += 28;
+    doc.text('Este reporte contiene información confidencial sensitiva regulada conforme a las directivas de Registro Civil.', 15, currentY + 16.5);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('• GUÍA DE NOMENCLATURAS: ', 15, currentY + 22.5);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('CONFIRMADA/ASISTIRE (Cupo reservado activo) | NO ASISTIRÁ (Ausente) | CANCELADA (Anulado)', 58, currentY + 22.5);
+    
+    currentY += 34;
 
     // Table Headers
     const drawTableHead = (y: number) => {
@@ -936,8 +945,8 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     // Summary Box
     doc.setFillColor(248, 250, 252); // Slate 50
     doc.setDrawColor(226, 232, 240); // Slate 200
-    doc.setLineWidth(0.2);
-    doc.rect(10, currentY, 190, 22, 'FD');
+    doc.setLineWidth(0.25);
+    doc.rect(10, currentY, 190, 28, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -945,7 +954,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.text('RESUMEN DE DESEMPEÑO Y CARGA OPERATIVA', 15, currentY + 6);
 
     doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(71, 85, 105);
     
     const countConfirmadas = listForPeriod.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
@@ -953,13 +962,22 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     const countCanceladas = listForPeriod.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
     const countOtras = listForPeriod.length - (countConfirmadas + countRealizadas + countCanceladas);
 
-    doc.text(`• Total Citas Registradas: ${listForPeriod.length}`, 15, currentY + 12);
-    doc.text(`• Confirmadas: ${countConfirmadas}`, 55, currentY + 12);
-    doc.text(`• Completadas: ${countRealizadas}`, 95, currentY + 12);
-    doc.text(`• Canceladas/Otras: ${countCanceladas + countOtras}`, 140, currentY + 12);
+    doc.text(`• Total Citas Registradas: ${listForPeriod.length}`, 15, currentY + 11);
+    doc.text(`• Confirmadas: ${countConfirmadas}`, 55, currentY + 11);
+    doc.text(`• Completadas: ${countRealizadas}`, 95, currentY + 11);
+    doc.text(`• Canceladas/Otras: ${countCanceladas + countOtras}`, 140, currentY + 11);
     
-    doc.text('Este reporte contiene métricas operativas confidenciales del flujo continuo de ciudadanos, conforme a directivas institucionales.', 15, currentY + 18);
-    currentY += 28;
+    doc.text('Este reporte contiene métricas operativas confidenciales del flujo continuo de ciudadanos, conforme a directivas institucionales.', 15, currentY + 16.5);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('• GUÍA DE NOMENCLATURAS: ', 15, currentY + 22.5);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('COMPLETADA (Atención realizada) | CONFIRMADA/ASISTIRE (Cupo reservado activo) | CANCELADA/NO ASISTIRÁ (Anulado)', 58, currentY + 22.5);
+
+    currentY += 34;
 
     // Table Headers
     const drawTableHead = (y: number) => {
@@ -971,11 +989,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       doc.setFontSize(8);
       
       doc.text('CÓDIGO/TX', 12, y + 4.8);
-      doc.text('TRÁMITE / CATEGORÍA', 52, y + 4.8);
-      doc.text('RECIPIENTE / SOLICITANTE', 102, y + 4.8);
-      doc.text('CÉDULA / ID', 142, y + 4.8);
-      doc.text('FECHA/HORA', 165, y + 4.8);
-      doc.text('ESTATUS', 185, y + 4.8);
+      doc.text('TRÁMITE / CATEGORÍA', 40, y + 4.8);
+      doc.text('RECIPIENTE / SOLICITANTE', 85, y + 4.8);
+      doc.text('CÉDULA / ID', 130, y + 4.8);
+      doc.text('FECHA/HORA', 154, y + 4.8);
+      doc.text('ESTATUS', 182, y + 4.8);
     };
 
     drawTableHead(currentY);
@@ -1003,17 +1021,17 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
       const name = c.datosPersonales.nombreCompleto || 'N/D';
       
-      const labelTx = c.codigoTransaccion.length > 15 ? c.codigoTransaccion.slice(0, 15) + '...' : c.codigoTransaccion;
+      const labelTx = c.codigoTransaccion.length > 13 ? c.codigoTransaccion.slice(0, 13) + '...' : c.codigoTransaccion;
       const labelCategory = getSubServicioName(c.subServicioId);
-      const labelCategoryDisplay = labelCategory.length > 30 ? labelCategory.slice(0, 28) + '...' : labelCategory;
-      const labelName = name.length > 25 ? name.slice(0, 24) + '...' : name;
+      const labelCategoryDisplay = labelCategory.length > 25 ? labelCategory.slice(0, 23) + '...' : labelCategory;
+      const labelName = name.length > 24 ? name.slice(0, 22) + '...' : name;
       const labelId = c.datosPersonales.identificacion || 'N/D';
       
       doc.text(labelTx, 12, currentY + 5);
-      doc.text(labelCategoryDisplay, 52, currentY + 5);
-      doc.text(labelName, 102, currentY + 5);
-      doc.text(labelId, 142, currentY + 5);
-      doc.text(`${c.fecha}\n${c.hora}`, 165, currentY + 3.5);
+      doc.text(labelCategoryDisplay, 40, currentY + 5);
+      doc.text(labelName, 85, currentY + 5);
+      doc.text(labelId, 130, currentY + 5);
+      doc.text(`${c.fecha} ${c.hora}`, 154, currentY + 5);
       
       let statusText = (c.estado || 'CONFIRMADA').toUpperCase();
       if (statusText === 'ASISTIRE') statusText = 'CONFIRMADA';
@@ -1030,7 +1048,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
         doc.setTextColor(185, 28, 28);
         doc.setFont('Helvetica', 'bold');
       }
-      doc.text(statusText, 185, currentY + 5);
+      doc.text(statusText, 182, currentY + 5);
 
       doc.setDrawColor(241, 245, 249);
       doc.setLineWidth(0.1);

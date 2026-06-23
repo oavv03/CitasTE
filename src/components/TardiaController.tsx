@@ -695,7 +695,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
         doc.setFont('Helvetica', 'bold');
         doc.setFontSize(15);
         doc.setTextColor(255, 255, 255);
-        doc.text('REPORTE OFICIAL DE CITAS AUDITADAS (VID)', 20, y + 34);
+        doc.text('REPORTE OFICIAL DE CITAS REGISTRADAS (VID)', 20, y + 34);
       };
 
       const drawTableHead = (y: number) => {
@@ -727,7 +727,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(71, 85, 105);
-      doc.text(`Constancia generada para la auditoría de citas operativas registradas en el sistema para ciudadanos rezagados (pasados de edad).`, 20, currentY, { maxWidth: 170 });
+      doc.text(`Constancia generada para el control de citas operativas registradas en el sistema para ciudadanos rezagados (pasados de edad).`, 20, currentY, { maxWidth: 170 });
 
       currentY += 12;
 
@@ -820,27 +820,20 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
         });
       }
 
-      // Check height before signature section to prevent drawing over the bottom margin
-      if (currentY > 240) {
+      // Check height before footer section to prevent drawing over the bottom margin
+      if (currentY > 250) {
         doc.addPage();
         drawHeader(0);
         currentY = 55;
       }
 
       currentY += 15;
-      // Signature Section - Supervisor signature removed per user request
-      doc.setDrawColor(203, 213, 225);
-      doc.line(20, currentY, 90, currentY);
-
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text('FIRMA RESPONSABLE OFICIALÍA', 22, currentY + 5);
 
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(7.5);
-      doc.text(`Id Atención: SEGUIMIENTO-PE-2026`, 22, currentY + 9);
-      doc.text(`Fecha Impresión: ${new Date().toISOString()}`, 122, currentY + 9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Id Atención: SEGUIMIENTO-PE-2026`, 22, currentY);
+      doc.text(`Fecha Impresión: ${new Date().toISOString()}`, 122, currentY);
 
       doc.save(`Reporte_Citas_VID_${startStr}_a_${endStr}.pdf`);
       setExportLoading(null);
