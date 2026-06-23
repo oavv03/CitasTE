@@ -673,28 +673,47 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
         format: 'a4'
       });
 
-      // Dark slate band header
-      doc.setFillColor(15, 23, 42); // slate-900
-      doc.rect(0, 0, 210, 45, 'F');
+      const drawHeader = (y: number) => {
+        // Dark slate band header
+        doc.setFillColor(15, 23, 42); // slate-900
+        doc.rect(0, y, 210, 45, 'F');
 
-      // Accent border line (Emerald green representing realized/completed successfully)
-      doc.setFillColor(16, 185, 129); // emerald-500
-      doc.rect(0, 45, 210, 2.5, 'F');
+        // Accent border line (Emerald green representing realized/completed successfully)
+        doc.setFillColor(16, 185, 129); // emerald-500
+        doc.rect(0, y + 45, 210, 2.5, 'F');
 
-      // Title & Header Text
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.text('TRIBUNAL ELECTORAL DE PANAMÁ', 20, 16);
-      doc.setFontSize(8.5);
-      doc.setFont('Helvetica', 'normal');
-      doc.setTextColor(203, 213, 225); // slate-300
-      doc.text('DIRECCIÓN DE CEDULACIÓN — OFICIALÍA ESPECIALIZADA DE PASADOS DE EDAD (VID)', 20, 22);
+        // Title & Header Text
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('TRIBUNAL ELECTORAL DE PANAMÁ', 20, y + 16);
+        doc.setFontSize(8.5);
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(203, 213, 225); // slate-300
+        doc.text('DIRECCIÓN DE CEDULACIÓN — OFICIALÍA ESPECIALIZADA DE PASADOS DE EDAD (VID)', 20, y + 22);
 
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(15);
-      doc.setTextColor(255, 255, 255);
-      doc.text('REPORTE OFICIAL DE CITAS AUDITADAS (VID)', 20, 34);
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(255, 255, 255);
+        doc.text('REPORTE OFICIAL DE CITAS AUDITADAS (VID)', 20, y + 34);
+      };
+
+      const drawTableHead = (y: number) => {
+        doc.setFillColor(30, 41, 59); // slate-800
+        doc.rect(20, y, 170, 7.5, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(7.5);
+        
+        doc.text('FECHA/HORA', 22, y + 5);
+        doc.text('CIUDADANO SOLICITANTE', 48, y + 5);
+        doc.text('CÉDULA / ID', 105, y + 5);
+        doc.text('SUCURSAL', 135, y + 5);
+        doc.text('ESTADO', 172, y + 5);
+      };
+
+      // Draw initial page header
+      drawHeader(0);
 
       let currentY = 58;
 
@@ -712,11 +731,11 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
 
       currentY += 12;
 
-      // Overview Score Card
+      // Overview Score Card with Nomenclature Explanation
       doc.setFillColor(240, 253, 250); // emerald-50
       doc.setDrawColor(110, 231, 183); // emerald-300
       doc.setLineWidth(0.3);
-      doc.rect(20, currentY, 170, 16, 'FD');
+      doc.rect(20, currentY, 170, 28, 'FD'); // Expanded from 16 to 28 height
 
       doc.setTextColor(15, 23, 42);
       doc.setFont('Helvetica', 'bold');
@@ -726,21 +745,22 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       doc.setTextColor(5, 150, 105); // emerald-600
       doc.text(`${records.length} Citas`, 160, currentY + 10);
 
-      currentY += 26;
-
-      // Table Header
-      doc.setFillColor(30, 41, 59); // slate-800
-      doc.rect(20, currentY, 170, 7.5, 'F');
-      doc.setTextColor(255, 255, 255);
+      // Nomenclature breakdown in VID Report
       doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(7.5);
+      doc.setFontSize(8.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('EXPLICACIÓN DE NOMENCLATURAS (ESTADOS DE CITAS):', 26, currentY + 17);
       
-      doc.text('FECHA/HORA', 22, currentY + 5);
-      doc.text('CIUDADANO SOLICITANTE', 48, currentY + 5);
-      doc.text('CÉDULA / ID', 105, currentY + 5);
-      doc.text('SUCURSAL', 135, currentY + 5);
-      doc.text('ESTADO', 172, currentY + 5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text('• ATENDIDO: Cita presencial completada con éxito y biometría totalmente validada.', 26, currentY + 21);
+      doc.text('• CONFIRMADA: Cupo reservado y cita oficial activa planificada.  |  • CANCELADA: Cita anulada.', 26, currentY + 25);
 
+      currentY += 38; // Adjusted to prevent overlaps and fit the expanded block properly
+
+      // Draw initial table header
+      drawTableHead(currentY);
       currentY += 7.5;
 
       // Draw table rows
@@ -755,12 +775,23 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
         currentY += 15;
       } else {
         records.forEach((rec, idx) => {
+          // If we are reaching the bottom of the page, add page and reset headers
+          if (currentY > 265) {
+            doc.addPage();
+            drawHeader(0);
+            currentY = 55;
+            drawTableHead(currentY);
+            currentY += 7.5;
+          }
+
           doc.setDrawColor(241, 245, 249);
           doc.rect(20, currentY, 170, 9, 'D');
           
           doc.setFont('Helvetica', 'bold');
+          doc.setTextColor(15, 23, 42);
           doc.text(`${rec.fecha} ${rec.hora}`, 22, currentY + 6);
           doc.setFont('Helvetica', 'normal');
+          doc.setTextColor(51, 65, 85);
           
           const fullName = rec.datosPersonales.nombreCompleto || 'Desconocido';
           const truncatedName = fullName.length > 25 ? fullName.substring(0, 22) + '...' : fullName;
@@ -787,6 +818,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
           
           currentY += 9;
         });
+      }
+
+      // Check height before signature section to prevent drawing over the bottom margin
+      if (currentY > 240) {
+        doc.addPage();
+        drawHeader(0);
+        currentY = 55;
       }
 
       currentY += 15;

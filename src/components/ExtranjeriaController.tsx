@@ -1066,7 +1066,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.25);
-    doc.rect(10, currentY, 190, 20, 'FD');
+    doc.rect(10, currentY, 190, 26, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -1080,8 +1080,16 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     doc.text(`• Capacidad Máxima del Periodo: Regulada por intervalos de ${intervalo} min con promedio de ${capacidad} slots`, 15, currentY + 15);
     doc.text(`• Casilleros Activos totales: ${activeBoothsCount} puestos`, 125, currentY + 11);
     doc.text(`• Reporte Oficial con Estados Generales`, 125, currentY + 15);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('• GUÍA DE NOMENCLATURAS: ', 15, currentY + 20.5);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('ATENDIDO (Atendida con éxito y biometría validada) | PENDIENTE/CONFIRMADA (Activa programada) | CANCELADA (Anulada/Inasistencia)', 54, currentY + 20.5);
     
-    currentY += 26;
+    currentY += 32;
 
     // Table Headers
     const drawTableHead = (y: number) => {
