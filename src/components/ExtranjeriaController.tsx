@@ -140,6 +140,19 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   // Supervisor custom period visibility filter
   const [supervisorPeriodFilter, setSupervisorPeriodFilter] = useState<'dia' | 'semana' | 'mes' | 'año'>('dia');
 
+  // New Date Range State for reports
+  const [reportStartDate, setReportStartDate] = useState<string>(() => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-01`;
+  });
+  const [reportEndDate, setReportEndDate] = useState<string>(() => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  });
+
   // Supervisor tabs / sub-views (control of queues vs. calendar & creation/deletion panel)
   const [supervisorTab, setSupervisorTab] = useState<'flujo' | 'calendario'>('flujo');
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
@@ -812,7 +825,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       }
     }));
 
-    showStatus(`Trámite finalizado con éxito para la cita ${appId}. Registro guardado para auditoría en el reporte diario.`, 'success');
+    showStatus(`Trámite finalizado con éxito para la cita ${appId}. Registro guardado en el reporte diario de atención.`, 'success');
   };
 
   // Filter appointments for the general table filter (matches query and filters)
@@ -942,65 +955,29 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     });
   }, [appointments, appMetadata, selectedCubiculo]);
 
-  // 5. Supervisor Analytics / Reports: appointments marked as 'realizada'
-  const filterRealizadasByPeriod = (periodToCheck: 'dia' | 'semana' | 'mes' | 'año') => {
+  // 5. Supervisor Analytics / Reports: appointments in selected interval, regardless of status
+  const filterRealizadasByDateRange = (startStr: string, endStr: string) => {
     return appointments.filter(app => {
-      const meta = appMetadata[app.id];
-      if (!meta || meta.estadoTicket !== 'realizada') return false;
-
-      try {
-        const now = new Date();
-        const refDate = new Date(app.fecha + 'T00:00:00');
-
-        if (periodToCheck === 'dia') {
-          const year = now.getFullYear();
-          const month = String(now.getMonth() + 1).padStart(2, '0');
-          const day = String(now.getDate()).padStart(2, '0');
-          return app.fecha === `${year}-${month}-${day}`;
-        }
-
-        if (periodToCheck === 'semana') {
-          const currentDay = now.getDay();
-          const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
-          const monday = new Date(now);
-          monday.setDate(now.getDate() - distanceToMonday);
-          monday.setHours(0, 0, 0, 0);
-
-          const sunday = new Date(monday);
-          sunday.setDate(monday.getDate() + 6);
-          sunday.setHours(23, 59, 59, 999);
-
-          return refDate >= monday && refDate <= sunday;
-        }
-
-        if (periodToCheck === 'mes') {
-          return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
-        }
-
-        if (periodToCheck === 'año') {
-          return refDate.getFullYear() === now.getFullYear();
-        }
-      } catch (e) {
-        return false;
-      }
-      return false;
+      if (!app.fecha) return false;
+      return app.fecha >= startStr && app.fecha <= endStr;
     });
   };
 
   // Download performed (realized) appointments report - CSV Format
-  const handleDownloadRealizadasCSV = (period: 'dia' | 'semana' | 'mes' | 'año') => {
-    const list = filterRealizadasByPeriod(period);
+  const handleDownloadRealizadasCSV = () => {
+    const list = filterRealizadasByDateRange(reportStartDate, reportEndDate);
     if (list.length === 0) {
-      alert('No se encontraron citas completadas (realizadas) en el periodo seleccionado para generar el reporte.');
+      alert('No se encontraron citas en el intervalo seleccionado para generar el reporte.');
       return;
     }
 
-    const headers = ['ID de Cita', 'Ciudadano', 'Pasaporte/ID', 'Fecha Cita', 'Hora', 'Operador Responsable', 'Cubículo', 'Hora Completado'];
+    const headers = ['ID de Cita', 'Ciudadano', 'Pasaporte/ID', 'Fecha Cita', 'Hora', 'Operador Responsable', 'Cubículo', 'Estado', 'Hora Completado/Modificado'];
     const rows = list.map(app => {
       const meta = appMetadata[app.id];
       const name = app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
       const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
-      const cubiculoName = booths.find(b => b.id === meta?.assignedCubiculo)?.name || `Cubículo ${meta?.assignedCubiculo}`;
+      const cubiculoName = booths.find(b => b.id === meta?.assignedCubiculo)?.name || (meta?.assignedCubiculo ? `Cubículo ${meta.assignedCubiculo}` : 'N/A');
+      const estado = meta?.estadoTicket || app.status || 'Pendiente';
       return [
         app.id,
         name,
@@ -1009,6 +986,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
         app.hora,
         meta?.staffResponsable || 'N/D',
         cubiculoName,
+        estado.toUpperCase(),
         meta?.timestampCompletado || 'N/D'
       ];
     });
@@ -1019,17 +997,17 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Reporte_Extranjeria_Completadas_${period.toUpperCase()}_${new Date().toISOString().substring(0,10)}.csv`);
+    link.setAttribute("download", `Reporte_Extranjeria_Citas_${reportStartDate}_a_${reportEndDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   // Download performed (realized) appointments report - PDF Format using jsPDF helper
-  const handleDownloadRealizadasPDF = (period: 'dia' | 'semana' | 'mes' | 'año') => {
-    const list = filterRealizadasByPeriod(period);
+  const handleDownloadRealizadasPDF = () => {
+    const list = filterRealizadasByDateRange(reportStartDate, reportEndDate);
     if (list.length === 0) {
-      alert('No se encontraron citas completadas (realizadas) en el periodo seleccionado para generar el reporte PDF.');
+      alert('No se encontraron citas en el intervalo seleccionado para generar el reporte PDF.');
       return;
     }
 
@@ -1059,17 +1037,16 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       doc.setTextColor(15, 23, 42);
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(11);
-      doc.text('AUDITORÍA DE GESTIÓN: TRÁMITES DE EXTRANJERÍA COMPLETADOS', 10, currentY);
+      doc.text('REPORTE GENERAL DE ATENCIÓN DE CITAS (TODOS LOS ESTADOS) - EXTRANJERÍA', 10, currentY);
 
       currentY += 5;
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(100, 116, 139);
-      doc.text('Control Operativo de Supervisor de Extranjería - Toma de Fotografía y Biometría', 10, currentY);
+      doc.text('Control Operativo de Supervisor de Extranjería', 10, currentY);
 
       currentY += 5;
-      const periodLabel = period === 'dia' ? 'HOY (DIARIO)' : period === 'semana' ? 'ESTA SEMANA' : period === 'mes' ? 'ESTE MES' : 'ESTE AÑO';
-      doc.text(`Período analizado: ${periodLabel}  |  Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}`, 10, currentY);
+      doc.text(`Intervalo analizado: Desde ${reportStartDate} Hasta ${reportEndDate}  |  Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}`, 10, currentY);
 
       currentY += 4;
       doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
@@ -1080,7 +1057,12 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
 
     drawHeader();
 
-    // Summary Statistics box
+    // Summary Statistics box counting statuses
+    const totalCount = list.length;
+    const completedCount = list.filter(app => appMetadata[app.id]?.estadoTicket === 'realizada').length;
+    const cancelledCount = list.filter(app => appMetadata[app.id]?.estadoTicket === 'cancelada').length;
+    const pendingCount = totalCount - completedCount - cancelledCount;
+
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.25);
@@ -1094,10 +1076,10 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(71, 85, 105);
-    doc.text(`• Total de Trámites Completados con Pago Realizado: ${list.length} ciudadanos atendidos`, 15, currentY + 11);
-    doc.text(`• Capacidad Máxima del Periodo: Regulada por intervalores de ${intervalo} min con promedio de ${capacidad} slots`, 15, currentY + 15);
-    doc.text(`• Casilleros Activos totales: ${activeBoothsCount} puestos`, 110, currentY + 11);
-    doc.text(`• Reporte Oficial Generado por el Supervisor de Extranjería`, 110, currentY + 15);
+    doc.text(`• Total Citas Registradas: ${totalCount}  |  Completadas: ${completedCount}  |  Pendientes: ${pendingCount}  |  Canceladas: ${cancelledCount}`, 15, currentY + 11);
+    doc.text(`• Capacidad Máxima del Periodo: Regulada por intervalos de ${intervalo} min con promedio de ${capacidad} slots`, 15, currentY + 15);
+    doc.text(`• Casilleros Activos totales: ${activeBoothsCount} puestos`, 125, currentY + 11);
+    doc.text(`• Reporte Oficial con Estados Generales`, 125, currentY + 15);
     
     currentY += 26;
 
@@ -1111,11 +1093,11 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       doc.setFontSize(7.5);
       
       doc.text('ID CITA', 12, y + 4.8);
-      doc.text('CIUDADANO EXTRANJERO', 40, y + 4.8);
-      doc.text('PASAPORTE', 90, y + 4.8);
-      doc.text('CUBÍCULO', 115, y + 4.8);
-      doc.text('OPERADOR EN ENTRADA', 142, y + 4.8);
-      doc.text('COMPLETADO EL', 170, y + 4.8);
+      doc.text('CIUDADANO EXTRANJERO', 35, y + 4.8);
+      doc.text('PASAPORTE', 80, y + 4.8);
+      doc.text('CUBÍCULO', 105, y + 4.8);
+      doc.text('ESTADO', 130, y + 4.8);
+      doc.text('OPERADOR / ATENDIDO', 155, y + 4.8);
     };
 
     drawTableHead(currentY);
@@ -1143,21 +1125,36 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       doc.setFontSize(7);
 
       const name = app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
-      const nameShort = name.length > 28 ? name.slice(0, 26) + '...' : name;
+      const nameShort = name.length > 25 ? name.slice(0, 23) + '...' : name;
       const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
-      const cubiculoName = booths.find(b => b.id === meta?.assignedCubiculo)?.name || `Cubículo ${meta?.assignedCubiculo}`;
+      const cubiculoName = booths.find(b => b.id === meta?.assignedCubiculo)?.name || (meta?.assignedCubiculo ? `Cubículo ${meta.assignedCubiculo}` : 'Sin Asignar');
       const staffName = meta?.staffResponsable || 'Oficial General';
       const staffShort = staffName.length > 18 ? staffName.slice(0, 16) + '...' : staffName;
+      
+      const estado = (meta?.estadoTicket || app.status || 'Pendiente').toUpperCase();
       const tCompleted = meta?.timestampCompletado || 'N/D';
 
       doc.text(app.id, 12, currentY + 5);
-      doc.text(nameShort.toUpperCase(), 40, currentY + 5);
-      doc.text(passport, 90, currentY + 5);
-      doc.text(cubiculoName, 115, currentY + 5);
-      doc.text(staffShort, 142, currentY + 5);
-      doc.setFont('Helvetica', 'bold');
-      doc.text(tCompleted, 170, currentY + 5);
+      doc.text(nameShort.toUpperCase(), 35, currentY + 5);
+      doc.text(passport, 80, currentY + 5);
+      doc.text(cubiculoName, 105, currentY + 5);
+      
+      // Draw status with colors
+      if (estado === 'REALIZADA' || estado === 'COMPLETADA' || estado === 'CONFIRMADA' || estado === 'ATENDIDO') {
+        doc.setTextColor(16, 124, 65);
+        doc.setFont('Helvetica', 'bold');
+      } else if (estado === 'CANCELADA' || estado === 'CANCELADO' || estado === 'INASISTENCIA') {
+        doc.setTextColor(185, 28, 28);
+        doc.setFont('Helvetica', 'bold');
+      } else {
+        doc.setTextColor(180, 83, 9);
+        doc.setFont('Helvetica', 'bold');
+      }
+      doc.text(estado, 130, currentY + 5);
+      
+      doc.setTextColor(15, 23, 42);
       doc.setFont('Helvetica', 'normal');
+      doc.text(`${staffShort} / ${tCompleted}`, 155, currentY + 5);
 
       doc.setDrawColor(241, 245, 249);
       doc.setLineWidth(0.1);
@@ -1166,29 +1163,8 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       currentY += 8;
     });
 
-    // Signature Area
-    if (currentY > 230) {
-      doc.addPage();
-      currentY = 15;
-      drawHeader();
-    }
-
-    currentY += 15;
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.2);
-    doc.line(70, currentY, 140, currentY);
-    
-    currentY += 4;
-    doc.setTextColor(15, 23, 42);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text(' FIRMA DEL SUPERVISOR GENERAL DE EXTRANJERÍA', 72, currentY);
-    currentY += 4;
-    doc.setFont('Helvetica', 'normal');
-    doc.setTextColor(100, 116, 139);
-    doc.text('Departamento de Cedulación y Naturalización - Sede Ancón', 73, currentY);
-
-    doc.save(`reporte_extranjeria_atendidos_${period}.pdf`);
+    // Signature Area removed per user request
+    doc.save(`reporte_extranjeria_atendidos_${reportStartDate}_a_${reportEndDate}.pdf`);
   };
 
   const handlePrintPDF = () => {
@@ -1368,7 +1344,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
             <div className="space-y-1">
               <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block">Consola General del Supervisor</span>
               <p className="text-xs text-slate-350 leading-relaxed font-semibold">
-                Como Supervisor tiene control total de los flujos de cita. Puede: <strong className="text-white">1) Activar/desactivar casilleros de atención</strong> (4 asignados + 4 de reserva), <strong className="text-white">2) Asignar citas</strong> pre-verificadas a los cubículos, <strong className="text-white">3) Descargar informes de auditoría</strong> de los trámites finalizados en distintos periodos (día, semana, mes, año), y <strong className="text-white">4) Modificar parámetros</strong> de slots.
+                Como Supervisor tiene control total de los flujos de cita. Puede: <strong className="text-white">1) Activar/desactivar casilleros de atención</strong> (4 asignados + 4 de reserva), <strong className="text-white">2) Asignar citas</strong> pre-verificadas a los cubículos, <strong className="text-white">3) Descargar informes de atención</strong> de los trámites finalizados por intervalo de fechas, y <strong className="text-white">4) Modificar parámetros</strong> de slots.
               </p>
             </div>
           </div>
@@ -1712,51 +1688,74 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                 )}
               </div>
 
-              {/* AUDIT & PERFORMANCE REPORTS (REALIZED CITATIONS DOWNLOAD) */}
+              {/* ATENCION & PERFORMANCE REPORTS (REALIZED CITATIONS DOWNLOAD) */}
               <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-5 shadow-xl">
                 <div className="border-b border-slate-900 pb-3 text-left">
-                  <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
+                  <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5 font-sans">
                     <FileText className="w-4 h-4 text-amber-500" />
-                    <span>Reportes de Auditoría de Citas Realizadas</span>
+                    <span>Reportes de Atención de Citas Realizadas</span>
                   </h4>
-                  <p className="text-[10px] text-slate-405 font-bold uppercase">Descargue reportes con las citas completadas de Extranjería efectivamente atendidas</p>
+                  <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider font-mono">Descargue reportes con las citas completadas de Extranjería efectivamente atendidas por rango de fechas</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {(['dia', 'semana', 'mes', 'año'] as const).map(period => {
-                    const cnt = filterRealizadasByPeriod(period).length;
-                    const periodLabel = period === 'dia' ? 'De Hoy (Diario)' : period === 'semana' ? 'Semana Actual' : period === 'mes' ? 'Mensual (Mes en Curso)' : 'Anual (Año en Curso)';
+                <div className="bg-slate-900/60 border border-slate-850 p-4 rounded-xl space-y-4">
+                  {/* Date Input Range Selector */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                    <div className="space-y-1">
+                      <label className="text-[10.5px] font-black uppercase tracking-wider text-slate-400 block font-mono">
+                        Intervalo de Fecha Desde
+                      </label>
+                      <input
+                        type="date"
+                        value={reportStartDate}
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
                     
-                    return (
-                      <div key={`report-block-${period}`} className="bg-slate-900/60 border border-slate-850 p-4 rounded-xl flex flex-col justify-between gap-3 text-left">
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-450 block">Período {period.toUpperCase()}</span>
-                          <span className="text-2xl font-mono font-black text-white">{cnt}</span>
-                          <span className="text-[10.5px] font-bold text-slate-400 block">{periodLabel}</span>
-                        </div>
+                    <div className="space-y-1">
+                      <label className="text-[10.5px] font-black uppercase tracking-wider text-slate-400 block font-mono">
+                        Intervalo de Fecha Hasta
+                      </label>
+                      <input
+                        type="date"
+                        value={reportEndDate}
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
+                  </div>
 
-                        <div className="grid grid-cols-2 gap-2 mt-1">
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadRealizadasCSV(period)}
-                            className="bg-slate-950 hover:bg-slate-800 border border-slate-800 p-2 rounded text-[10px] font-black uppercase text-slate-300 flex items-center justify-center gap-1 cursor-pointer transition"
-                          >
-                            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>CSV</span>
-                          </button>
-                          
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadRealizadasPDF(period)}
-                            className="bg-slate-950 hover:bg-slate-850 border border-slate-800 p-2 rounded text-[10px] font-black uppercase text-amber-500 flex items-center justify-center gap-1 cursor-pointer transition"
-                          >
-                            <Download className="w-3.5 h-3.5 text-amber-500" />
-                            <span>PDF</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-850">
+                    <div className="text-left space-y-0.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block font-mono">
+                        Citas Atendidas Encontradas
+                      </span>
+                      <p className="text-xl font-mono font-black text-white">
+                        {filterRealizadasByDateRange(reportStartDate, reportEndDate).length} <span className="text-xs font-sans font-medium text-slate-400">citas completadas</span>
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 w-full sm:w-auto shrink-0 justify-end">
+                      <button
+                        type="button"
+                        onClick={handleDownloadRealizadasCSV}
+                        className="flex-1 sm:flex-none bg-slate-950 hover:bg-slate-800 border border-slate-800 px-4 py-2.5 rounded text-[10px] font-black uppercase text-slate-300 flex items-center justify-center gap-1.5 cursor-pointer transition min-w-[100px]"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                        <span>EXPORTAR CSV</span>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={handleDownloadRealizadasPDF}
+                        className="flex-1 sm:flex-none bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded text-[10px] font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition min-w-[100px]"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>DESCARGAR PDF</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 

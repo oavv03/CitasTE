@@ -815,20 +815,18 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       }
 
       currentY += 15;
-      // Signature Section
+      // Signature Section - Supervisor signature removed per user request
       doc.setDrawColor(203, 213, 225);
       doc.line(20, currentY, 90, currentY);
-      doc.line(120, currentY, 190, currentY);
 
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text('FIRMA RESPONSABLE OFICIALÍA', 22, currentY + 5);
-      doc.text('SUPERIT - FIRMA DE SUPERVISIÓN', 122, currentY + 5);
 
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(7.5);
-      doc.text(`Id Auditoría: SEGUIMIENTO-PE-2026`, 22, currentY + 9);
+      doc.text(`Id Atención: SEGUIMIENTO-PE-2026`, 22, currentY + 9);
       doc.text(`Fecha Impresión: ${new Date().toISOString()}`, 122, currentY + 9);
 
       doc.save(`Reporte_Citas_VID_${period}.pdf`);

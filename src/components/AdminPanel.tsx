@@ -270,6 +270,17 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
 
   const [metricPeriod, setMetricPeriod] = useState<'dia' | 'semana' | 'mes' | 'año' | 'todo'>('mes');
+  const [adminStartDate, setAdminStartDate] = useState<string>(() => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-01`;
+  });
+  const [adminEndDate, setAdminEndDate] = useState<string>(() => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  });
 
   const handleDownloadMetricsPDFReport = (
     type: 'extranjeria' | 'tardia' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil' | 'all',
@@ -857,93 +868,20 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     return citas;
   }, [citas, currentRole]);
 
-  // Reactive subset for simple admin on selected period
+  // Reactive subset for simple admin on selected date range
   const roleFilteredCitasForPeriod = useMemo(() => {
     return roleFilteredCitas.filter(cita => {
-      if (metricPeriod === 'todo') return true;
-      try {
-        const now = new Date();
-        const refDate = new Date(cita.fecha + 'T00:00:00');
-        
-        if (metricPeriod === 'dia') {
-          const year = now.getFullYear();
-          const month = String(now.getMonth() + 1).padStart(2, '0');
-          const day = String(now.getDate()).padStart(2, '0');
-          return cita.fecha === `${year}-${month}-${day}`;
-        }
-        
-        if (metricPeriod === 'semana') {
-          const currentDay = now.getDay();
-          const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
-          const monday = new Date(now);
-          monday.setDate(now.getDate() - distanceToMonday);
-          monday.setHours(0, 0, 0, 0);
-          
-          const sunday = new Date(monday);
-          sunday.setDate(monday.getDate() + 6);
-          sunday.setHours(23, 59, 59, 999);
-          
-          return refDate >= monday && refDate <= sunday;
-        }
-        
-        if (metricPeriod === 'mes') {
-          return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
-        }
-        
-        if (metricPeriod === 'año') {
-          return refDate.getFullYear() === now.getFullYear();
-        }
-      } catch (e) {
-        return false;
-      }
-      return false;
+      if (!cita.fecha) return false;
+      return cita.fecha >= adminStartDate && cita.fecha <= adminEndDate;
     });
-  }, [roleFilteredCitas, metricPeriod]);
+  }, [roleFilteredCitas, adminStartDate, adminEndDate]);
 
   // PDF report downloader specifically for Simple Admin
-  const handleDownloadSencilloPDF = (periodToCheck: 'dia' | 'semana' | 'mes' | 'año' | 'todo') => {
-    const listForPeriod = roleFilteredCitas.filter(cita => {
-      if (periodToCheck === 'todo') return true;
-      try {
-        const now = new Date();
-        const refDate = new Date(cita.fecha + 'T00:00:00');
-        
-        if (periodToCheck === 'dia') {
-          const year = now.getFullYear();
-          const month = String(now.getMonth() + 1).padStart(2, '0');
-          const day = String(now.getDate()).padStart(2, '0');
-          return cita.fecha === `${year}-${month}-${day}`;
-        }
-        
-        if (periodToCheck === 'semana') {
-          const currentDay = now.getDay();
-          const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
-          const monday = new Date(now);
-          monday.setDate(now.getDate() - distanceToMonday);
-          monday.setHours(0, 0, 0, 0);
-          
-          const sunday = new Date(monday);
-          sunday.setDate(monday.getDate() + 6);
-          sunday.setHours(23, 59, 59, 999);
-          
-          return refDate >= monday && refDate <= sunday;
-        }
-        
-        if (periodToCheck === 'mes') {
-          return refDate.getMonth() === now.getMonth() && refDate.getFullYear() === now.getFullYear();
-        }
-        
-        if (periodToCheck === 'año') {
-          return refDate.getFullYear() === now.getFullYear();
-        }
-      } catch (e) {
-        return false;
-      }
-      return false;
-    });
+  const handleDownloadSencilloPDF = () => {
+    const listForPeriod = roleFilteredCitasForPeriod;
 
     if (listForPeriod.length === 0) {
-      alert('No hay citas registradas en el período seleccionado para descargar en PDF.');
+      alert('No hay citas registradas en el intervalo seleccionado para descargar en PDF.');
       return;
     }
 
@@ -973,7 +911,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       doc.setTextColor(15, 23, 42);
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text('AUDITORÍA E INFORMES DE GESTIÓN (REPORTE DE CITAS)', 10, currentY);
+      doc.text('REPORTE DE ATENCIÓN E INFORMES DE GESTIÓN (REPORTE DE CITAS)', 10, currentY);
       
       currentY += 6;
       doc.setFont('Helvetica', 'normal');
@@ -983,8 +921,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       doc.text('Servicios: Organización Electoral, Cedulación y Registro Civil (Excluye Pasados de Edad)', 10, currentY);
 
       currentY += 5;
-      const periodLabel = periodToCheck === 'dia' ? 'Hoy' : periodToCheck === 'semana' ? 'Esta Semana' : periodToCheck === 'mes' ? 'Este Mes' : periodToCheck === 'año' ? 'Este Año' : 'Histórico Completo';
-      doc.text(`Período analizado: ${periodLabel.toUpperCase()}  |  Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}`, 10, currentY);
+      doc.text(`Intervalo analizado: Desde ${adminStartDate} Hasta ${adminEndDate}  |  Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}`, 10, currentY);
 
       // Accent divider line
       currentY += 4;
@@ -1012,11 +949,14 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setTextColor(71, 85, 105);
     
     const countConfirmadas = listForPeriod.filter(c => c.estado === 'confirmada' || c.estado === 'asistire').length;
-    const countOtras = listForPeriod.length - countConfirmadas;
+    const countRealizadas = listForPeriod.filter(c => c.estado === 'realizada' || c.estado === 'completada').length;
+    const countCanceladas = listForPeriod.filter(c => c.estado === 'cancelada' || c.estado === 'no_asistire').length;
+    const countOtras = listForPeriod.length - (countConfirmadas + countRealizadas + countCanceladas);
 
     doc.text(`• Total Citas Registradas: ${listForPeriod.length}`, 15, currentY + 12);
-    doc.text(`• Citas Confirmadas: ${countConfirmadas}`, 75, currentY + 12);
-    doc.text(`• Otras / Canceladas: ${countOtras}`, 135, currentY + 12);
+    doc.text(`• Confirmadas: ${countConfirmadas}`, 55, currentY + 12);
+    doc.text(`• Completadas: ${countRealizadas}`, 95, currentY + 12);
+    doc.text(`• Canceladas/Otras: ${countCanceladas + countOtras}`, 140, currentY + 12);
     
     doc.text('Este reporte contiene métricas operativas confidenciales del flujo continuo de ciudadanos, conforme a directivas institucionales.', 15, currentY + 18);
     currentY += 28;
@@ -1075,11 +1015,15 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       doc.text(labelId, 142, currentY + 5);
       doc.text(`${c.fecha}\n${c.hora}`, 165, currentY + 3.5);
       
-      const statusText = c.estado === 'confirmada' || c.estado === 'asistire' ? 'CONFIRMADA' : c.estado === 'no_asistire' ? 'NO ASISTIRÁ' : 'CANCELADA';
-      if (statusText === 'CONFIRMADA') {
+      let statusText = (c.estado || 'CONFIRMADA').toUpperCase();
+      if (statusText === 'ASISTIRE') statusText = 'CONFIRMADA';
+      if (statusText === 'NO_ASISTIRE') statusText = 'NO ASISTIRÁ';
+      if (statusText === 'REALIZADA' || statusText === 'COMPLETADA' || statusText === 'ATENDIDO') statusText = 'COMPLETADA';
+
+      if (statusText === 'CONFIRMADA' || statusText === 'COMPLETADA') {
         doc.setTextColor(16, 124, 65);
         doc.setFont('Helvetica', 'bold');
-      } else if (statusText === 'NO ASISTIRÁ') {
+      } else if (statusText === 'NO ASISTIRÁ' || statusText === 'PENDIENTE' || statusText === 'EN ESPERA') {
         doc.setTextColor(180, 83, 9);
         doc.setFont('Helvetica', 'bold');
       } else {
@@ -1095,7 +1039,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       currentY += 8;
     });
 
-    doc.save(`reporte_gestion_sencillo_${periodToCheck}.pdf`);
+    doc.save(`reporte_gestion_sencillo_${adminStartDate}_a_${adminEndDate}.pdf`);
   };
 
   // Dynamic calculations for Stats dashboard
@@ -3125,137 +3069,65 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
                   </div>
                 )}
 
-                {/* NUEVO: PANEL DE AUDITORÍA E INFORMES DE GESTIÓN (Exclusivo para Administrador Sencillo) */}
+                {/* NUEVO: PANEL DE REPORTE DE ATENCIÓN E INFORMES DE GESTIÓN (Exclusivo para Administrador Sencillo) */}
                 {currentRole === 'sencillo' && (
-                  <div id="auditoria_informes_sencillo" className="bg-slate-950 rounded-lg border border-slate-800 p-5 mt-6 shadow-xl space-y-5 animate-fade-in">
+                  <div id="atencion_informes_sencillo" className="bg-slate-950 rounded-lg border border-slate-800 p-5 mt-6 shadow-xl space-y-5 animate-fade-in text-left">
                     <div className="border-b border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="space-y-0.5">
                         <h3 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
                           <BarChart3 className="w-4 h-4 text-blue-500" />
-                          <span>AUDITORÍA E INFORMES DE GESTIÓN</span>
+                          <span>REPORTE DE ATENCIÓN E INFORMES DE GESTIÓN</span>
                         </h3>
-                        <p className="text-[10px] text-slate-400 font-medium">Genere y descargue reportes oficiales en formato PDF con métricas del flujo continuo de ciudadanos, tiempos en sala de espera y eficiencias de los agentes.</p>
-                      </div>
-                      
-                      {/* Period selectors inline */}
-                      <div className="flex flex-wrap items-center gap-1">
-                        {(['dia', 'semana', 'mes', 'año', 'todo'] as const).map((period) => (
-                          <button
-                            key={`period-sencillo-${period}`}
-                            type="button"
-                            onClick={() => setMetricPeriod(period)}
-                            className={`px-3 py-1 rounded text-[9px] font-black uppercase tracking-wider border transition cursor-pointer ${
-                              metricPeriod === period
-                                ? 'bg-blue-600 border-blue-600 text-white shadow-md'
-                                : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-300'
-                            }`}
-                          >
-                            {period === 'dia' && 'Día'}
-                            {period === 'semana' && 'Semana'}
-                            {period === 'mes' && 'Mes'}
-                            {period === 'año' && 'Año'}
-                            {period === 'todo' && 'Histórico'}
-                          </button>
-                        ))}
+                        <p className="text-[10px] text-slate-400 font-medium">Genere y descargue reportes oficiales de atencion en formato PDF con métricas del flujo continuo de ciudadanos, tiempos en sala de espera y eficiencias de los agentes.</p>
                       </div>
                     </div>
 
-                    {/* Interactive cards grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      {/* CARD 1: DÍA ACTUAL */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMetricPeriod('dia');
-                          setTimeout(() => handleDownloadSencilloPDF('dia'), 70);
-                        }}
-                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
-                          metricPeriod === 'dia'
-                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
-                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                        }`}
-                        title="Generar informe detallado de la jornada de hoy"
-                      >
-                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
-                        <span className="text-[11px] font-black uppercase tracking-wider">DÍA ACTUAL</span>
-                        <span className="text-[9px] opacity-70">Informe Diario (Hoy)</span>
-                      </button>
-
-                      {/* CARD 2: SEMANAL */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMetricPeriod('semana');
-                          setTimeout(() => handleDownloadSencilloPDF('semana'), 70);
-                        }}
-                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
-                          metricPeriod === 'semana'
-                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
-                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                        }`}
-                        title="Generar informe de la semana en curso"
-                      >
-                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
-                        <span className="text-[11px] font-black uppercase tracking-wider">SEMANAL</span>
-                        <span className="text-[9px] opacity-70">Lunes a Domingo</span>
-                      </button>
-
-                      {/* CARD 3: MENSUAL */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMetricPeriod('mes');
-                          setTimeout(() => handleDownloadSencilloPDF('mes'), 70);
-                        }}
-                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
-                          metricPeriod === 'mes'
-                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
-                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                        }`}
-                        title="Generar informe del mes en curso"
-                      >
-                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
-                        <span className="text-[11px] font-black uppercase tracking-wider">MENSUAL</span>
-                        <span className="text-[9px] opacity-70">Mes en Curso</span>
-                      </button>
-
-                      {/* CARD 4: ANUAL */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMetricPeriod('año');
-                          setTimeout(() => handleDownloadSencilloPDF('año'), 70);
-                        }}
-                        className={`p-4 rounded-lg border text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer ${
-                          metricPeriod === 'año'
-                            ? 'bg-blue-950/45 border-blue-500 text-blue-400 shadow-md shadow-blue-950/30'
-                            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                        }`}
-                        title="Generar informe del año en curso"
-                      >
-                        <Calendar className="w-5 h-5 text-blue-500 group-hover:scale-110 transition shrink-0" />
-                        <span className="text-[11px] font-black uppercase tracking-wider">ANUAL</span>
-                        <span className="text-[9px] opacity-70">Año en Curso</span>
-                      </button>
-                    </div>
-
-                    {/* Bottom action panel */}
-                    <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-slate-300">
-                      <div className="space-y-0.5 text-left">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Resumen de Métricas de Trámites Generales</span>
-                        <p className="text-[11px] font-semibold text-slate-200">
-                          Periodo: <span className="text-blue-400 font-mono uppercase">{metricPeriod === 'dia' ? 'Día Actual (Diario)' : metricPeriod === 'semana' ? 'Semanal' : metricPeriod === 'mes' ? 'Mensual' : metricPeriod === 'año' ? 'Anual' : 'Histórico Completo'}</span> | Total de citas encontradas en base: <span className="text-white font-mono font-bold">{roleFilteredCitasForPeriod.length}</span>
-                        </p>
+                    <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-850 space-y-4">
+                      {/* Date Range Selectors */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block font-mono">
+                            Intervalo de Fecha Desde
+                          </label>
+                          <input
+                            type="date"
+                            value={adminStartDate}
+                            onChange={(e) => setAdminStartDate(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500 transition"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block font-mono">
+                            Intervalo de Fecha Hasta
+                          </label>
+                          <input
+                            type="date"
+                            value={adminEndDate}
+                            onChange={(e) => setAdminEndDate(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500 transition"
+                          />
+                        </div>
                       </div>
-                      
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadSencilloPDF(metricPeriod)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider px-5 py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>PDF EXPORT</span>
-                      </button>
+
+                      {/* Summary & Download Button row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-850/60 text-slate-300">
+                        <div className="space-y-0.5 text-left">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Resumen de Métricas de Trámites Generales</span>
+                          <p className="text-[11px] font-semibold text-slate-200">
+                            Citas encontradas en el intervalo seleccionado: <span className="text-white font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800 ml-1">{roleFilteredCitasForPeriod.length} citas</span>
+                          </p>
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={handleDownloadSencilloPDF}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider px-5 py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>DESCARGAR REPORTE PDF</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
