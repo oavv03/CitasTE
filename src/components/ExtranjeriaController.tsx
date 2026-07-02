@@ -1583,7 +1583,16 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
 
                     {/* Checkboxes of REQUISITOS_EXTRANJERIA */}
                     <div className="space-y-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-450 block">Re-Verificación Obligatoria (2do Control)</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-455 block">Re-Verificación Obligatoria (2do Control)</span>
+                        <button
+                          type="button"
+                          onClick={() => setSupervisorCheckedDocs(REQUISITOS_EXTRANJERIA.map(r => r.id))}
+                          className="text-[9.5px] font-black text-amber-500 hover:text-amber-400 bg-amber-950/40 hover:bg-amber-950 border border-amber-500/30 rounded px-2 py-0.5 transition cursor-pointer flex items-center gap-1"
+                        >
+                          <span>Marcar todos ✓</span>
+                        </button>
+                      </div>
                       {REQUISITOS_EXTRANJERIA.map(req => {
                         const isChecked = supervisorCheckedDocs.includes(req.id);
                         return (
@@ -2487,11 +2496,8 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
             ) : (
               <div className="space-y-4">
                 {queueCubiculoAssigned.map(app => {
-                  const meta = appMetadata[app.id];
                   const name = getExtranjeriaCitizenName(app);
                   const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
-                  const needsCashierPay = meta?.estadoTicket === 'ninguno' || meta?.estadoTicket === 'en_proceso';
-                  const isPaid = meta?.estadoTicket === 'pagado_en_caja';
 
                   return (
                     <div key={`cubiculo-row-${app.id}`} className="bg-slate-900/60 border border-slate-850 p-5 rounded-lg space-y-4 shadow-md text-left">
@@ -2506,18 +2512,12 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                           <h5 className="text-sm font-black text-slate-100 uppercase leading-snug">{name}</h5>
                           <span className="text-[10px] text-slate-450 font-bold block">Nacionalidad: {app.datosPersonales?.nacionalidad || 'N/D'}  |  Pasaporte: {passport}</span>
                         </div>
+                      </div>
 
-                        <div>
-                          {isPaid ? (
-                            <span className="text-[9px] font-black uppercase bg-emerald-950 border border-emerald-800 text-emerald-400 px-3 py-1 rounded">
-                              Pago Registrado Ok ✓
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-black uppercase bg-amber-950 border border-amber-800 text-amber-400 px-3 py-1 rounded animate-pulse">
-                              Pendiente Pago de Caja
-                            </span>
-                          )}
-                        </div>
+                      <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-lg">
+                        <p className="text-xs text-slate-400 leading-relaxed font-semibold">
+                          Ciudadano asignado a este cubículo para atención presencial. Al terminar la atención, use el botón a continuación para dar por concluido el trámite. El cubículo quedará disponible de inmediato para el siguiente ciudadano.
+                        </p>
                       </div>
 
                       {/* TICKET SYSTEM SIMULATION PANEL BLOCK */}
@@ -2539,63 +2539,21 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                           </a>
                         </div>
 
-                        <p className="text-[10.5px] text-slate-400 leading-relaxed leading-normal font-semibold">
+                        <p className="text-[10.5px] text-slate-400 leading-relaxed font-semibold">
                           Por normativas, todo trámite migratorio presencial en el Tribunal Electoral requiere emitirse primero con el número oficial de ticket de caja en <strong className="text-slate-200 font-mono">https://sistema-de-ticket.vercel.app/</strong> para la recaudación tributaria.
                         </p>
-
-                        <div className="bg-slate-900 border border-slate-850 px-3 py-2 rounded flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="text-left">
-                            <span className="text-[8px] text-slate-500 uppercase font-black block">Detalles de Emisión de Ticket de Cobro:</span>
-                            <span className="text-[11px] font-bold text-slate-300">
-                              Llamar Turno: <strong className="text-yellow-500 font-mono font-bold">E-{app.id.slice(-4).toUpperCase()}</strong> en Cubículo {selectedCubiculo}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleRecallCitizen(app.id)}
-                              className="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-yellow-400 font-extrabold text-[10px] uppercase tracking-wider px-3.5 py-2 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                              title="Volver a anunciar al ciudadano por los altavoces"
-                            >
-                              <Volume2 className="w-3.5 h-3.5 text-yellow-500" />
-                              <span>Volver a Llamar 🔊</span>
-                            </button>
-
-                            {needsCashierPay ? (
-                              <button
-                                type="button"
-                                onClick={() => handleSendToCaja(app.id)}
-                                className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold text-[10px] uppercase tracking-wider px-4 py-2 rounded transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Play className="w-3.5 h-3.5" />
-                                <span>Llamar y Enviar a Caja de Pago</span>
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-emerald-400 font-black flex items-center gap-1.5">
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                <span>Enviado a Caja Correctamente</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
                       </div>
 
                       {/* Final closure button */}
                       <div className="pt-2 flex justify-end gap-2">
                         <button
                           type="button"
-                          disabled={needsCashierPay}
                           onClick={() => handleCompleteAppointment(app.id)}
-                          className={`px-5 py-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider shadow flex items-center gap-1.5 transition ${
-                            needsCashierPay 
-                              ? 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed'
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-700 cursor-pointer'
-                          }`}
-                          title="Finalizar el trámite únicamente después de registrar el pago de caja"
+                          className="px-5 py-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider shadow flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-700 cursor-pointer transition"
+                          title="Concluir el trámite"
                         >
                           <UserCheck className="w-4 h-4" />
-                          <span>Confirmar Pago & Finalizar Cita</span>
+                          <span>Concluir trámite</span>
                         </button>
                       </div>
                     </div>
@@ -2733,9 +2691,6 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                     <div className="text-xl font-black text-white uppercase tracking-tight">
                       {featuredBooth.name}
                     </div>
-                    <div className="text-[11px] font-bold text-amber-300">
-                      Operador: {featuredBooth.staff}
-                    </div>
                     <div className="pt-1.5">
                       <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/20">
                         <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
@@ -2788,7 +2743,6 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                           <span className={`w-2.5 h-2.5 rounded-full ${activeApp ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`} />
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-slate-450 block truncate">Operador: <strong className="text-slate-300 font-semibold">{b.staff}</strong></span>
                     </div>
 
                     {/* Mid Content - Big Ticket Code, Procedure and Name */}
@@ -2838,9 +2792,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
             </div>
 
             {/* Bottom Section: Sala de Espera y Queue de Supervisor */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
-              {/* Column 1 & 2: Cola general del día esperando verificación */}
-              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-md">
+            <div className="pt-2">
+              {/* Cola general del día esperando verificación */}
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-md">
                 <div className="flex items-center justify-between border-b border-slate-850 pb-3">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full" />
@@ -2856,7 +2810,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                     No hay ciudadanos listos en cola esperando despacho de cubículo.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[220px] overflow-y-auto pr-1">
                     {queueSupervisorPending.map(app => (
                       <div key={`tv-queue-${app.id}`} className="bg-slate-950/80 p-3.5 rounded-lg border border-slate-850 flex items-center justify-between gap-3">
                         <div className="text-left space-y-0.5 truncate">
@@ -2874,43 +2828,6 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                     ))}
                   </div>
                 )}
-              </div>
-
-              {/* Column 3: Historial de Turnos Completados RECIENTES */}
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-md">
-                <div className="flex items-center gap-2 border-b border-slate-850 pb-3">
-                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-200">Trámites Finalizados</span>
-                </div>
-
-                {(() => {
-                  const realizadas = appointments.filter(app => appMetadata[app.id]?.estadoTicket === 'realizada');
-                  if (realizadas.length === 0) {
-                    return (
-                      <div className="p-10 text-center text-slate-505 text-xs font-bold italic text-slate-500">
-                        Cero registros de hoy.
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-                      {realizadas
-                        .slice(-4)
-                        .reverse()
-                        .map(app => (
-                          <div key={`tv-recent-${app.id}`} className="bg-emerald-950/10 border border-emerald-500/15 p-2.5 rounded-lg flex items-center justify-between">
-                            <div className="text-left font-mono space-y-0.5">
-                              <span className="text-[10px] font-black text-slate-300">E-{app.id.slice(-4).toUpperCase()}</span>
-                              <span className="text-[9px] text-slate-400 block truncate max-w-[130px] font-semibold">
-                                {getExtranjeriaCitizenName(app)}
-                              </span>
-                            </div>
-                            <span className="text-[8.5px] font-black text-emerald-450 uppercase font-bold">FINALIZADO</span>
-                          </div>
-                        ))}
-                    </div>
-                  );
-                })()}
               </div>
             </div>
           </div>
