@@ -457,16 +457,18 @@ Su número de seguimiento es: ${uniqueNumber}`;
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a4'
+      format: 'letter'
     });
+
+    const pageW = doc.internal.pageSize.getWidth();
 
     // Dark slate band header
     doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.rect(0, 0, pageW, 40, 'F');
 
     // Accent line (Gold/Amber)
     doc.setFillColor(217, 119, 6);
-    doc.rect(0, 40, 210, 2.5, 'F');
+    doc.rect(0, 40, pageW, 2.5, 'F');
 
     // Title / Header Text
     doc.setTextColor(255, 255, 255);
@@ -491,7 +493,7 @@ Su número de seguimiento es: ${uniqueNumber}`;
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9.5);
     doc.setTextColor(71, 85, 105);
-    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación de pasados de edad presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: 170 });
+    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación de pasados de edad presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: pageW - 40 });
 
     currentY += 15;
 
@@ -499,7 +501,7 @@ Su número de seguimiento es: ${uniqueNumber}`;
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.3);
-    doc.rect(20, currentY, 170, 52, 'FD');
+    doc.rect(20, currentY, pageW - 40, 52, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -536,29 +538,29 @@ Su número de seguimiento es: ${uniqueNumber}`;
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text('Este documento le faculta para agendar de forma autónoma su cita en el sistema electoral. Ingrese al enlace provisto a continuación o escanee las credenciales correspondientes:', 20, currentY, { maxWidth: 170 });
+    doc.text('Este documento le faculta para agendar de forma autónoma su cita en el sistema electoral. Ingrese al enlace provisto a continuación o escanee las credenciales correspondientes:', 20, currentY, { maxWidth: pageW - 40 });
 
     currentY += 12;
     doc.setFillColor(239, 246, 255);
     doc.setDrawColor(191, 219, 254);
-    doc.rect(20, currentY, 170, 16, 'FD');
+    doc.rect(20, currentY, pageW - 40, 16, 'FD');
 
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(29, 78, 216);
     const linkToRender = exp.link || exp.directLink || '';
-    doc.text(linkToRender, 24, currentY + 10, { maxWidth: 162 });
+    doc.text(linkToRender, 24, currentY + 10, { maxWidth: pageW - 48 });
 
     currentY += 28;
     doc.setDrawColor(226, 232, 240);
-    doc.line(20, currentY, 190, currentY);
+    doc.line(20, currentY, pageW - 20, currentY);
 
     currentY += 10;
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
     doc.text('TRIBUNAL ELECTORAL DE PANAMÁ - CONTROL PASADOS DE EDAD', 20, currentY);
-    doc.text('SISTEMA DE ASIGNACIÓN Y SEGUIMIENTO AUTOMATIZADO - VIGENCIA 2026', 100, currentY);
+    doc.text('SISTEMA DE ASIGNACIÓN Y SEGUIMIENTO AUTOMATIZADO - VIGENCIA 2026', pageW - 135, currentY);
 
     doc.save(`Tracking_${exp.number || exp.id}.pdf`);
   };
@@ -796,17 +798,19 @@ Su número de seguimiento es: ${trackNum}`;
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4'
+        format: 'letter'
       });
+
+      const pageW = doc.internal.pageSize.getWidth();
 
       const drawHeader = (y: number) => {
         // Dark slate band header
         doc.setFillColor(15, 23, 42); // slate-900
-        doc.rect(0, y, 210, 45, 'F');
+        doc.rect(0, y, pageW, 45, 'F');
 
         // Accent border line (Emerald green representing realized/completed successfully)
         doc.setFillColor(16, 185, 129); // emerald-500
-        doc.rect(0, y + 45, 210, 2.5, 'F');
+        doc.rect(0, y + 45, pageW, 2.5, 'F');
 
         // Title & Header Text
         doc.setTextColor(255, 255, 255);
@@ -826,7 +830,7 @@ Su número de seguimiento es: ${trackNum}`;
 
       const drawTableHead = (y: number) => {
         doc.setFillColor(30, 41, 59); // slate-800
-        doc.rect(20, y, 170, 7.5, 'F');
+        doc.rect(20, y, pageW - 40, 7.5, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('Helvetica', 'bold');
         doc.setFontSize(7.5);
@@ -835,7 +839,7 @@ Su número de seguimiento es: ${trackNum}`;
         doc.text('CIUDADANO SOLICITANTE', 48, y + 5);
         doc.text('CÉDULA / ID', 105, y + 5);
         doc.text('SUCURSAL', 135, y + 5);
-        doc.text('ESTADO', 172, y + 5);
+        doc.text('ESTADO', pageW - 38, y + 5);
       };
 
       // Draw initial page header
@@ -853,7 +857,7 @@ Su número de seguimiento es: ${trackNum}`;
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(71, 85, 105);
-      doc.text(`Constancia generada para el control de citas operativas registradas en el sistema para ciudadanos rezagados (pasados de edad).`, 20, currentY, { maxWidth: 170 });
+      doc.text(`Constancia generada para el control de citas operativas registradas en el sistema para ciudadanos rezagados (pasados de edad).`, 20, currentY, { maxWidth: pageW - 40 });
 
       currentY += 12;
 
@@ -861,7 +865,7 @@ Su número de seguimiento es: ${trackNum}`;
       doc.setFillColor(240, 253, 250); // emerald-50
       doc.setDrawColor(110, 231, 183); // emerald-300
       doc.setLineWidth(0.3);
-      doc.rect(20, currentY, 170, 28, 'FD'); // Expanded from 16 to 28 height
+      doc.rect(20, currentY, pageW - 40, 28, 'FD'); // Expanded from 16 to 28 height
 
       doc.setTextColor(15, 23, 42);
       doc.setFont('Helvetica', 'bold');
@@ -869,7 +873,7 @@ Su número de seguimiento es: ${trackNum}`;
       doc.text(`CANTIDAD TOTAL DE CITAS ENCONTRADAS (VID): `, 26, currentY + 10);
       doc.setFontSize(11);
       doc.setTextColor(5, 150, 105); // emerald-600
-      doc.text(`${records.length} Citas`, 160, currentY + 10);
+      doc.text(`${records.length} Citas`, pageW - 50, currentY + 10);
 
       // Nomenclature breakdown in VID Report
       doc.setFont('Helvetica', 'bold');
@@ -896,13 +900,13 @@ Su número de seguimiento es: ${trackNum}`;
 
       if (records.length === 0) {
         doc.setDrawColor(226, 232, 240);
-        doc.rect(20, currentY, 170, 12, 'D');
+        doc.rect(20, currentY, pageW - 40, 12, 'D');
         doc.text('No se encontraron registros de citas dentro de este lapso temporal.', 25, currentY + 8);
         currentY += 15;
       } else {
         records.forEach((rec, idx) => {
           // If we are reaching the bottom of the page, add page and reset headers
-          if (currentY > 265) {
+          if (currentY > 245) {
             doc.addPage();
             drawHeader(0);
             currentY = 55;
@@ -911,7 +915,7 @@ Su número de seguimiento es: ${trackNum}`;
           }
 
           doc.setDrawColor(241, 245, 249);
-          doc.rect(20, currentY, 170, 9, 'D');
+          doc.rect(20, currentY, pageW - 40, 9, 'D');
           
           doc.setFont('Helvetica', 'bold');
           doc.setTextColor(15, 23, 42);
@@ -932,13 +936,13 @@ Su número de seguimiento es: ${trackNum}`;
           const est = (rec.estado || 'CONFIRMADA').toUpperCase();
           if (est === 'REALIZADA' || est === 'COMPLETADA' || est === 'ATENDIDO') {
             doc.setTextColor(16, 124, 65);
-            doc.text('ATENDIDO', 172, currentY + 6);
+            doc.text('ATENDIDO', pageW - 38, currentY + 6);
           } else if (est === 'CANCELADA' || est === 'NO_ASISTIRE' || est === 'CANCELADO') {
             doc.setTextColor(185, 28, 28);
-            doc.text('CANCELADA', 172, currentY + 6);
+            doc.text('CANCELADA', pageW - 38, currentY + 6);
           } else {
             doc.setTextColor(29, 78, 216); // Blue
-            doc.text('CONFIRMADA', 172, currentY + 6);
+            doc.text('CONFIRMADA', pageW - 38, currentY + 6);
           }
           doc.setTextColor(51, 65, 85);
           

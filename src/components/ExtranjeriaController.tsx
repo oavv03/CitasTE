@@ -1091,8 +1091,10 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a4'
+      format: 'letter'
     });
+
+    const pageW = doc.internal.pageSize.getWidth();
 
     const primaryColor = [15, 23, 42]; // Slate 900
     const accentColor = [217, 119, 6];  // Amber 600
@@ -1102,7 +1104,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     const drawHeader = () => {
       // Top accent bar
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(10, currentY, 190, 10, 'F');
+      doc.rect(10, currentY, pageW - 20, 10, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFont('Helvetica', 'bold');
@@ -1128,7 +1130,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       currentY += 4;
       doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
       doc.setLineWidth(0.8);
-      doc.line(10, currentY, 200, currentY);
+      doc.line(10, currentY, pageW - 10, currentY);
       currentY += 8;
     };
 
@@ -1143,7 +1145,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.25);
-    doc.rect(10, currentY, 190, 26, 'FD');
+    doc.rect(10, currentY, pageW - 20, 26, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -1155,8 +1157,8 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     doc.setTextColor(71, 85, 105);
     doc.text(`• Total Citas Registradas: ${totalCount}  |  Completadas: ${completedCount}  |  Pendientes: ${pendingCount}  |  Canceladas: ${cancelledCount}`, 15, currentY + 11);
     doc.text(`• Capacidad Máxima del Periodo: Regulada por intervalos de ${intervalo} min con promedio de ${capacidad} slots`, 15, currentY + 15);
-    doc.text(`• Casilleros Activos totales: ${activeBoothsCount} puestos`, 125, currentY + 11);
-    doc.text(`• Reporte Oficial con Estados Generales`, 125, currentY + 15);
+    doc.text(`• Casilleros Activos totales: ${activeBoothsCount} puestos`, pageW - 85, currentY + 11);
+    doc.text(`• Reporte Oficial con Estados Generales`, pageW - 85, currentY + 15);
 
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(7.5);
@@ -1171,7 +1173,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     // Table Headers
     const drawTableHead = (y: number) => {
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(10, y, 190, 7, 'F');
+      doc.rect(10, y, pageW - 20, 7, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFont('Helvetica', 'bold');
@@ -1191,7 +1193,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     // Render Completed Appointments
     list.forEach((app, index) => {
       const meta = appMetadata[app.id];
-      if (currentY > 270) {
+      if (currentY > 245) {
         doc.addPage();
         currentY = 15;
         drawHeader();
@@ -1202,7 +1204,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       // Zebra rows striped
       if (index % 2 === 1) {
         doc.setFillColor(248, 250, 252);
-        doc.rect(10, currentY, 190, 8, 'F');
+        doc.rect(10, currentY, pageW - 20, 8, 'F');
       }
 
       doc.setTextColor(15, 23, 42);
@@ -1243,7 +1245,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
 
       doc.setDrawColor(241, 245, 249);
       doc.setLineWidth(0.1);
-      doc.line(10, currentY + 8, 200, currentY + 8);
+      doc.line(10, currentY + 8, pageW - 10, currentY + 8);
 
       currentY += 8;
     });

@@ -353,8 +353,10 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a4'
+      format: 'letter'
     });
+
+    const pageW = doc.internal.pageSize.getWidth();
 
     const primaryColor = [15, 23, 42]; // Slate 900
     
@@ -372,7 +374,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     const drawHeader = () => {
       // Top bar
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(10, currentY, 190, 10, 'F');
+      doc.rect(10, currentY, pageW - 20, 10, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFont('Helvetica', 'bold');
@@ -409,7 +411,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       currentY += 4;
       doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
       doc.setLineWidth(0.8);
-      doc.line(10, currentY, 200, currentY);
+      doc.line(10, currentY, pageW - 10, currentY);
       currentY += 8;
     };
 
@@ -419,7 +421,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFillColor(248, 250, 252); // Slate 50
     doc.setDrawColor(226, 232, 240); // Slate 200
     doc.setLineWidth(0.25);
-    doc.rect(10, currentY, 190, 28, 'FD');
+    doc.rect(10, currentY, pageW - 20, 28, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -452,7 +454,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     // Table Headers
     const drawTableHead = (y: number) => {
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(10, y, 190, 7, 'F');
+      doc.rect(10, y, pageW - 20, 7, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFont('Helvetica', 'bold');
@@ -463,7 +465,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       doc.text('RECIPIENTE/SOLICITANTE', 68, y + 4.8);
       doc.text('CÉDULA/PASAPORTE', 118, y + 4.8);
       doc.text('CORREO ELECTRÓNICO', 145, y + 4.8);
-      doc.text('ESTATUS', 180, y + 4.8);
+      doc.text('ESTATUS', pageW - 30, y + 4.8);
     };
 
     drawTableHead(currentY);
@@ -471,7 +473,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
     // Render Rows
     filtered.forEach((c, index) => {
-      if (currentY > 270) {
+      if (currentY > 245) {
         doc.addPage();
         currentY = 15;
         drawHeader();
@@ -482,7 +484,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       // Alternate row background
       if (index % 2 === 1) {
         doc.setFillColor(248, 250, 252);
-        doc.rect(10, currentY, 190, 8, 'F');
+        doc.rect(10, currentY, pageW - 20, 8, 'F');
       }
 
       doc.setTextColor(15, 23, 42);
@@ -516,11 +518,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
         doc.setTextColor(185, 28, 28);
         doc.setFont('Helvetica', 'bold');
       }
-      doc.text(statusText, 180, currentY + 5);
+      doc.text(statusText, pageW - 30, currentY + 5);
 
       doc.setDrawColor(241, 245, 249);
       doc.setLineWidth(0.1);
-      doc.line(10, currentY + 8, 200, currentY + 8);
+      doc.line(10, currentY + 8, pageW - 10, currentY + 8);
 
       currentY += 8;
     });
@@ -535,16 +537,18 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a4'
+      format: 'letter'
     });
+
+    const pageW = doc.internal.pageSize.getWidth();
 
     // Dark slate band header
     doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.rect(0, 0, pageW, 40, 'F');
 
     // Accent line (Gold/Amber)
     doc.setFillColor(217, 119, 6);
-    doc.rect(0, 40, 210, 2.5, 'F');
+    doc.rect(0, 40, pageW, 2.5, 'F');
 
     // Title / Header Text
     doc.setTextColor(255, 255, 255);
@@ -572,7 +576,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9.5);
     doc.setTextColor(71, 85, 105);
-    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación de pasados de edad presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: 170 });
+    doc.text('Estimado(a) ciudadano(a), el Tribunal Electoral de Panamá hace constar que se ha registrado su expediente de filiación de pasados de edad presencial bajo las siguientes credenciales autorizadas:', 20, currentY, { maxWidth: pageW - 40 });
 
     currentY += 15;
 
@@ -580,7 +584,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.3);
-    doc.rect(20, currentY, 170, 52, 'FD');
+    doc.rect(20, currentY, pageW - 40, 52, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -612,7 +616,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFillColor(254, 243, amberIndexColor(exp)); // Amber background
     doc.setDrawColor(251, 191, 36);  // Amber 400
     doc.setLineWidth(0.4);
-    doc.rect(20, currentY, 170, 36, 'FD');
+    doc.rect(20, currentY, pageW - 40, 36, 'FD');
 
     doc.setTextColor(180, 83, 9); // Amber 700
     doc.setFont('Helvetica', 'bold');
@@ -627,7 +631,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(120, 113, 108);
-    doc.text('Presente este código impreso o en su dispositivo al momento de presentarse a la sucursal seleccionada para su cita.', 26, currentY + 26, { maxWidth: 156 });
+    doc.text('Presente este código impreso o en su dispositivo al momento de presentarse a la sucursal seleccionada para su cita.', 26, currentY + 26, { maxWidth: pageW - 52 });
 
     currentY += 46;
 
@@ -641,13 +645,13 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFillColor(241, 245, 249);
     doc.setDrawColor(203, 213, 225);
     doc.setLineWidth(0.1);
-    doc.rect(20, currentY, 170, 12, 'FD');
+    doc.rect(20, currentY, pageW - 40, 12, 'FD');
 
     doc.setTextColor(37, 99, 235); // Blue 600
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(7.5);
     const linkText = exp.link || exp.directLink || `${pasadoEdadLinkBase.trim().endsWith('/') ? pasadoEdadLinkBase.trim().slice(0, -1) : pasadoEdadLinkBase.trim()}/?tramite=ced_pasados_edad&seguimiento=${exp.number || exp.id}`;
-    doc.text(linkText, 24, currentY + 7.5, { maxWidth: 162 });
+    doc.text(linkText, 24, currentY + 7.5, { maxWidth: pageW - 48 });
 
     currentY += 22;
 
@@ -661,14 +665,14 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(100, 116, 139);
-    doc.text('1. Ingrese al enlace anterior o acceda a la plataforma e ingrese su Código de Seguimiento.\n2. Seleccione la fecha, hora e instalaciones de la sucursal donde desea realizar su proceso de filiación.\n3. Acuda a la hora programada. Se requiere puntualidad (llegar 15 minutos antes con sus documentos originales).', 20, currentY, { maxWidth: 170 });
+    doc.text('1. Ingrese al enlace anterior o acceda a la plataforma e ingrese su Código de Seguimiento.\n2. Seleccione la fecha, hora e instalaciones de la sucursal donde desea realizar su proceso de filiación.\n3. Acuda a la hora programada. Se requiere puntualidad (llegar 15 minutos antes con sus documentos originales).', 20, currentY, { maxWidth: pageW - 40 });
 
     currentY += 26;
 
     // Stamp / Footer area
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.2);
-    doc.line(20, currentY, 190, currentY);
+    doc.line(20, currentY, pageW - 20, currentY);
 
     currentY += 8;
     doc.setFont('Helvetica', 'normal');
@@ -897,8 +901,10 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a4'
+      format: 'letter'
     });
+
+    const pageW = doc.internal.pageSize.getWidth();
 
     const primaryColor = [15, 23, 42]; // Slate 900
     const accentColor = [37, 99, 235]; // Blue 600
@@ -908,7 +914,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     const drawHeader = () => {
       // Top bar
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(10, currentY, 190, 10, 'F');
+      doc.rect(10, currentY, pageW - 20, 10, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFont('Helvetica', 'bold');
@@ -936,7 +942,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       currentY += 4;
       doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
       doc.setLineWidth(0.8);
-      doc.line(10, currentY, 200, currentY);
+      doc.line(10, currentY, pageW - 10, currentY);
       currentY += 8;
     };
 
@@ -946,7 +952,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     doc.setFillColor(248, 250, 252); // Slate 50
     doc.setDrawColor(226, 232, 240); // Slate 200
     doc.setLineWidth(0.25);
-    doc.rect(10, currentY, 190, 28, 'FD');
+    doc.rect(10, currentY, pageW - 20, 28, 'FD');
 
     doc.setTextColor(15, 23, 42);
     doc.setFont('Helvetica', 'bold');
@@ -982,7 +988,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
     // Table Headers
     const drawTableHead = (y: number) => {
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(10, y, 190, 7, 'F');
+      doc.rect(10, y, pageW - 20, 7, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFont('Helvetica', 'bold');
@@ -993,7 +999,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       doc.text('RECIPIENTE / SOLICITANTE', 85, y + 4.8);
       doc.text('CÉDULA / ID', 130, y + 4.8);
       doc.text('FECHA/HORA', 154, y + 4.8);
-      doc.text('ESTATUS', 182, y + 4.8);
+      doc.text('ESTATUS', pageW - 28, y + 4.8);
     };
 
     drawTableHead(currentY);
@@ -1001,7 +1007,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
 
     // Render Rows
     listForPeriod.forEach((c, index) => {
-      if (currentY > 270) {
+      if (currentY > 245) {
         doc.addPage();
         currentY = 15;
         drawHeader();
@@ -1012,7 +1018,7 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
       // Alternate row background
       if (index % 2 === 1) {
         doc.setFillColor(248, 250, 252);
-        doc.rect(10, currentY, 190, 8, 'F');
+        doc.rect(10, currentY, pageW - 20, 8, 'F');
       }
 
       doc.setTextColor(15, 23, 42);
@@ -1048,11 +1054,11 @@ export default function AdminPanel({ citas, onUpdateCitas, onClose }: AdminPanel
         doc.setTextColor(185, 28, 28);
         doc.setFont('Helvetica', 'bold');
       }
-      doc.text(statusText, 182, currentY + 5);
+      doc.text(statusText, pageW - 28, currentY + 5);
 
       doc.setDrawColor(241, 245, 249);
       doc.setLineWidth(0.1);
-      doc.line(10, currentY + 8, 200, currentY + 8);
+      doc.line(10, currentY + 8, pageW - 10, currentY + 8);
 
       currentY += 8;
     });
