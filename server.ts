@@ -650,6 +650,7 @@ interface ServerCita {
   numeroSeguimiento?: string;
   datosPersonales?: any;
   nombre?: string;
+  creadoPor?: string;
 }
 
 function getAppointments(): ServerCita[] {
@@ -2463,7 +2464,8 @@ async function startServer() {
         subServicioNombre,
         sucursalNombre,
         sucursalDireccion,
-        requisitos
+        requisitos,
+        creadoPor
       } = req.body;
 
       if (!id || !codigoTransaccion) {
@@ -2568,7 +2570,8 @@ async function startServer() {
         fechaCreacion: fechaCreacion || new Date().toISOString(),
         numeroSeguimiento: datosPersonales?.numeroSeguimiento || req.body.numeroSeguimiento || undefined,
         datosPersonales: datosPersonales || undefined,
-        nombre: datosPersonales?.nombreCompleto || req.body.nombre || ""
+        nombre: datosPersonales?.nombreCompleto || req.body.nombre || "",
+        creadoPor: creadoPor || datosPersonales?.creadoPor || undefined
       };
 
       if (isSupabaseConfigured && supabase) {

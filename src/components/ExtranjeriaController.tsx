@@ -81,24 +81,59 @@ interface AppointmentMetadata {
   staffResponsable?: string;
 }
 
+const getMinutesFromHourString = (timeStr: string) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const ampm = match[3] ? match[3].toUpperCase() : '';
+  if (ampm === 'PM' && hours < 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+};
+
+const isExtranjeriaAppointment = (app: any) => {
+  const cat = (app.servicioCategoria || '').toLowerCase();
+  const catName = (app.categoriaNombre || '').toLowerCase();
+  const sub = (app.subServicioNombre || '').toLowerCase();
+  const subId = (app.subServicioId || '').toLowerCase();
+  return (
+    cat === 'extranjeria' ||
+    catName.includes('extranj') ||
+    sub.includes('extranj') ||
+    subId.includes('extranj')
+  );
+};
+
 export default function ExtranjeriaController({ currentRole, forceSubRole }: ExtranjeriaControllerProps) {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [supervisorSearchQuery, setSupervisorSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [dateFilter, setDateFilter] = useState('');
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' | null }>({ text: '', type: null });
   const [showConfirmSave, setShowConfirmSave] = useState(false);
 
-  // Return the first name and first last name if available, otherwise fallback
+  // Return the complete formatted citizen name
   const getExtranjeriaCitizenName = (app: any) => {
     if (!app) return 'N/D';
-    const first = app.datosPersonales?.primerNombre || '';
-    const last = app.datosPersonales?.primerApellido || '';
-    if (first || last) {
-      return `${first} ${last}`.trim();
+    const dp = app.datosPersonales;
+    if (dp) {
+      const parts = [
+        dp.primerNombre || '',
+        dp.segundoNombre || '',
+        dp.primerApellido || '',
+        dp.segundoApellido || ''
+      ].map(s => s.trim()).filter(Boolean);
+      
+      if (parts.length > 0) {
+        return parts.join(' ');
+      }
+      if (dp.nombreCompleto) return dp.nombreCompleto;
     }
-    return app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
+    return app.nombre || 'N/D';
   };
 
   // Profile Simulator selection
@@ -231,7 +266,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
     return days;
   }, [calendarDate]);
 
-  // Appointments grouped by date for fast lookup in calendars
+  // Appointments grouped by date for fast lookup in calendars, sorted by hour
   const appointmentsByDate = useMemo(() => {
     const g: Record<string, any[]> = {};
     appointments.forEach(app => {
@@ -240,6 +275,14 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
         if (!g[d]) g[d] = [];
         g[d].push(app);
       }
+    });
+    // Sort each day's appointments by hour
+    Object.keys(g).forEach(key => {
+      g[key].sort((a, b) => {
+        const timeA = getMinutesFromHourString(a.hora || '');
+        const timeB = getMinutesFromHourString(b.hora || '');
+        return timeA - timeB;
+      });
     });
     return g;
   }, [appointments]);
@@ -430,11 +473,13 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
           const catName = (app.categoriaNombre || '').toLowerCase();
           const sub = (app.subServicioNombre || '').toLowerCase();
           const subId = (app.subServicioId || '').toLowerCase();
+          const isTardia = subId === 'ced_pasados_edad' || sub.includes('tardía') || sub.includes('tardia');
           return (
             cat === 'extranjeria' ||
             catName.includes('extranj') ||
             sub.includes('extranj') ||
-            subId.includes('extranj')
+            subId.includes('extranj') ||
+            isTardia
           );
         });
         setAppointments(filtered);
@@ -458,6 +503,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
 
     try {
       const transactionId = 'EXT-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      const creatorName = sessionStorage.getItem('admin_username') || 'Supervisor de Extranjería';
       const payload = {
         id: transactionId,
         correo: newCitaCorreo.trim() || 'extranjeria@te.gob.pa',
@@ -474,6 +520,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
         estado: 'confirmada',
         telefono: newCitaTelefono.trim() || 'N/A',
         nombre: newCitaNombre.trim(),
+        creadoPor: creatorName,
         datosPersonales: {
           primerNombre: newCitaNombre.split(' ')[0] || '',
           primerApellido: newCitaNombre.split(' ')[1] || '',
@@ -481,7 +528,8 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
           pasaporte: newCitaPasaporte.trim(),
           nacionalidad: newCitaNacionalidad.trim() || 'No especificada',
           correo: newCitaCorreo.trim() || 'extranjeria@te.gob.pa',
-          telefono: newCitaTelefono.trim() || 'N/A'
+          telefono: newCitaTelefono.trim() || 'N/A',
+          creadoPor: creatorName
         },
         requisitos: [
           'Nota de Migración',
@@ -857,7 +905,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   const queueAtencionIn = useMemo(() => {
     return appointments.filter(app => {
       const meta = appMetadata[app.id];
-      return !meta || !meta.passedToSupervisor;
+      return isExtranjeriaAppointment(app) && (!meta || !meta.passedToSupervisor);
     });
   }, [appointments, appMetadata]);
 
@@ -865,7 +913,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   const queueAtencionOut = useMemo(() => {
     return appointments.filter(app => {
       const meta = appMetadata[app.id];
-      return meta && meta.passedToSupervisor;
+      return isExtranjeriaAppointment(app) && meta && meta.passedToSupervisor;
     });
   }, [appointments, appMetadata]);
 
@@ -873,9 +921,29 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   const queueSupervisorPending = useMemo(() => {
     return appointments.filter(app => {
       const meta = appMetadata[app.id];
-      return meta && meta.passedToSupervisor && meta.assignedCubiculo === null;
+      return isExtranjeriaAppointment(app) && meta && meta.passedToSupervisor && meta.assignedCubiculo === null;
     });
   }, [appointments, appMetadata]);
+
+  // Filtered supervisor pending list for quick search
+  const filteredQueueSupervisorPending = useMemo(() => {
+    const query = supervisorSearchQuery.trim().toLowerCase();
+    if (!query) return queueSupervisorPending;
+    return queueSupervisorPending.filter(app => {
+      const name = getExtranjeriaCitizenName(app).toLowerCase();
+      const passport = (app.datosPersonales?.pasaporte || app.identificacion || '').toLowerCase();
+      const id = app.id.toLowerCase();
+      const subServicio = (app.subServicioNombre || 'Servicio de Cedulación Extranjera').toLowerCase();
+      const createdBy = (app.creadoPor || app.datosPersonales?.creadoPor || 'Portal del Ciudadano').toLowerCase();
+      return (
+        name.includes(query) ||
+        passport.includes(query) ||
+        id.includes(query) ||
+        subServicio.includes(query) ||
+        createdBy.includes(query)
+      );
+    });
+  }, [queueSupervisorPending, supervisorSearchQuery]);
 
   // Filtered appointments for the supervisor's period dashboard
   const supervisorFilteredAppointments = useMemo(() => {
@@ -911,6 +979,15 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
       }
 
       return true;
+    }).sort((a, b) => {
+      const dateA = a.fecha || '';
+      const dateB = b.fecha || '';
+      if (dateA !== dateB) {
+        return dateA.localeCompare(dateB);
+      }
+      const timeA = getMinutesFromHourString(a.hora || '');
+      const timeB = getMinutesFromHourString(b.hora || '');
+      return timeA - timeB;
     });
   }, [appointments, supervisorPeriodFilter]);
 
@@ -951,7 +1028,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
   const queueCubiculoAssigned = useMemo(() => {
     return appointments.filter(app => {
       const meta = appMetadata[app.id];
-      return meta && meta.assignedCubiculo === selectedCubiculo && meta.estadoTicket !== 'realizada';
+      return isExtranjeriaAppointment(app) && meta && meta.assignedCubiculo === selectedCubiculo && meta.estadoTicket !== 'realizada';
     });
   }, [appointments, appMetadata, selectedCubiculo]);
 
@@ -1384,74 +1461,74 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
           </div>
 
           {supervisorTab === 'flujo' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className={currentRole === 'super' ? "grid grid-cols-1 lg:grid-cols-12 gap-6" : "space-y-6"}>
             
             {/* Left side: Casilleros and Controls */}
-            <div className="lg:col-span-5 space-y-6">
-              
-              {/* CASILLEROS DE ATENCIÓN (CUBÍCULOS MANAGER) */}
-              <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-900">
-                  <div className="space-y-0.5">
-                    <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
-                      <Building2 className="w-4 h-4 text-amber-500" />
-                      <span>Casilleros de Atención</span>
-                    </h4>
-                    <p className="text-[9.5px] text-slate-450 font-bold uppercase">4 Operativos fijos  |  4 Puestos de reserva</p>
+            {currentRole === 'super' && (
+              <div className="lg:col-span-5 space-y-6">
+                
+                {/* CASILLEROS DE ATENCIÓN (CUBÍCULOS MANAGER) */}
+                <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-900">
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-amber-500" />
+                        <span>Casilleros de Atención</span>
+                      </h4>
+                      <p className="text-[9.5px] text-slate-455 font-bold uppercase">4 Operativos fijos  |  4 Puestos de reserva</p>
+                    </div>
+                    <span className="text-xs font-mono font-black px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-amber-400">
+                      {activeBoothsCount} Abiertos
+                    </span>
                   </div>
-                  <span className="text-xs font-mono font-black px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-amber-400">
-                    {activeBoothsCount} Abiertos
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3.5 pt-1">
-                  {booths.map(b => (
-                    <div 
-                      key={b.id} 
-                      className={`p-3.5 rounded-lg border transition flex flex-col justify-between gap-3 ${
-                        b.active 
-                          ? 'bg-slate-900/90 border-emerald-500/40 shadow-inner' 
-                          : 'bg-slate-950 border-slate-850 opacity-60'
-                      }`}
-                    >
-                      <div className="space-y-1 text-left">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-black text-slate-250 uppercase">{b.name}</span>
-                          <span className={`w-2.5 h-2.5 rounded-full ${b.active ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`} />
-                        </div>
-                        <span className="text-[9.5px] font-bold text-slate-400 font-mono block">Personal: {b.staff}</span>
-                        <div className="pt-1.5">
-                          {b.empty ? (
-                            <span className="text-[8px] bg-slate-900/50 text-slate-450 border border-slate-800 font-black uppercase px-2 py-0.5 rounded">
-                              Reserva Vacía
-                            </span>
-                          ) : (
-                            <span className="text-[8px] bg-emerald-950/40 text-emerald-400 border border-emerald-900 font-black uppercase px-2 py-0.5 rounded">
-                              Fijo Habilitado
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Enable/Disable dynamic switch button */}
-                      <button
-                        type="button"
-                        onClick={() => toggleBoothActive(b.id)}
-                        className={`w-full py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition ${
+                  <div className="grid grid-cols-2 gap-3.5 pt-1">
+                    {booths.map(b => (
+                      <div 
+                        key={b.id} 
+                        className={`p-3.5 rounded-lg border transition flex flex-col justify-between gap-3 ${
                           b.active 
-                            ? 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800' 
-                            : 'bg-amber-600/90 hover:bg-amber-700 text-white shadow-md'
+                            ? 'bg-slate-900/90 border-emerald-500/40 shadow-inner' 
+                            : 'bg-slate-950 border-slate-850 opacity-60'
                         }`}
                       >
-                        {b.active ? 'Desactivar' : b.empty ? 'Activar Reserva' : 'Activar Casillero'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                        <div className="space-y-1 text-left">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-black text-slate-250 uppercase">{b.name}</span>
+                            <span className={`w-2.5 h-2.5 rounded-full ${b.active ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`} />
+                          </div>
+                          <span className="text-[9.5px] font-bold text-slate-400 font-mono block">Personal: {b.staff}</span>
+                          <div className="pt-1.5">
+                            {b.empty ? (
+                              <span className="text-[8px] bg-slate-900/50 text-slate-450 border border-slate-800 font-black uppercase px-2 py-0.5 rounded">
+                                Reserva Vacía
+                              </span>
+                            ) : (
+                              <span className="text-[8px] bg-emerald-950/40 text-emerald-400 border border-emerald-900 font-black uppercase px-2 py-0.5 rounded">
+                                Fijo Habilitado
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-              {/* TIMING CONFIGURATOR */}
-              {currentRole === 'super' && (
+                        {/* Enable/Disable dynamic switch button */}
+                        <button
+                          type="button"
+                          onClick={() => toggleBoothActive(b.id)}
+                          className={`w-full py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition ${
+                            b.active 
+                              ? 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800' 
+                              : 'bg-amber-600/90 hover:bg-amber-700 text-white shadow-md'
+                          }`}
+                        >
+                          {b.active ? 'Desactivar' : b.empty ? 'Activar Reserva' : 'Activar Casillero'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* TIMING CONFIGURATOR */}
                 <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-amber-500" />
@@ -1526,12 +1603,12 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                     </button>
                   </form>
                 </div>
-              )}
 
-            </div>
+              </div>
+            )}
 
             {/* Right side: Waiting List for Assignments and Management Reports */}
-            <div className="lg:col-span-7 space-y-6">
+            <div className={currentRole === 'super' ? "lg:col-span-7 space-y-6" : "space-y-6"}>
 
               {/* OUTSTANDING CITATIONS FOR CUBICLE ASSIGNMENT */}
               <div className="bg-slate-950 rounded-xl border border-slate-800 p-5 space-y-4 shadow-xl">
@@ -1557,6 +1634,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                         <div className="text-[11px] font-mono font-black text-white">{selectedAppForSupervisor.id}</div>
                         <div className="text-xs font-bold text-slate-150 uppercase">
                           {getExtranjeriaCitizenName(selectedAppForSupervisor)}
+                        </div>
+                        <div className="text-[10px] text-emerald-400 font-bold block font-sans">
+                          Agendado por: {selectedAppForSupervisor.creadoPor || selectedAppForSupervisor.datosPersonales?.creadoPor || 'Portal del Ciudadano'}
                         </div>
                       </div>
                       
@@ -1668,39 +1748,72 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                     </p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-850/60 max-h-[400px] overflow-y-auto pr-1">
-                    {queueSupervisorPending.map(app => {
-                      const name = app.datosPersonales?.nombreCompleto || app.nombre || 'N/D';
-                      const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
-                      
-                      return (
+                  <div className="space-y-3.5">
+                    {/* Live Search Input for Supervisor Pending Queue */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Búsqueda rápida por Nombre, ID, Pasaporte, Trámite, Creado por..."
+                        value={supervisorSearchQuery}
+                        onChange={(e) => setSupervisorSearchQuery(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-md py-1.5 pl-9 pr-8 text-[11px] text-white focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-amber-500 font-medium placeholder-slate-600"
+                      />
+                      {supervisorSearchQuery && (
                         <button
-                          key={app.id} 
                           type="button"
-                          onClick={() => {
-                            setSelectedAppForSupervisor(app);
-                            setSupervisorCheckedDocs([]);
-                          }}
-                          className="w-full py-3.5 px-3 text-left transition hover:bg-slate-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-850/30 last:border-0 rounded-lg cursor-pointer"
+                          onClick={() => setSupervisorSearchQuery('')}
+                          className="absolute right-2.5 top-1.5 text-slate-500 hover:text-white text-xs font-black px-1"
                         >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold font-mono text-amber-400">{app.id}</span>
-                              <span className="text-[8.5px] bg-amber-950/20 border border-amber-500/30 text-amber-400 uppercase font-bold px-1.5 py-0.2 rounded font-mono">
-                                Pre-verificado (Atención)
-                              </span>
-                            </div>
-                            <span className="text-xs font-bold text-slate-200 block uppercase">{name}</span>
-                            <span className="text-[9.5px] font-mono text-slate-450 block font-semibold">PAS: {passport} | Fecha: {app.fecha} ({app.hora})</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-slate-400 hover:text-white transition font-black uppercase text-[9.5px] tracking-wider shrink-0 bg-slate-900 border border-slate-800 px-3 py-2 rounded-md">
-                            <span>Verificar Requisitos</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </div>
+                          ✕
                         </button>
-                      );
-                    })}
+                      )}
+                    </div>
+
+                    {filteredQueueSupervisorPending.length === 0 ? (
+                      <div className="py-12 border border-dashed border-slate-850 rounded-lg text-center space-y-1.5 text-slate-500">
+                        <span className="text-[11px] font-bold uppercase tracking-wider block text-slate-400">Sin Coincidencias</span>
+                        <p className="text-[10px] max-w-xs mx-auto leading-relaxed">
+                          No se encontraron expedientes con la búsqueda "<strong className="text-slate-300">{supervisorSearchQuery}</strong>". Intente con otro criterio.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-850/60 max-h-[360px] overflow-y-auto pr-1">
+                        {filteredQueueSupervisorPending.map(app => {
+                          const name = getExtranjeriaCitizenName(app);
+                          const passport = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
+                          
+                          return (
+                            <button
+                              key={app.id} 
+                              type="button"
+                              onClick={() => {
+                                setSelectedAppForSupervisor(app);
+                                setSupervisorCheckedDocs([]);
+                              }}
+                              className="w-full py-3.5 px-3 text-left transition hover:bg-slate-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-850/30 last:border-0 rounded-lg cursor-pointer"
+                            >
+                              <div className="space-y-1 text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold font-mono text-amber-400">{app.id}</span>
+                                  <span className="text-[8.5px] bg-amber-950/20 border border-amber-500/30 text-amber-400 uppercase font-bold px-1.5 py-0.2 rounded font-mono">
+                                    Pre-verificado (Atención)
+                                  </span>
+                                </div>
+                                <span className="text-xs font-bold text-slate-200 block uppercase">{name}</span>
+                                <span className="text-[9.5px] font-mono text-slate-450 block font-semibold">PAS: {passport} | Fecha: {app.fecha} ({app.hora})</span>
+                                <span className="text-[9.5px] text-emerald-400 block font-semibold">Agendado por: {app.creadoPor || app.datosPersonales?.creadoPor || 'Portal del Ciudadano'}</span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-slate-400 hover:text-white transition font-black uppercase text-[9.5px] tracking-wider shrink-0 bg-slate-900 border border-slate-800 px-3 py-2 rounded-md">
+                                <span>Verificar Requisitos</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2150,6 +2263,8 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                             const pName = app.nombre || app.datosPersonales?.nombreCompleto || 'Ciudadano N/D';
                             const passportVal = app.datosPersonales?.pasaporte || app.identificacion || 'N/D';
                             
+                            const subservice = app.subServicioNombre || (isExtranjeriaAppointment(app) ? 'Servicio de Extranjería' : 'Cédula Pasados de Edad');
+                            
                             return (
                               <div key={`cal-det-${app.id}`} className="space-y-1.5 pt-3.5 first:pt-0">
                                 <div className="flex items-start justify-between gap-2">
@@ -2158,6 +2273,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                                       <span className="text-amber-500 font-mono font-black text-xs">{app.id}</span>
                                       <span className="text-[9px] bg-slate-900 text-slate-400 border border-slate-800 px-1 rounded font-mono font-bold leading-none py-0.5">
                                         {app.hora}
+                                      </span>
+                                      <span className="text-[8px] uppercase tracking-wide bg-slate-900 border border-slate-800 px-1.5 py-0.2 rounded font-black text-slate-400 font-mono">
+                                        {subservice}
                                       </span>
                                     </div>
                                     <h5 className="font-extrabold text-white text-[11px] uppercase truncate max-w-[170px]">
@@ -2279,6 +2397,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                         </div>
                         <span className="text-xs font-bold text-slate-100 block uppercase">{name}</span>
                         <span className="text-[9.5px] font-bold text-slate-450 block font-mono">PAS: {passport}  |  Fecha: {app.fecha} ({app.hora})</span>
+                        <span className="text-[9.5px] text-emerald-400 block font-semibold">Agendado por: {app.creadoPor || app.datosPersonales?.creadoPor || 'Portal del Ciudadano'}</span>
                       </div>
 
                       <div className="py-1">
@@ -2316,6 +2435,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                   <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest block font-mono">Cita para Validación</span>
                   <div className="text-xs font-mono font-black text-white">{selectedAppForCheck.id}</div>
                   <div className="text-sm font-bold text-slate-100 uppercase">{getExtranjeriaCitizenName(selectedAppForCheck)}</div>
+                  <div className="text-[10px] text-emerald-400 font-bold block font-sans">
+                    Agendado por: {selectedAppForCheck.creadoPor || selectedAppForCheck.datosPersonales?.creadoPor || 'Portal del Ciudadano'}
+                  </div>
                   <div className="text-[10px] text-slate-450 leading-relaxed font-semibold">
                     Pasaporte: {selectedAppForCheck.datosPersonales?.pasaporte || selectedAppForCheck.identificacion} <br />
                     Trámite: {selectedAppForCheck.subServicioNombre || 'Servicio de Cedulación Extranjera'}
@@ -2510,6 +2632,7 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                             </span>
                           </div>
                           <h5 className="text-sm font-black text-slate-100 uppercase leading-snug">{name}</h5>
+                          <span className="text-[10px] text-emerald-400 font-bold block">Agendado por: {app.creadoPor || app.datosPersonales?.creadoPor || 'Portal del Ciudadano'}</span>
                           <span className="text-[10px] text-slate-450 font-bold block">Nacionalidad: {app.datosPersonales?.nacionalidad || 'N/D'}  |  Pasaporte: {passport}</span>
                         </div>
                       </div>
@@ -2673,10 +2796,13 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                     <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-amber-300 bg-amber-950 border border-amber-500/35">
                       TRÁMITE DE EXTRANJERÍA
                     </span>
-                    <div className="text-[11px] font-black text-slate-300 uppercase tracking-widest">CIUDADANO CONVOCADO:</div>
+                    <div className="text-[11px] font-black text-slate-300 uppercase tracking-widest font-mono">CIUDADANO CONVOCADO:</div>
                     <div className="text-2xl font-black text-white uppercase tracking-tight truncate">
                       {getExtranjeriaCitizenName(featuredApp)}
                     </div>
+                    <span className="text-[10px] text-emerald-400 block font-semibold">
+                      Agendado por: {featuredApp.creadoPor || featuredApp.datosPersonales?.creadoPor || 'Portal del Ciudadano'}
+                    </span>
                   </div>
 
                   <div className="md:col-span-4 text-center py-1">
@@ -2760,6 +2886,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                           <div className="text-[13px] font-extrabold text-white uppercase truncate px-1 max-w-full">
                             {getExtranjeriaCitizenName(activeApp)}
                           </div>
+                          <span className="text-[9.5px] text-emerald-400 block font-semibold truncate px-1 mt-0.5">
+                            Agendado por: {activeApp.creadoPor || activeApp.datosPersonales?.creadoPor || 'Portal del Ciudadano'}
+                          </span>
 
                         </div>
                       ) : (
@@ -2816,6 +2945,9 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
                         <div className="text-left space-y-0.5 truncate">
                           <span className="text-xs font-bold text-slate-200 uppercase truncate block font-semibold text-slate-100">
                             {getExtranjeriaCitizenName(app)}
+                          </span>
+                          <span className="text-[9.5px] text-emerald-400 block font-semibold truncate leading-none">
+                            Agendado por: {app.creadoPor || app.datosPersonales?.creadoPor || 'Portal del Ciudadano'}
                           </span>
                           <span className="text-[9.5px] font-mono text-indigo-400 font-bold block">
                             E-{app.id.slice(-4).toUpperCase()} (Extranjería)

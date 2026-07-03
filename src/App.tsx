@@ -269,9 +269,14 @@ export default function App() {
     }
     const finalTxCode = `${fecha.replace(/-/g, '').substring(2, 6)}-${code}`;
 
+    const creatorName = datosPersonales.nombreCompleto || `${datosPersonales.primerNombre || ''} ${datosPersonales.primerApellido || ''}`.trim() || datosPersonales.correo || 'Portal del Ciudadano';
+
     const nuevaCita: Cita = {
       id: `TE-${Date.now()}`,
-      datosPersonales,
+      datosPersonales: {
+        ...datosPersonales,
+        creadoPor: creatorName
+      },
       servicioCategoria: selectedCategoria,
       subServicioId: selectedSubServicioId,
       sucursalId,
@@ -280,6 +285,7 @@ export default function App() {
       codigoTransaccion: finalTxCode,
       fechaCreacion: new Date().toISOString(),
       estado: 'confirmada',
+      creadoPor: creatorName
     };
 
     // Register on express server as well

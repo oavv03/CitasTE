@@ -78,6 +78,7 @@ export default function TardiaController({
   const [expCorreo, setExpCorreo] = useState('');
   const [expTelefono, setExpTelefono] = useState('');
   const [expNotes, setExpNotes] = useState('');
+  const [expCategory, setExpCategory] = useState('Primera vez nacional, sin biometría');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Default link base state
@@ -94,6 +95,9 @@ export default function TardiaController({
     link: string;
   } | null>(null);
 
+  const [searchExpQuery, setSearchExpQuery] = useState('');
+  const [searchExpCategory, setSearchExpCategory] = useState('Todas');
+
   const [historicalExp, setHistoricalExp] = useState<any[]>(() => {
     const stored = localStorage.getItem('te_panama_historical_expedientes');
     if (stored) {
@@ -109,7 +113,8 @@ export default function TardiaController({
         fechaNacimiento: "1978-11-05",
         correo: "roberto.alvarado@example.com",
         telefono: "6222-3333",
-        notes: "Creado de forma automática por el Supervisor/SuperIT al programar cita directa.",
+        category: "Renovación blanco y negro",
+        notes: "Renovación blanco y negro - Creado de forma automática por el Supervisor/SuperIT al programar cita directa.",
         fechaCreacion: new Date().toISOString()
       },
       {
@@ -120,7 +125,8 @@ export default function TardiaController({
         fechaNacimiento: "1975-04-12",
         correo: "oscargave3003@gmail.com",
         telefono: "6123-4567",
-        notes: "Expediente de prueba pre-autorizado por la Dirección de Registro Civil",
+        category: "Primera vez nacional, sin biometría",
+        notes: "Primera vez nacional, sin biometría - Expediente de prueba pre-autorizado por la Dirección de Registro Civil",
         fechaCreacion: new Date().toISOString()
       },
       {
@@ -131,7 +137,8 @@ export default function TardiaController({
         fechaNacimiento: "1980-08-30",
         correo: "ana.espinoza@example.com",
         telefono: "6987-6543",
-        notes: "Filiación biométrica tardía aprobada",
+        category: "Primera vez nacional, inscripción tardía (Hasta 6 meses)",
+        notes: "Primera vez nacional, inscripción tardía (Hasta 6 meses) - Filiación biométrica tardía aprobada",
         fechaCreacion: new Date().toISOString()
       }
     ];
@@ -394,14 +401,15 @@ export default function TardiaController({
     }
     const directLink = `${base}/?tramite=ced_pasados_edad&seguimiento=${uniqueNumber}`;
 
-    const textMessage = `Estimado(a) ${expName.trim()}, el Tribunal Electoral le informa que su expediente de pasados de edad ha sido procesado con éxito.
+    const textMessage = `Estimado(a) ${expName.trim()}, el Departamento de Verificación de Identidad de la Dirección Nacional de Cedulación del Tribunal Electoral, le informa que su solicitud ha sido procesada. Para continuar con el trámite de atención presencial agende su cita, ingresando al siguiente enlace:
 
-Su Número de Seguimiento Obligatorio es: *${uniqueNumber}*
-
-Para agendar su cita de atención presencial en la sucursal de su preferencia, por favor ingrese al siguiente enlace oficial, donde sus datos estarán pre-cargados automáticamente:
 ${directLink}
-  
-Recuerde presentar los requisitos correspondientes el día de su cita.`;
+
+Recuerde el día de la cita presentarse 15 minutos antes de la hora programada.
+
+Su número de seguimiento es: ${uniqueNumber}`;
+
+    const finalNotes = expCategory + (expNotes.trim() ? ` - ${expNotes.trim()}` : '');
 
     const newRecord = {
       id: uniqueNumber,
@@ -411,7 +419,8 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       fechaNacimiento: expFechaNacimiento,
       correo: expCorreo.trim(),
       telefono: expTelefono.trim(),
-      notes: expNotes.trim(),
+      category: expCategory,
+      notes: finalNotes,
       directLink,
       textMessage,
       fechaCreacion: new Date().toISOString()
@@ -439,6 +448,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     setExpCorreo('');
     setExpTelefono('');
     setExpNotes('');
+    setExpCategory('Primera vez nacional, sin biometría');
   };
 
   // Safe tracking PDF downloader for single tracking records
@@ -663,14 +673,13 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
     }
     const directLink = `${base}/?tramite=ced_pasados_edad&seguimiento=${trackNum}`;
 
-    const textMessage = `Estimado(a) ${newCitaNombre.trim()}, el Tribunal Electoral le informa que su expediente de pasados de edad ha sido procesado con éxito.
+    const textMessage = `Estimado(a) ${newCitaNombre.trim()}, el Departamento de Verificación de Identidad de la Dirección Nacional de Cedulación del Tribunal Electoral, le informa que su solicitud ha sido procesada. Para continuar con el trámite de atención presencial agende su cita, ingresando al siguiente enlace:
 
-Su Número de Seguimiento Obligatorio es: *${trackNum}*
-
-Para agendar su cita de atención presencial en la sucursal de su preferencia, por favor ingrese al siguiente enlace oficial, donde sus datos estarán pre-cargados automáticamente:
 ${directLink}
-  
-Recuerde presentar los requisitos correspondientes el día de su cita.`;
+
+Recuerde el día de la cita presentarse 15 minutos antes de la hora programada.
+
+Su número de seguimiento es: ${trackNum}`;
 
     const newRecord = {
       id: trackNum,
@@ -731,6 +740,42 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
       return matchSearch && matchStatus;
     });
   }, [allTardiaCitas, searchQuery, statusFilter]);
+
+  // Filtered list of authorized trackings/expedientes
+  const filteredHistoricalExp = useMemo(() => {
+    let result = historicalExp;
+
+    if (searchExpCategory !== 'Todas') {
+      result = result.filter(rec => {
+        const cat = (rec.category || '').toLowerCase();
+        const notes = (rec.notes || '').toLowerCase();
+        const lowerCatSelected = searchExpCategory.toLowerCase();
+        return cat === lowerCatSelected || notes.includes(lowerCatSelected);
+      });
+    }
+
+    const query = searchExpQuery.trim().toLowerCase();
+    if (!query) return result;
+
+    return result.filter(rec => {
+      const name = (rec.citizenName || '').toLowerCase();
+      const number = (rec.number || '').toLowerCase();
+      const id = (rec.id || '').toLowerCase();
+      const identificacion = (rec.identificacion || '').toLowerCase();
+      const correo = (rec.correo || '').toLowerCase();
+      const notes = (rec.notes || '').toLowerCase();
+      const category = (rec.category || '').toLowerCase();
+      return (
+        name.includes(query) ||
+        number.includes(query) ||
+        id.includes(query) ||
+        identificacion.includes(query) ||
+        correo.includes(query) ||
+        notes.includes(query) ||
+        category.includes(query)
+      );
+    });
+  }, [historicalExp, searchExpQuery, searchExpCategory]);
 
   // Filter helper for exact period of appointments based on date range
   const getCitasByDateRange = (startStr: string, endStr: string) => {
@@ -2060,9 +2105,50 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
               )}
             </div>
 
+            {historicalExp.length > 0 && (
+              <div className="p-3.5 bg-slate-900/40 border-b border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Búsqueda rápida (Nombre, Seguimiento, Cédula...)"
+                    value={searchExpQuery}
+                    onChange={(e) => setSearchExpQuery(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded py-1.5 pl-9 pr-8 text-[11px] text-white focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-blue-600 font-medium placeholder-slate-600"
+                  />
+                  {searchExpQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchExpQuery('')}
+                      className="absolute right-2.5 top-1.5 text-slate-500 hover:text-white text-xs font-black px-1"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <div className="w-full sm:w-64">
+                  <select
+                    value={searchExpCategory}
+                    onChange={(e) => setSearchExpCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 text-slate-300 p-1.5 rounded text-[11px] focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-blue-600 font-medium cursor-pointer"
+                  >
+                    <option value="Todas">Todas las categorías</option>
+                    <option value="Primera vez nacional, sin biometría">Primera vez nacional, sin biometría</option>
+                    <option value="Primera vez nacional, inscripción tardía (Hasta 6 meses)">Primera vez nacional, inscripción tardía (Hasta 6 meses)</option>
+                    <option value="Renovación blanco y negro">Renovación blanco y negro</option>
+                    <option value="Primera vez nacional con 20 años y 1 día cumplidos">Primera vez nacional con 20 años y 1 día cumplidos</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             {historicalExp.length === 0 ? (
               <div className="p-10 text-center text-[11px] text-slate-500 font-medium">
                 No se han generado expedientes de pasados de edad (VID) en esta sesión local de oficialía.
+              </div>
+            ) : filteredHistoricalExp.length === 0 ? (
+              <div className="p-10 text-center text-[11px] text-slate-500 font-medium">
+                No se encontraron expedientes con la búsqueda "<strong className="text-slate-300">{searchExpQuery}</strong>".
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -2078,7 +2164,7 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-850 text-xs text-slate-330">
-                    {historicalExp.map((rec) => (
+                    {filteredHistoricalExp.map((rec) => (
                       <tr key={rec.id} className="hover:bg-slate-900/40 border-b border-slate-850/50">
                         <td className="p-3 text-[10px] font-mono text-slate-450">
                           {rec.fechaCreacion ? rec.fechaCreacion.substring(0, 10) : '2026-05-27'}
@@ -2257,10 +2343,26 @@ Recuerde presentar los requisitos correspondientes el día de su cita.`;
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                    Observaciones / Notas Internas
+                    Categoría de Observación / Trámite <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={expCategory}
+                    onChange={(e) => setExpCategory(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded text-xs px-3 focus:outline-none focus:ring-1 focus:ring-blue-650 font-medium text-slate-300 cursor-pointer"
+                  >
+                    <option value="Primera vez nacional, sin biometría">Primera vez nacional, sin biometría</option>
+                    <option value="Primera vez nacional, inscripción tardía (Hasta 6 meses)">Primera vez nacional, inscripción tardía (Hasta 6 meses)</option>
+                    <option value="Renovación blanco y negro">Renovación blanco y negro</option>
+                    <option value="Primera vez nacional con 20 años y 1 día cumplidos">Primera vez nacional con 20 años y 1 día cumplidos</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                    Notas Internas Adicionales
                   </label>
                   <textarea
-                    placeholder="Notas opcionales del expediente (Pasados de Edad)..."
+                    placeholder="Notas opcionales adicionales para el expediente..."
                     value={expNotes}
                     rows={2}
                     onChange={(e) => setExpNotes(e.target.value)}

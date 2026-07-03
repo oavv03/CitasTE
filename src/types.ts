@@ -18,6 +18,7 @@ export interface DatosPersonales {
   fechaResolucion?: string;
   numeroResolucion?: string;
   fechaVencimiento?: string;
+  creadoPor?: string;
 }
 
 export type ServicioCategoriaId = 'extranjeria' | 'organizacion_electoral' | 'cedulacion' | 'registro_civil' | 'panamenos_extranjero';
@@ -58,6 +59,7 @@ export interface Cita {
   fechaCreacion: string;
   estado: 'confirmada' | 'cancelada' | 'asistire' | 'no_asistire' | 'realizada';
   creadaPorSupervisor?: boolean;
+  creadoPor?: string;
 }
 
 export interface ExtranjeriaRecord {
