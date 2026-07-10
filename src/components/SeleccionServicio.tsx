@@ -275,10 +275,10 @@ export default function SeleccionServicio({
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1 max-w-2xl">
                 <h2 className="text-xl md:text-2xl font-black tracking-tight text-white">
-                  ¿Qué trámite desea realizar hoy?
+                  Elija el trámite que desea realizar
                 </h2>
                 <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                  Para comenzar, seleccione la opción correspondiente. Una vez dentro, podrá revisar los requisitos obligatorios y reservar su cita.
+                  Seleccione el trámite para el que requiere la cita en: Registro Civil, Cedulación u Organización Electoral.  Ingrese y lea detenidamente los requisitos, elija la fecha disponible para su cita.
                 </p>
               </div>
               {onBack && (
@@ -632,7 +632,7 @@ export default function SeleccionServicio({
               </h4>
             </div>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              Seleccione un procedimiento específico del listado izquierdo para consultar sus requisitos de atención y continuar con el agendamiento.
+              Elija el trámite que desea realizar, del listado siguiente:
             </p>
           </div>
           
@@ -770,14 +770,18 @@ export default function SeleccionServicio({
                         const isSpecialRule = 
                           req.toUpperCase().includes('EVITA EL COLOR BLANCO') ||
                           req.toUpperCase().includes('EVITA ACCESORIOS') ||
-                          req.toUpperCase().includes('CABELLO DESPEJADO');
+                          req.toUpperCase().includes('CABELLO DESPEJADO') ||
+                          req.toUpperCase().includes('VESTIMENTA:') ||
+                          req.toUpperCase().includes('CABELLO:') ||
+                          req.toUpperCase().includes('ACCESORIOS:') ||
+                          req.toUpperCase().includes('INSTRUCCIONES PARA TOMA DE FOTOGRAFÍA');
 
                         return (
                           <li key={idx} className="flex items-start gap-2.5">
                             <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-[9px] border border-emerald-200">
                               ✓
                             </span>
-                            <span className={`flex-1 col-span-1 ${isSpecialRule ? 'font-extrabold text-slate-900 uppercase bg-yellow-50/30' : ''}`}>
+                            <span className={`flex-1 col-span-1 ${isSpecialRule ? 'font-extrabold text-slate-900 bg-yellow-50/30 px-1 rounded' : ''}`}>
                               {hasColon ? (
                                 <>
                                   <strong className={isSpecialRule ? 'font-black text-slate-950' : 'font-extrabold text-slate-800'}>{label}:</strong>
@@ -801,7 +805,7 @@ export default function SeleccionServicio({
                       Información Adicional de Atención
                     </p>
                     <p className="text-[11px] text-blue-800 leading-relaxed mt-0.5 font-medium">
-                      Debe presentar toda la documentación en perfecto estado físico y original el día reservado. Su puntualidad es indispensable para mantener el orden de turnos en ventanilla.
+                      Presentarse quince (15) minutos antes de la hora programada, de lo contrario deberá agendar nuevamente, y quedará sujeto a la disponibilidad existente.
                     </p>
                   </div>
                 </div>
@@ -825,7 +829,7 @@ export default function SeleccionServicio({
               <div className="border-t border-slate-100 pt-3 mt-4 text-[10px] text-slate-400 font-medium flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 <span className="italic">
-                  Nota: El trámite presencial es obligatorio e intransferible. Asegure cumplir con el perfil institucional solicitado.
+                  Nota: Los datos personales suministrados serán tratados conforme a lo establecido en la Ley 81 de 26 de marzo de 2019, sobre Protección de Datos.
                 </span>
               </div>
             )}

@@ -118,86 +118,366 @@ export default function App() {
   // Load from LocalStorage on mount & Sync with server
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('te_panama_citas');
-      if (stored) {
-        const parsed: Cita[] = JSON.parse(stored);
-        setCitasList(parsed);
+      const demoCitas: Cita[] = [
+        {
+          id: "TE-EXT-20260703-01",
+          servicioCategoria: "extranjeria",
+          subServicioId: "ext_primera_vez",
+          sucursalId: "anc_main",
+          fecha: "2026-07-03",
+          hora: "07:00 AM",
+          codigoTransaccion: "2607-JEAN88",
+          fechaCreacion: "2026-07-01T14:30:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Pasaporte",
+            identificacion: "PA445566",
+            fechaNacimiento: "1988-04-15",
+            telefono: "+507 6231-8899",
+            correo: "jean.dupont@example.com",
+            nombreCompleto: "Jean-Pierre Dupont",
+            primerNombre: "Jean-Pierre",
+            primerApellido: "Dupont",
+            pasaporte: "PA445566",
+            nacionalidad: "Francesa"
+          }
+        },
+        {
+          id: "TE-EXT-20260703-02",
+          servicioCategoria: "extranjeria",
+          subServicioId: "ext_primera_vez",
+          sucursalId: "anc_main",
+          fecha: "2026-07-03",
+          hora: "08:15 AM",
+          codigoTransaccion: "2607-CHEN99",
+          fechaCreacion: "2026-07-02T10:15:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Pasaporte",
+            identificacion: "PA998877",
+            fechaNacimiento: "1992-09-20",
+            telefono: "+507 6511-2233",
+            correo: "chen.wei@example.com",
+            nombreCompleto: "Chen Wei",
+            primerNombre: "Chen",
+            primerApellido: "Wei",
+            pasaporte: "PA998877",
+            nacionalidad: "China"
+          }
+        },
+        {
+          id: "TE-EXT-20260703-03",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_extranjero_renovacion",
+          sucursalId: "anc_main",
+          fecha: "2026-07-03",
+          hora: "09:30 AM",
+          codigoTransaccion: "2607-SOFI77",
+          fechaCreacion: "2026-07-02T11:20:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "PE-8-9921",
+            fechaNacimiento: "1990-12-05",
+            telefono: "+507 6912-3344",
+            correo: "sofia.lorenzi@example.com",
+            nombreCompleto: "Sofia Lorenzi",
+            primerNombre: "Sofia",
+            primerApellido: "Lorenzi",
+            pasaporte: "PA887766",
+            nacionalidad: "Italiana"
+          }
+        },
+        {
+          id: "TE-EXT-20260703-04",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_extranjero_duplicado_perdida",
+          sucursalId: "anc_main",
+          fecha: "2026-07-03",
+          hora: "11:00 AM",
+          codigoTransaccion: "2607-ALEJ55",
+          fechaCreacion: "2026-07-02T15:45:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "PE-3-5544",
+            fechaNacimiento: "1985-07-14",
+            telefono: "+507 6755-4432",
+            correo: "alejandro.ruiz@example.com",
+            nombreCompleto: "Alejandro Ruiz",
+            primerNombre: "Alejandro",
+            primerApellido: "Ruiz",
+            pasaporte: "PA223344",
+            nacionalidad: "Española"
+          }
+        },
+        {
+          id: "TE-EXT-20260702-01",
+          servicioCategoria: "extranjeria",
+          subServicioId: "ext_primera_vez",
+          sucursalId: "anc_main",
+          fecha: "2026-07-02",
+          hora: "08:30 AM",
+          codigoTransaccion: "2607-AMAR12",
+          fechaCreacion: "2026-06-30T09:00:00.000Z",
+          estado: "realizada",
+          datosPersonales: {
+            tipoIdentificacion: "Pasaporte",
+            identificacion: "PA556677",
+            fechaNacimiento: "1994-11-02",
+            telefono: "+507 6112-9988",
+            correo: "amara.diallo@example.com",
+            nombreCompleto: "Amara Diallo",
+            primerNombre: "Amara",
+            primerApellido: "Diallo",
+            pasaporte: "PA556677",
+            nacionalidad: "Senegalesa"
+          }
+        },
+        {
+          id: "TE-EXT-20260702-02",
+          servicioCategoria: "extranjeria",
+          subServicioId: "ext_primera_vez",
+          sucursalId: "anc_main",
+          fecha: "2026-07-02",
+          hora: "11:00 AM",
+          codigoTransaccion: "2607-HANS34",
+          fechaCreacion: "2026-06-30T14:20:00.000Z",
+          estado: "cancelada",
+          datosPersonales: {
+            tipoIdentificacion: "Pasaporte",
+            identificacion: "PA334455",
+            fechaNacimiento: "1983-05-18",
+            telefono: "+507 6890-4455",
+            correo: "hans.muller@example.com",
+            nombreCompleto: "Hans Müller",
+            primerNombre: "Hans",
+            primerApellido: "Müller",
+            pasaporte: "PA334455",
+            nacionalidad: "Alemana"
+          }
+        },
+        {
+          id: "TE-EXT-20260706-01",
+          servicioCategoria: "extranjeria",
+          subServicioId: "ext_primera_vez",
+          sucursalId: "anc_main",
+          fecha: "2026-07-06",
+          hora: "09:00 AM",
+          codigoTransaccion: "2607-YUSU45",
+          fechaCreacion: "2026-07-02T17:10:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Pasaporte",
+            identificacion: "PA778899",
+            fechaNacimiento: "1987-01-30",
+            telefono: "+507 6344-9981",
+            correo: "yusuf.fayed@example.com",
+            nombreCompleto: "Yusuf Al-Fayed",
+            primerNombre: "Yusuf",
+            primerApellido: "Al-Fayed",
+            pasaporte: "PA778899",
+            nacionalidad: "Egipcia"
+          }
+        },
+        {
+          id: "TE-PE-20260703-01",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_pasados_edad",
+          sucursalId: "anc_main",
+          fecha: "2026-07-03",
+          hora: "08:15 AM",
+          codigoTransaccion: "2607-ESTE11",
+          fechaCreacion: "2026-07-01T08:30:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "8-445-667",
+            fechaNacimiento: "2005-06-12",
+            telefono: "+507 6201-9988",
+            correo: "esteban.caballero@example.com",
+            nombreCompleto: "Esteban Caballero Pérez",
+            primerNombre: "Esteban",
+            primerApellido: "Caballero",
+            numeroSeguimiento: "VID-26-000-111"
+          }
+        },
+        {
+          id: "TE-PE-20260703-02",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_pasados_edad",
+          sucursalId: "anc_main",
+          fecha: "2026-07-03",
+          hora: "09:30 AM",
+          codigoTransaccion: "2607-MARI22",
+          fechaCreacion: "2026-07-01T09:45:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "4-789-102",
+            fechaNacimiento: "2004-10-15",
+            telefono: "+507 6655-4433",
+            correo: "maria.gonzalez@example.com",
+            nombreCompleto: "María Luz González",
+            primerNombre: "María",
+            primerApellido: "González",
+            numeroSeguimiento: "VID-26-000-222"
+          }
+        },
+        {
+          id: "TE-PE-20260703-03",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_pasados_edad",
+          sucursalId: "anc_main",
+          fecha: "2026-07-03",
+          hora: "11:00 AM",
+          codigoTransaccion: "2607-CARL33",
+          fechaCreacion: "2026-07-02T13:10:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "9-122-384",
+            fechaNacimiento: "2003-02-28",
+            telefono: "+507 6100-2211",
+            correo: "carlos.samudio@example.com",
+            nombreCompleto: "Carlos Alberto Samudio",
+            primerNombre: "Carlos",
+            primerApellido: "Samudio",
+            numeroSeguimiento: "VID-26-000-333"
+          }
+        },
+        {
+          id: "TE-PE-20260702-01",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_pasados_edad",
+          sucursalId: "anc_main",
+          fecha: "2026-07-02",
+          hora: "09:00 AM",
+          codigoTransaccion: "2607-MILA44",
+          fechaCreacion: "2026-06-29T10:00:00.000Z",
+          estado: "realizada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "8-999-1002",
+            fechaNacimiento: "2002-12-15",
+            telefono: "+507 6911-3829",
+            correo: "milagros.degracia@example.com",
+            nombreCompleto: "Milagros de Gracia",
+            primerNombre: "Milagros",
+            primerApellido: "de Gracia",
+            numeroSeguimiento: "VID-26-000-444"
+          }
+        },
+        {
+          id: "TE-PE-20260704-01",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_pasados_edad",
+          sucursalId: "anc_main",
+          fecha: "2026-07-04",
+          hora: "10:15 AM",
+          codigoTransaccion: "2607-JOSE55",
+          fechaCreacion: "2026-07-02T16:00:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "2-105-992",
+            fechaNacimiento: "2006-03-24",
+            telefono: "+507 6492-3311",
+            correo: "jose.arispe@example.com",
+            nombreCompleto: "José Arispe Urriola",
+            primerNombre: "José",
+            primerApellido: "Arispe",
+            numeroSeguimiento: "VID-26-000-555"
+          }
+        },
+        {
+          id: "TE-PE-20260706-01",
+          servicioCategoria: "cedulacion",
+          subServicioId: "ced_pasados_edad",
+          sucursalId: "anc_main",
+          fecha: "2026-07-06",
+          hora: "08:45 AM",
+          codigoTransaccion: "2607-DIAN66",
+          fechaCreacion: "2026-07-02T18:15:00.000Z",
+          estado: "confirmada",
+          datosPersonales: {
+            tipoIdentificacion: "Cedula",
+            identificacion: "7-712-453",
+            fechaNacimiento: "2005-09-08",
+            telefono: "+507 6599-2211",
+            correo: "diana.vergara@example.com",
+            nombreCompleto: "Diana Patricia Vergara",
+            primerNombre: "Diana",
+            primerApellido: "Vergara",
+            numeroSeguimiento: "VID-26-000-666"
+          }
+        }
+      ];
 
-        // Fetch newest statuses for these appointments from the backend DB
-        const ids = parsed.map(c => c.id);
-        if (ids.length > 0) {
-          fetch('/api/sync-appointments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids })
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.success && Array.isArray(data.appointments)) {
-              // Map updated statuses back to ours
-              const updatedList = parsed.map(localCita => {
-                const match = data.appointments.find((srv: any) => srv.id === localCita.id);
-                if (match) {
-                  return { ...localCita, estado: match.estado };
-                }
-                return localCita;
-              });
-              
-              // Only save if there was actually a change to prevent infinite loops
-              const isDifferent = JSON.stringify(updatedList) !== JSON.stringify(parsed);
-              if (isDifferent) {
-                console.log("[Sync] Synced appointments with server-side configurations.");
-                setCitasList(updatedList);
-                localStorage.setItem('te_panama_citas', JSON.stringify(updatedList));
-              }
+      const stored = localStorage.getItem('te_panama_citas');
+      let currentList: Cita[] = [];
+
+      if (stored) {
+        try {
+          currentList = JSON.parse(stored);
+        } catch (err) {
+          currentList = [];
+        }
+
+        // Check if our high-quality demo set has already been merged
+        const hasDemoData = currentList.some(c => c.id === "TE-EXT-20260703-01");
+        if (!hasDemoData) {
+          const merged = [...currentList];
+          demoCitas.forEach(demo => {
+            const idx = merged.findIndex(c => c.id === demo.id);
+            if (idx >= 0) {
+              merged[idx] = demo;
+            } else {
+              merged.push(demo);
             }
-          })
-          .catch(err => console.warn('Could not sync appointments with server DB:', err));
+          });
+          currentList = merged;
+          localStorage.setItem('te_panama_citas', JSON.stringify(merged));
+          console.log("[Sync] Merged high-quality Extranjería and Pasados de Edad demo appointments.");
         }
       } else {
-        // Seed default appointments, including a special supervisor appointment and a regular one
-        const seedCitas: Cita[] = [
-          {
-            id: "TE-SP-20260527-7777",
-            datosPersonales: {
-              tipoIdentificacion: 'Cedula',
-              identificacion: '8-111-2222',
-              fechaNacimiento: '1978-11-05',
-              telefono: '6222-3333',
-              correo: 'roberto.alvarado@example.com',
-              numeroSeguimiento: 'NºSP-26-888-999'
-            },
-            servicioCategoria: 'cedulacion',
-            subServicioId: 'ced_pasados_edad',
-            sucursalId: 'anc_main',
-            fecha: '2026-05-27',
-            hora: '09:30 AM',
-            codigoTransaccion: 'PAS-SP-500200',
-            fechaCreacion: new Date().toISOString(),
-            estado: 'confirmada',
-            creadaPorSupervisor: true
-          },
-          {
-            id: "TE-20260530-1001",
-            datosPersonales: {
-              tipoIdentificacion: 'Cedula',
-              identificacion: '8-945-904',
-              fechaNacimiento: '1995-10-15',
-              telefono: '6612-3456',
-              correo: 'oscargave3003@gmail.com'
-            },
-            servicioCategoria: 'cedulacion',
-            subServicioId: 'ced_primera_vez',
-            sucursalId: 'anc_main',
-            fecha: '2026-05-30',
-            hora: '10:00 AM',
-            codigoTransaccion: '2605-MOCK77',
-            fechaCreacion: new Date().toISOString(),
-            estado: 'confirmada'
+        currentList = demoCitas;
+        localStorage.setItem('te_panama_citas', JSON.stringify(demoCitas));
+        console.log("[Sync] Initialized appointments list with complete demo database.");
+      }
+
+      setCitasList(currentList);
+
+      // Fetch newest statuses for these appointments from the backend DB
+      const ids = currentList.map(c => c.id);
+      if (ids.length > 0) {
+        fetch('/api/sync-appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success && Array.isArray(data.appointments)) {
+            // Map updated statuses back to ours
+            const updatedList = currentList.map(localCita => {
+              const match = data.appointments.find((srv: any) => srv.id === localCita.id);
+              if (match) {
+                return { ...localCita, estado: match.estado };
+              }
+              return localCita;
+            });
+            
+            // Only save if there was actually a change to prevent infinite loops
+            const isDifferent = JSON.stringify(updatedList) !== JSON.stringify(currentList);
+            if (isDifferent) {
+              console.log("[Sync] Synced appointments with server-side configurations.");
+              setCitasList(updatedList);
+              localStorage.setItem('te_panama_citas', JSON.stringify(updatedList));
+            }
           }
-        ];
-        setCitasList(seedCitas);
-        localStorage.setItem('te_panama_citas', JSON.stringify(seedCitas));
+        })
+        .catch(err => console.warn('Could not sync appointments with server DB:', err));
       }
     } catch (e) {
       console.warn('Could not read te_panama_citas from localStorage', e);

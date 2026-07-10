@@ -518,10 +518,26 @@ export default function AgendamientoCita({
           {isPastAgeTrámiteSelected && (
             <div className="bg-blue-50 border border-blue-200 text-blue-950 p-3 rounded text-xs font-semibold flex flex-col gap-1.5 leading-relaxed shadow-sm">
               <span className="text-blue-850 font-extrabold uppercase tracking-wide flex items-center gap-1">
-                ⚠️ Trámite Exclusivo de Sede Principal
+                ⚠️ Información de Atención
               </span>
-              <span>
-                Por regulación institucional, la inscripción de ciudadanos Pasados de Edad se gestiona de manera centralizada <strong>exclusivamente en la Sede Principal de Ancón</strong> (Vía Omar Torrijos Herrera). Las demás sedes regionales o distritales no están habilitadas para este trámite.
+              <span className="whitespace-pre-line text-slate-700 font-medium">
+                Este trámite se realiza en todas las oficinas regionales o distritales a nivel nacional este servicio se brinda sin previa cita. Consulte las ubicaciones en:{" "}
+                <a
+                  href="https://www.tribunal-electoral.gob.pa/contactenos/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-700 underline font-bold"
+                >
+                  https://www.tribunal-electoral.gob.pa/contactenos/
+                </a>
+                {"\n\n"}
+                En la sede de Ancón se realiza en el Departamento de Verificación de Identidad ubicado en Edificio del Tribunal Electoral, primer piso contactándonos en la cuenta de correo electrónico:{" "}
+                <a
+                  href="mailto:verificacionid@tribunal-electoral.gob.pa"
+                  className="text-blue-700 underline font-bold"
+                >
+                  verificacionid@tribunal-electoral.gob.pa
+                </a>
               </span>
             </div>
           )}

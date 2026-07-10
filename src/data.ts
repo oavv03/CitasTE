@@ -56,112 +56,100 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
   {
     id: 'cedulacion',
     nombre: 'Cedulación',
-    descripcion: 'Trámites relacionados con la obtención, renovación, y duplicados de cédulas de identidad personal.',
+    descripcion: 'Documento de identidad personal (cédula y carné de residente permanente): trámite para obtención, renovación y duplicado.',
     icono: 'IdCard',
     subServicios: [
       {
         id: 'ced_primera_vez',
-        nombre: 'Cédula por Primera Vez (Mayores de 18 años)',
-        descripcion: 'Para ciudadanos panameños nacidos en el territorio nacional que alcanzan la mayoría de edad.',
+        nombre: 'Cédula por primera vez (18 años hasta 20 años)',
+        descripcion: 'Panameños que alcanzan la mayoría de edad',
         requisitos: [
+          'Trámite gratuito',
           'Tener 18 años cumplidos.',
-          'Cédula juvenil',
-          'Presencia física del interesado.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
+          'Presentarse personalmente',
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
         ]
       },
       {
         id: 'ced_renovacion',
         nombre: 'Renovación de Cédula',
-        descripcion: 'Renovación de documento vencido o próximo a vencer.',
+        descripcion: 'Cédula vencida o por vencer (6 meses antes de su vencimiento)',
         requisitos: [
+          'Trámite gratuito',
+          'Presentarse personalmente',
           'Presentar la cédula de identidad vencida o por vencer (6 meses antes).',
-          'Vestimenta adecuada para la toma de fotografía (no hombros descubiertos, no blusas escotadas).',
-          'Trámite gratuito para renovación regular.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
         ]
       },
       {
         id: 'ced_duplicado',
-        nombre: 'Duplicado de Cédula (Pérdida o Robo)',
-        descripcion: 'Reposición del documento por pérdida, robo, hurto o deterioro.',
+        nombre: 'Duplicado de Cédula',
+        descripcion: '',
         requisitos: [
-          'El costo es de B/. 35.00',
-          'Denuncia de pérdida (opcional pero recomendada).',
-          'Confirmación de datos biométricos en oficina.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
+          'Precio (efectivo) B/. 35.00 / Jubilados, pensionados o tercera edad B/. 17.50',
+          'Presentarse personalmente',
+          'En caso de robo o hurto del documento de identidad, se recomienda presente denuncia (no obligatorio)',
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
         ]
       },
       {
         id: 'ced_juvenil_primera',
-        nombre: 'Cédula Juvenil por Primera Vez',
-        descripcion: 'Formulación y entrega de cédula de identidad para menores de edad por primera vez.',
+        nombre: 'Cédula Juvenil por primera vez',
+        descripcion: 'A partir de los 12 años de edad, es obligatorio portar el documento de identidad personal',
         requisitos: [
-          'Estar acompañado de por lo menos uno de los padres con su cédula vigente.',
+          'Trámite gratuito',
+          'Presentarse personalmente acompañado de uno de los padres, hermano mayor de edad, abuelo o tío que consten inscritos como familiares',
           'Certificado de nacimiento del menor.',
-          'El menor de edad debe estar presente física voluntariamente.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
         ]
       },
       {
         id: 'ced_juvenil_renovacion',
-        nombre: 'Cédula Juvenil Renovación',
-        descripcion: 'Trámite de renovación para la cédula de identidad de menor de edad por vencimiento.',
+        nombre: 'Renovación de Cédula Juvenil',
+        descripcion: 'Cédula vencida o por vencer (6 meses antes de su vencimiento)',
         requisitos: [
-          'Estar acompañado de uno de los padres con su cédula vigente.',
-          'Presentar la cédula juvenil vencida o próxima a vencer.',
-          'El menor de edad debe estar presente físicamente.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
+          'Trámite gratuito',
+          'Presentarse personalmente acompañado de uno de los padres, hermano mayor de edad, abuelo o tío que consten inscritos como familiares',
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
         ]
       },
       {
         id: 'ced_pasados_edad',
-        nombre: 'Cédula por primera pasados de edad',
-        descripcion: 'Trámite de cedulación tardía para ciudadanos panameños nacidos en el territorio nacional que alcanzaron la mayoría de edad sin obtener su documento.',
+        nombre: 'Cédula por primera vez con edad de 20 años y 1 día, en adelante',
+        descripcion: 'Ciudadano panameño que solicita su cédula a los 20 años 1 día de edad, en adelante. Este trámite no aplica a ciudadanos que tengan menos de la edad indicada.\nEste trámite no requiere que solicite cita. Solamente necesitará gestionar una cita si realiza el trámite en el departamento de Verificación ubicado en la Sede de Ancón del Tribunal Electoral.',
         requisitos: [
-          'Declaración jurada de dos (2) testigos panameños mayores de edad.',
-          'Certificado de nacimiento expedido por el Registro Civil.',
-          'Pruebas documentales de presencia física en el país (certificados de escuela, cartillas de vacunas, etc.).',
-          'Presencia física del interesado con vestimenta formal y hombros cubiertos.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
-        ]
-      },
-      {
-        id: 'ced_extranjero_renovacion',
-        nombre: 'Renovación de carné de residente permanente',
-        descripcion: 'Trámite de renovación del documento de identidad personal para ciudadanos extranjeros residentes permanentes.',
-        requisitos: [
-          'Presentarse a las oficinas del Tribunal Electoral.',
-          'Proporcionar el número de su cédula o el de su carné de residente permanente.',
-          'Costo B/.75.00.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
-        ]
-      },
-      {
-        id: 'ced_extranjero_duplicado_perdida',
-        nombre: 'Duplicado carné de residente permanente',
-        descripcion: 'Reposición de la cédula de extranjero (PE) residente permanente debido a robo, extravío o deterioro.',
-        requisitos: [
-          'Presentarse a las oficinas del Tribunal Electoral.',
-          'Presentar el carné de residente permanente que requiere reemplazar.',
-          'Costo B/.65.00.',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.'
+          'Trámite gratuito',
+          'Complete el formulario de solicitud: Descargue el formulario aquí www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/MEMORIAL-DE-SOLICITUD-DE-TRAMITE-PRIMERA-VEZ-PASADO-DE-EDAD.pdf',
+          'Adjunte las pruebas con el memorial de solicitud y remítalo al correo de verificaciónid@tribunal-electoral.gob.pa para revisión, previo a la asignación de la cita.',
+          'Según el caso, se requiere que aporte los siguientes documentos, algunos de los cuales se han identificado como obligatorios. El proceso de evaluación será más ágil, en la medida que se cuente con mayor cantidad de documentos:',
+          'Panameño residente en el país:',
+          '• Documentos escolares (boletín escolar, diplomas, certificación de estudios u otros) sellados por el MEDUCA.',
+          '• Certificado de Bautismo',
+          '• Documentos médicos (tarjetas de vacunación o certificación médica, historial clínico, referencia medica)',
+          '• Otro documento que acrediten la identidad y nacionalidad panameña.',
+          '• (Obligatorio) Familiar cercano panameño o tutor legal (resolución o sentencia). De no poder comparecer un familiar cercano, deberá brindar declaración jurada dos (2) testigos.',
+          'Panameño que residen fuera del país:',
+          '• (Obligatorio) Pasaporte original vigente / salvoconducto con sello de entrada (2 copias)',
+          '• (Opcional) carné de residente, licencia de conducir, documento de identidad personal del país donde reside, pasaporte panameño con sello de salida, registro de nacimiento, de tener padres extranjeros presentar documento de identidad, Documentos que acrediten el cambio de nombre y/o apellido, cuando estos no coincidan con la inscripción de nacimiento en Panamá.',
+          '• (Obligatorio) Familiar panameño cercano o tutor legal (resolución o sentencia). De no poder presentar familiar cercano deberá presentar (2) dos testigos que brindarán declaración jurada.',
+          '• Todo documento en idioma distinto al español, deberá ser traducido al español por Traductor Público Autorizado en Panamá.',
+          '• Todo documento proveniente de otro país debe ser apostillado.',
+          '• De no hablar español el solicitante, familiar o testigo, debe asistirse por un Traductor Público Autorizado en Panamá (debe presentar carné de idoneidad y su respectivo sello de traductor).'
         ]
       }
     ]
@@ -214,14 +202,41 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         nombre: 'Carné de residente permanente por primera vez',
         descripcion: 'Emisión del documento de identidad personal para extranjeros residentes permanentes.',
         requisitos: [
-          'Nota de Migración',
-          'Fotocopia de Carné de Permanencia',
-          'Fotocopia de Pasaporte',
-          'B/. 100.00(en efectivo)',
-          'EVITA EL COLOR BLANCO: NO USES SUÉTERES, CAMISAS, BLUSAS NI BUFANDAS BLANCAS.',
-          'EVITA ACCESORIOS EN EL ROSTRO: NO LLEVES GORRAS, SOMBREROS, LENTES OSCUROS NI PIERCINGS VISIBLES EN LA CARA.',
-          'CABELLO DESPEJADO: ASEGÚRATE DE LLEVAR EL ROSTRO Y LAS CEJAS TOTALMENTE VISIBLES.',
-          'Tener cita programada y presentarse 15 minutos antes'
+          'Precio (efectivo) B/. 100.00',
+          'Requiere contar con cita programada',
+          'Nota del Servicio Nacional de Migración',
+          'Fotocopia del carné expedido por el Servicio Nacional de Migración',
+          'Fotocopia de la página de las generales del pasaporte',
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
+        ]
+      },
+      {
+        id: 'ced_extranjero_renovacion',
+        nombre: 'Renovación de carné de residente permanente',
+        descripcion: 'Trámite de renovación del documento de identidad personal para ciudadanos extranjeros residentes permanentes.',
+        requisitos: [
+          'Precio (efectivo) B/. 75.00',
+          'Presentarse personalmente',
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
+        ]
+      },
+      {
+        id: 'ced_extranjero_duplicado_perdida',
+        nombre: 'Duplicado carné de residente permanente',
+        descripcion: 'Reposición de carné de residente permanente.',
+        requisitos: [
+          'Precio (efectivo) B/. 65.00',
+          'Presentarse personalmente',
+          '• Instrucciones para toma de fotografía:',
+          'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
+          'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
+          'Accesorios: Se permitirán únicamente aretes pequeños, no grandes ni llamativos. No se permite el uso de piercings faciales, salvo que sean permanentes o constituyan una expresión cultural de pueblos originarios, tampoco se permite el uso de gorra, sombrero u otro accesorio en la cabeza que pueda ocultar o distorsionar rasgos faciales.'
         ]
       }
     ]

@@ -99,12 +99,79 @@ export default function TardiaController({
   const [searchExpCategory, setSearchExpCategory] = useState('Todas');
 
   const [historicalExp, setHistoricalExp] = useState<any[]>(() => {
-    const stored = localStorage.getItem('te_panama_historical_expedientes');
-    if (stored) {
-      try { return JSON.parse(stored); } catch (e) { return []; }
-    }
-    // Return seed as default if no storage is set
-    return [
+    const demoExpedientes = [
+      {
+        id: "VID-26-000-111",
+        number: "VID-26-000-111",
+        citizenName: "Esteban Caballero Pérez",
+        identificacion: "8-445-667",
+        fechaNacimiento: "2005-06-12",
+        correo: "esteban.caballero@example.com",
+        telefono: "+507 6201-9988",
+        category: "Primera vez nacional, sin biometría",
+        notes: "Trámite de filiación tardía para obtención de cédula por primera vez.",
+        fechaCreacion: new Date().toISOString()
+      },
+      {
+        id: "VID-26-000-222",
+        number: "VID-26-000-222",
+        citizenName: "María Luz González",
+        identificacion: "4-789-102",
+        fechaNacimiento: "2004-10-15",
+        correo: "maria.gonzalez@example.com",
+        telefono: "+507 6655-4433",
+        category: "Primera vez nacional, inscripción tardía (Hasta 6 meses)",
+        notes: "Inscripción tardía aprobada por la Dirección de Registro Civil.",
+        fechaCreacion: new Date().toISOString()
+      },
+      {
+        id: "VID-26-000-333",
+        number: "VID-26-000-333",
+        citizenName: "Carlos Alberto Samudio",
+        identificacion: "9-122-384",
+        fechaNacimiento: "2003-02-28",
+        correo: "carlos.samudio@example.com",
+        telefono: "+507 6100-2211",
+        category: "Primera vez nacional con 20 años y 1 día cumplidos",
+        notes: "Trámite de cédula tardía para ciudadanos de 20 años o más.",
+        fechaCreacion: new Date().toISOString()
+      },
+      {
+        id: "VID-26-000-444",
+        number: "VID-26-000-444",
+        citizenName: "Milagros de Gracia",
+        identificacion: "8-999-1002",
+        fechaNacimiento: "2002-12-15",
+        correo: "milagros.degracia@example.com",
+        telefono: "+507 6911-3829",
+        category: "Renovación blanco y negro",
+        notes: "Autorización de renovación para cédula tardía.",
+        fechaCreacion: new Date().toISOString()
+      },
+      {
+        id: "VID-26-000-555",
+        number: "VID-26-000-555",
+        citizenName: "José Arispe Urriola",
+        identificacion: "2-105-992",
+        fechaNacimiento: "2006-03-24",
+        correo: "jose.arispe@example.com",
+        telefono: "+507 6492-3311",
+        category: "Primera vez nacional, sin biometría",
+        notes: "Pendiente de toma de datos biométricos para filiación.",
+        fechaCreacion: new Date().toISOString()
+      },
+      {
+        id: "VID-26-000-666",
+        number: "VID-26-000-666",
+        citizenName: "Diana Patricia Vergara",
+        identificacion: "7-712-453",
+        fechaNacimiento: "2005-09-08",
+        correo: "diana.vergara@example.com",
+        telefono: "+507 6599-2211",
+        category: "Primera vez nacional, inscripción tardía (Hasta 6 meses)",
+        notes: "Expediente autorizado para agendamiento presencial de Toma de Fotos.",
+        fechaCreacion: new Date().toISOString()
+      },
       {
         id: "NºSP-26-888-999",
         number: "NºSP-26-888-999",
@@ -116,32 +183,32 @@ export default function TardiaController({
         category: "Renovación blanco y negro",
         notes: "Renovación blanco y negro - Creado de forma automática por el Supervisor/SuperIT al programar cita directa.",
         fechaCreacion: new Date().toISOString()
-      },
-      {
-        id: "Nº26-123-456",
-        number: "Nº26-123-456",
-        citizenName: "Oscar González G.",
-        identificacion: "8-999-9999",
-        fechaNacimiento: "1975-04-12",
-        correo: "oscargave3003@gmail.com",
-        telefono: "6123-4567",
-        category: "Primera vez nacional, sin biometría",
-        notes: "Primera vez nacional, sin biometría - Expediente de prueba pre-autorizado por la Dirección de Registro Civil",
-        fechaCreacion: new Date().toISOString()
-      },
-      {
-        id: "Nº54-474-325",
-        number: "Nº54-474-325",
-        citizenName: "Ana María Espinoza",
-        identificacion: "4-789-1234",
-        fechaNacimiento: "1980-08-30",
-        correo: "ana.espinoza@example.com",
-        telefono: "6987-6543",
-        category: "Primera vez nacional, inscripción tardía (Hasta 6 meses)",
-        notes: "Primera vez nacional, inscripción tardía (Hasta 6 meses) - Filiación biométrica tardía aprobada",
-        fechaCreacion: new Date().toISOString()
       }
     ];
+
+    const stored = localStorage.getItem('te_panama_historical_expedientes');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        // If our primary demo tracking code is missing, merge them!
+        const hasDemo = parsed.some((e: any) => e.id === "VID-26-000-111");
+        if (!hasDemo) {
+          const merged = [...parsed];
+          demoExpedientes.forEach(demo => {
+            if (!merged.some((e: any) => e.id === demo.id)) {
+              merged.push(demo);
+            }
+          });
+          localStorage.setItem('te_panama_historical_expedientes', JSON.stringify(merged));
+          return merged;
+        }
+        return parsed;
+      } catch (e) {
+        return demoExpedientes;
+      }
+    }
+    localStorage.setItem('te_panama_historical_expedientes', JSON.stringify(demoExpedientes));
+    return demoExpedientes;
   });
 
   // STATES FOR PLANNING OPERATION CONFIG (adminpedad)

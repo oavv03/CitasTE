@@ -532,10 +532,11 @@ export default function ExtranjeriaController({ currentRole, forceSubRole }: Ext
           creadoPor: creatorName
         },
         requisitos: [
-          'Nota de Migración',
-          'Fotocopia de Carné de Permanencia',
-          'Fotocopia de Pasaporte',
-          'B/. 100.00(en efectivo)'
+          'Precio (efectivo) B/. 100.00',
+          'Requiere contar con cita programada',
+          'Nota del Servicio Nacional de Migración',
+          'Fotocopia del carné expedido por el Servicio Nacional de Migración',
+          'Fotocopia de la página de las generales del pasaporte'
         ]
       };
 
