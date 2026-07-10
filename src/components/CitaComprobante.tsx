@@ -10,6 +10,38 @@ interface CitaComprobanteProps {
   onDeleteCita?: (citaId: string) => void;
 }
 
+const renderWithLinks = (text: string) => {
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (part.match(/^https?:\/\//) || part.match(/^www\./)) {
+      const href = part.startsWith('http') ? part : `https://${part}`;
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+        >
+          {part}
+        </a>
+      );
+    } else if (part.match(/^[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
+      return (
+        <a
+          key={index}
+          href={`mailto:${part}`}
+          className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCita }: CitaComprobanteProps) {
   const currentCategory = SERVICIOS_TRIBUNAL.find((c) => c.id === cita.servicioCategoria);
   const currentSubService = currentCategory?.subServicios.find((s) => s.id === cita.subServicioId);
@@ -392,7 +424,7 @@ export default function CitaComprobante({ cita, onDone, onCancelCita, onDeleteCi
             </h6>
             <ul className="space-y-1 text-xs text-slate-700 pl-4 list-disc leading-relaxed font-semibold">
               {currentSubService.requisitos.map((req, idx) => (
-                <li key={idx}>{req}</li>
+                <li key={idx}>{renderWithLinks(req)}</li>
               ))}
               <li className="font-extrabold text-slate-900">
                 Llegar con 15 minutos de anticipación al horario pactado.

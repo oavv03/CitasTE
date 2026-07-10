@@ -31,6 +31,38 @@ const normalizeText = (text: string): string => {
     .replace(/[\u0300-\u036f]/g, "");
 };
 
+const renderWithLinks = (text: string) => {
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (part.match(/^https?:\/\//) || part.match(/^www\./)) {
+      const href = part.startsWith('http') ? part : `https://${part}`;
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+        >
+          {part}
+        </a>
+      );
+    } else if (part.match(/^[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
+      return (
+        <a
+          key={index}
+          href={`mailto:${part}`}
+          className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 interface SeleccionServicioProps {
   selectedCategoria: ServicioCategoriaId | null;
   selectedSubServicioId: string | null;
@@ -785,10 +817,10 @@ export default function SeleccionServicio({
                               {hasColon ? (
                                 <>
                                   <strong className={isSpecialRule ? 'font-black text-slate-950' : 'font-extrabold text-slate-800'}>{label}:</strong>
-                                  {text}
+                                  {renderWithLinks(text)}
                                 </>
                               ) : (
-                                req
+                                renderWithLinks(req)
                               )}
                             </span>
                           </li>
