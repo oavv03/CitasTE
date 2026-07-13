@@ -32,11 +32,70 @@ const normalizeText = (text: string): string => {
 };
 
 const renderWithLinks = (text: string) => {
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
-  const parts = text.split(urlRegex);
+  // Regex to match markdown links like [text](url)
+  const mdLinkRegex = /\[([^\]]+)\]\(((?:https?:\/\/|www\.)[^\s)]+)\)/g;
+  
+  // Parse markdown links
+  const parts: Array<{ type: 'text' | 'link'; content?: string; text?: string; url?: string }> = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = mdLinkRegex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    const plainText = text.substring(lastIndex, matchIndex);
+    if (plainText) {
+      parts.push({ type: 'text', content: plainText });
+    }
+    parts.push({
+      type: 'link',
+      text: match[1],
+      url: match[2]
+    });
+    lastIndex = mdLinkRegex.lastIndex;
+  }
+  
+  const remainingText = text.substring(lastIndex);
+  if (remainingText) {
+    parts.push({ type: 'text', content: remainingText });
+  }
+  
+  // If no markdown links were found, fallback to auto-linking standard URLs/emails
+  if (parts.length === 1 && parts[0].type === 'text') {
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+    const urlParts = text.split(urlRegex);
+    return urlParts.map((part, index) => {
+      if (part.match(/^https?:\/\//) || part.match(/^www\./)) {
+        const href = part.startsWith('http') ? part : `https://${part}`;
+        return (
+          <a
+            key={index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+          >
+            {part}
+          </a>
+        );
+      } else if (part.match(/^[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
+        return (
+          <a
+            key={index}
+            href={`mailto:${part}`}
+            className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  }
+  
+  // Render text segments mixed with parsed markdown links
   return parts.map((part, index) => {
-    if (part.match(/^https?:\/\//) || part.match(/^www\./)) {
-      const href = part.startsWith('http') ? part : `https://${part}`;
+    if (part.type === 'link') {
+      const href = part.url!.startsWith('http') ? part.url! : `https://${part.url!}`;
       return (
         <a
           key={index}
@@ -45,21 +104,40 @@ const renderWithLinks = (text: string) => {
           rel="noopener noreferrer"
           className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
         >
-          {part}
+          {part.text}
         </a>
       );
-    } else if (part.match(/^[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
-      return (
-        <a
-          key={index}
-          href={`mailto:${part}`}
-          className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
-        >
-          {part}
-        </a>
-      );
+    } else {
+      const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+      const subParts = part.content!.split(urlRegex);
+      return subParts.map((subPart, subIdx) => {
+        if (subPart.match(/^https?:\/\//) || subPart.match(/^www\./)) {
+          const href = subPart.startsWith('http') ? subPart : `https://${subPart}`;
+          return (
+            <a
+              key={`${index}-${subIdx}`}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+            >
+              {subPart}
+            </a>
+          );
+        } else if (subPart.match(/^[^\s]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
+          return (
+            <a
+              key={`${index}-${subIdx}`}
+              href={`mailto:${subPart}`}
+              className="text-blue-700 underline font-bold hover:text-blue-900 break-all"
+            >
+              {subPart}
+            </a>
+          );
+        }
+        return subPart;
+      });
     }
-    return part;
   });
 };
 

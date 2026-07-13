@@ -285,7 +285,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
             }
           }
           if (!isValid) {
-            newErrors.numeroSeguimiento = `Número de expediente no ubicado en el control de la base de datos. El trámite requiere de un proceso previamente aprobado que le dará un número de expediente, favor escribir a verificaciónid@tribunal-electoral.gob.pa o entrar a la página del tribunal-electoral.gob.pa, para revisar sus requisitos.`;
+            newErrors.numeroSeguimiento = `Número de expediente no ubicado en el control de la base de datos. El trámite requiere de un proceso previamente aprobado que le dará un número de expediente, favor escribir a verificacionid@tribunal-electoral.gob.pa o entrar a la página del tribunal-electoral.gob.pa, para revisar sus requisitos.`;
           } else if (citizenDetails) {
             // Update tracking value to official casing/formatting
             if (citizenDetails.number && citizenDetails.number !== numeroSeguimiento) {

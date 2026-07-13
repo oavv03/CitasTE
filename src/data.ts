@@ -130,10 +130,10 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
       {
         id: 'ced_pasados_edad',
         nombre: 'Cédula por primera vez con edad de 20 años y 1 día, en adelante',
-        descripcion: 'Ciudadano panameño que solicita su cédula a los 20 años y 1 día de edad, en adelante.\n\nEste trámite no aplica a ciudadanos que tengan menos de la edad indicada.\nEl trámite no requiere que solicite cita.  Solamente necesitará gestionar una cita si realiza el trámite en el departamento de Verificación de Identidad ubicado en la Sede de Ancón del Tribunal Electoral, piso 1.',
+        descripcion: 'Ciudadano panameño que solicita su cédula a los 20 años y 1 día de edad, en adelante. Este trámite no aplica a ciudadanos que tengan menos de la edad indicada.',
         requisitos: [
-          'Complete el formulario de solicitud: Descargue el formulario aquí www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/MEMORIAL-DE-SOLICITUD-DE-TRAMITE-PRIMERA-VEZ-PASADO-DE-EDAD.pdf',
-          'Adjunte las pruebas con el memorial de solicitud y remítalo al correo de verificaciónid@tribunal-electoral.gob.pa para revisión, previo a la asignación de la cita.',
+          'Complete el formulario de solicitud: Descargue el formulario [aquí](https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/MEMORIAL-DE-SOLICITUD-DE-TRAMITE-PRIMERA-VEZ-PASADO-DE-EDAD.pdf)',
+          'Adjunte las pruebas con el memorial de solicitud y remítalo al correo de verificacionid@tribunal-electoral.gob.pa para revisión, previo a la asignación de la cita.',
           'Según el caso, se requiere que aporte los siguientes documentos, algunos de los cuales se han identificado como obligatorios.  El proceso de evaluación será más ágil, en la medida que se cuente con mayor cantidad de documentos que acrediten su identidad:',
           'Panameño residente en el país:',
           '• Documentos escolares (boletín escolar, diplomas, certificación de estudios u otros) sellados por el MEDUCA.',
@@ -454,12 +454,12 @@ try {
               }
             }
             if (sub.id === 'ced_pasados_edad') {
-              if (sub.descripcion && sub.descripcion.includes('20 años 1 día de edad')) {
-                sub.descripcion = 'Ciudadano panameño que solicita su cédula a los 20 años y 1 día de edad, en adelante.\n\nEste trámite no aplica a ciudadanos que tengan menos de la edad indicada.\nEl trámite no requiere que solicite cita.  Solamente necesitará gestionar una cita si realiza el trámite en el departamento de Verificación de Identidad ubicado en la Sede de Ancón del Tribunal Electoral, piso 1.';
+              if (sub.descripcion && sub.descripcion.includes('20 años')) {
+                sub.descripcion = 'Ciudadano panameño que solicita su cédula a los 20 años y 1 día de edad, en adelante. Este trámite no aplica a ciudadanos que tengan menos de la edad indicada.';
               }
               sub.requisitos = [
-                'Complete el formulario de solicitud: Descargue el formulario aquí www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/MEMORIAL-DE-SOLICITUD-DE-TRAMITE-PRIMERA-VEZ-PASADO-DE-EDAD.pdf',
-                'Adjunte las pruebas con el memorial de solicitud y remítalo al correo de verificaciónid@tribunal-electoral.gob.pa para revisión, previo a la asignación de la cita.',
+                'Complete el formulario de solicitud: Descargue el formulario [aquí](https://www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/MEMORIAL-DE-SOLICITUD-DE-TRAMITE-PRIMERA-VEZ-PASADO-DE-EDAD.pdf)',
+                'Adjunte las pruebas con el memorial de solicitud y remítalo al correo de verificacionid@tribunal-electoral.gob.pa para revisión, previo a la asignación de la cita.',
                 'Según el caso, se requiere que aporte los siguientes documentos, algunos de los cuales se han identificado como obligatorios.  El proceso de evaluación será más ágil, en la medida que se cuente con mayor cantidad de documentos que acrediten su identidad:',
                 'Panameño residente en el país:',
                 '• Documentos escolares (boletín escolar, diplomas, certificación de estudios u otros) sellados por el MEDUCA.',
