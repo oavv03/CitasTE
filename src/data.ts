@@ -108,7 +108,6 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
         requisitos: [
           'Trámite gratuito',
           'Presentarse personalmente acompañado de uno de los padres, hermano mayor de edad, abuelo o tío que consten inscritos como familiares',
-          'Certificado de nacimiento del menor.',
           '• Instrucciones para toma de fotografía:',
           'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
           'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
@@ -131,25 +130,30 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
       {
         id: 'ced_pasados_edad',
         nombre: 'Cédula por primera vez con edad de 20 años y 1 día, en adelante',
-        descripcion: 'Ciudadano panameño que solicita su cédula a los 20 años 1 día de edad, en adelante. Este trámite no aplica a ciudadanos que tengan menos de la edad indicada.\nEste trámite no requiere que solicite cita. Solamente necesitará gestionar una cita si realiza el trámite en el departamento de Verificación ubicado en la Sede de Ancón del Tribunal Electoral.',
+        descripcion: 'Ciudadano panameño que solicita su cédula a los 20 años y 1 día de edad, en adelante.\n\nEste trámite no aplica a ciudadanos que tengan menos de la edad indicada.\nEl trámite no requiere que solicite cita.  Solamente necesitará gestionar una cita si realiza el trámite en el departamento de Verificación de Identidad ubicado en la Sede de Ancón del Tribunal Electoral, piso 1.',
         requisitos: [
-          'Trámite gratuito',
           'Complete el formulario de solicitud: Descargue el formulario aquí www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/MEMORIAL-DE-SOLICITUD-DE-TRAMITE-PRIMERA-VEZ-PASADO-DE-EDAD.pdf',
           'Adjunte las pruebas con el memorial de solicitud y remítalo al correo de verificaciónid@tribunal-electoral.gob.pa para revisión, previo a la asignación de la cita.',
-          'Según el caso, se requiere que aporte los siguientes documentos, algunos de los cuales se han identificado como obligatorios. El proceso de evaluación será más ágil, en la medida que se cuente con mayor cantidad de documentos:',
+          'Según el caso, se requiere que aporte los siguientes documentos, algunos de los cuales se han identificado como obligatorios.  El proceso de evaluación será más ágil, en la medida que se cuente con mayor cantidad de documentos que acrediten su identidad:',
           'Panameño residente en el país:',
           '• Documentos escolares (boletín escolar, diplomas, certificación de estudios u otros) sellados por el MEDUCA.',
-          '• Certificado de Bautismo',
-          '• Documentos médicos (tarjetas de vacunación o certificación médica, historial clínico, referencia medica)',
+          '• Certificado de Bautismo.',
+          '• Documentos médicos (tarjetas de vacunación o certificación médica, historial clínico, referencia médica).',
           '• Otro documento que acrediten la identidad y nacionalidad panameña.',
-          '• (Obligatorio) Familiar cercano panameño o tutor legal (resolución o sentencia). De no poder comparecer un familiar cercano, deberá brindar declaración jurada dos (2) testigos.',
+          '• (Obligatorio) Familiar cercano panameño o tutor legal (resolución o sentencia). De no poder comparecer un familiar cercano, deberán brindar declaración jurada dos (2) testigos.',
+          ' ',
           'Panameño que residen fuera del país:',
-          '• (Obligatorio) Pasaporte original vigente / salvoconducto con sello de entrada (2 copias)',
+          '• (Obligatorio) Pasaporte original vigente / salvoconducto con sello de entrada (2 copias).',
           '• (Opcional) carné de residente, licencia de conducir, documento de identidad personal del país donde reside, pasaporte panameño con sello de salida, registro de nacimiento, de tener padres extranjeros presentar documento de identidad, Documentos que acrediten el cambio de nombre y/o apellido, cuando estos no coincidan con la inscripción de nacimiento en Panamá.',
-          '• (Obligatorio) Familiar panameño cercano o tutor legal (resolución o sentencia). De no poder presentar familiar cercano deberá presentar (2) dos testigos que brindarán declaración jurada.',
+          '• (Obligatorio) Familiar panameño cercano o tutor legal (resolución o sentencia). De no poder presentar familiar cercano dos (2) testigos deberán brindar declaración jurada.',
           '• Todo documento en idioma distinto al español, deberá ser traducido al español por Traductor Público Autorizado en Panamá.',
-          '• Todo documento proveniente de otro país debe ser apostillado.',
-          '• De no hablar español el solicitante, familiar o testigo, debe asistirse por un Traductor Público Autorizado en Panamá (debe presentar carné de idoneidad y su respectivo sello de traductor).'
+          '• Todo documento proveniente de otro país debe ser apostillado o legalizado.',
+          '• De no hablar español el solicitante, familiar o testigo, debe asistirse por un Traductor Público Autorizado en Panamá (debe presentar carné de idoneidad y su respectivo sello de traductor).',
+          ' ',
+          'Información adicional de atención:',
+          '• El día de la cita presentar las pruebas en original y 2 copias.',
+          '• Se le tomará declaración jurada al solicitante y al familiar responsable / tutor / testigos (portar cédula vigente).',
+          '• Presentarse quince (15) minutos antes de la hora programada, de lo contrario deberá agendar nuevamente, y quedará sujeto a la disponibilidad existente.'
         ]
       }
     ]
@@ -207,6 +211,7 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
           'Nota del Servicio Nacional de Migración',
           'Fotocopia del carné expedido por el Servicio Nacional de Migración',
           'Fotocopia de la página de las generales del pasaporte',
+          'En caso de menor de edad, aplican los mismos requisitos y debe estar acompañado de uno de sus padres siempre que esté incluido en la resolución del Servicio Nacional de Migración.',
           '• Instrucciones para toma de fotografía:',
           'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
           'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
@@ -216,10 +221,11 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
       {
         id: 'ced_extranjero_renovacion',
         nombre: 'Renovación de carné de residente permanente',
-        descripcion: 'Trámite de renovación del documento de identidad personal para ciudadanos extranjeros residentes permanentes.',
+        descripcion: 'Trámite de renovación de documento de identidad personal para ciudadano extranjero residente permanente, con documento vencido o por vencer (6 meses antes de su vencimiento)',
         requisitos: [
           'Precio (efectivo) B/. 75.00',
           'Presentarse personalmente',
+          'En caso de menor de edad, aplican los mismos requisitos y debe estar acompañado de uno de los padres, hermano mayor de edad, abuelo o tío que consten inscritos como familiares.',
           '• Instrucciones para toma de fotografía:',
           'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
           'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
@@ -229,10 +235,11 @@ export const SERVICIOS_TRIBUNAL: CategoriaServicio[] = [
       {
         id: 'ced_extranjero_duplicado_perdida',
         nombre: 'Duplicado carné de residente permanente',
-        descripcion: 'Reposición de carné de residente permanente.',
+        descripcion: 'Reposición de la cédula de extranjero (PE) residente permanente debido a robo, extravío o deterioro.',
         requisitos: [
           'Precio (efectivo) B/. 65.00',
           'Presentarse personalmente',
+          'En caso de robo o hurto del documento de identidad, se recomienda presente denuncia (no obligatorio)',
           '• Instrucciones para toma de fotografía:',
           'Vestimenta: podrá usar ropa de cualquier color, excepto blanco, y deberá mantener los hombros cubiertos para evitar interferencias visuales. En caso de que utilice velo o toca como parte de su vestimenta, debe dejar expuesta la frente, el rostro y las orejas, asegurando la plena visibilidad de los rasgos faciales.',
           'Cabello: El titular deberá mantener el cabello recogido detrás de las orejas, permitiendo que el contorno del rostro sea completamente visible.',
@@ -434,6 +441,85 @@ try {
   if (cachedServicios) {
     const parsed = JSON.parse(cachedServicios);
     if (parsed && parsed.length > 0 && parsed[0].id === 'registro_civil') {
+      // Dynamic migration for any older cached description / title
+      parsed.forEach((cat: any) => {
+        if (cat.subServicios) {
+          cat.subServicios.forEach((sub: any) => {
+            if (sub.id === 'ced_renovacion') {
+              if (sub.descripcion === 'Renovación de documento vencido o próximo a vencer.') {
+                sub.descripcion = 'Cédula vencida o por vencer (6 meses antes de su vencimiento)';
+              }
+              if (sub.nombre === 'Renovación de Cédula de Identidad') {
+                sub.nombre = 'Renovación de Cédula';
+              }
+            }
+            if (sub.id === 'ced_pasados_edad') {
+              if (sub.descripcion && sub.descripcion.includes('20 años 1 día de edad')) {
+                sub.descripcion = 'Ciudadano panameño que solicita su cédula a los 20 años y 1 día de edad, en adelante.\n\nEste trámite no aplica a ciudadanos que tengan menos de la edad indicada.\nEl trámite no requiere que solicite cita.  Solamente necesitará gestionar una cita si realiza el trámite en el departamento de Verificación de Identidad ubicado en la Sede de Ancón del Tribunal Electoral, piso 1.';
+              }
+              sub.requisitos = [
+                'Complete el formulario de solicitud: Descargue el formulario aquí www.tribunal-electoral.gob.pa/wp-content/uploads/2026/05/MEMORIAL-DE-SOLICITUD-DE-TRAMITE-PRIMERA-VEZ-PASADO-DE-EDAD.pdf',
+                'Adjunte las pruebas con el memorial de solicitud y remítalo al correo de verificaciónid@tribunal-electoral.gob.pa para revisión, previo a la asignación de la cita.',
+                'Según el caso, se requiere que aporte los siguientes documentos, algunos de los cuales se han identificado como obligatorios.  El proceso de evaluación será más ágil, en la medida que se cuente con mayor cantidad de documentos que acrediten su identidad:',
+                'Panameño residente en el país:',
+                '• Documentos escolares (boletín escolar, diplomas, certificación de estudios u otros) sellados por el MEDUCA.',
+                '• Certificado de Bautismo.',
+                '• Documentos médicos (tarjetas de vacunación o certificación médica, historial clínico, referencia médica).',
+                '• Otro documento que acrediten la identidad y nacionalidad panameña.',
+                '• (Obligatorio) Familiar cercano panameño o tutor legal (resolución o sentencia). De no poder comparecer un familiar cercano, deberán brindar declaración jurada dos (2) testigos.',
+                ' ',
+                'Panameño que residen fuera del país:',
+                '• (Obligatorio) Pasaporte original vigente / salvoconducto con sello de entrada (2 copias).',
+                '• (Opcional) carné de residente, licencia de conducir, documento de identidad personal del país donde reside, pasaporte panameño con sello de salida, registro de nacimiento, de tener padres extranjeros presentar documento de identidad, Documentos que acrediten el cambio de nombre y/o apellido, cuando estos no coincidan con la inscripción de nacimiento en Panamá.',
+                '• (Obligatorio) Familiar panameño cercano o tutor legal (resolución o sentencia). De no poder presentar familiar cercano dos (2) testigos deberán brindar declaración jurada.',
+                '• Todo documento en idioma distinto al español, deberá ser traducido al español por Traductor Público Autorizado en Panamá.',
+                '• Todo documento proveniente de otro país debe ser apostillado o legalizado.',
+                '• De no hablar español el solicitante, familiar o testigo, debe asistirse por un Traductor Público Autorizado en Panamá (debe presentar carné de idoneidad y su respectivo sello de traductor).',
+                ' ',
+                'Información adicional de atención:',
+                '• El día de la cita presentar las pruebas en original y 2 copias.',
+                '• Se le tomará declaración jurada al solicitante y al familiar responsable / tutor / testigos (portar cédula vigente).',
+                '• Presentarse quince (15) minutos antes de la hora programada, de lo contrario deberá agendar nuevamente, y quedará sujeto a la disponibilidad existente.'
+              ];
+            }
+            if (sub.id === 'ext_primera_vez') {
+              if (Array.isArray(sub.requisitos) && !sub.requisitos.some((r: string) => r.toLowerCase().includes('en caso de menor de edad'))) {
+                const idx = sub.requisitos.findIndex((r: string) => r.includes('pasaporte') || r.toLowerCase().includes('pasaporte'));
+                if (idx !== -1) {
+                  sub.requisitos.splice(idx + 1, 0, 'En caso de menor de edad, aplican los mismos requisitos y debe estar acompañado de uno de sus padres siempre que esté incluido en la resolución del Servicio Nacional de Migración.');
+                } else {
+                  sub.requisitos.push('En caso de menor de edad, aplican los mismos requisitos y debe estar acompañado de uno de sus padres siempre que esté incluido en la resolución del Servicio Nacional de Migración.');
+                }
+              }
+            }
+            if (sub.id === 'ced_extranjero_renovacion') {
+              sub.descripcion = 'Trámite de renovación de documento de identidad personal para ciudadano extranjero residente permanente, con documento vencido o por vencer (6 meses antes de su vencimiento)';
+              if (Array.isArray(sub.requisitos) && !sub.requisitos.some((r: string) => r.toLowerCase().includes('en caso de menor de edad'))) {
+                const idx = sub.requisitos.indexOf('Presentarse personalmente');
+                if (idx !== -1) {
+                  sub.requisitos.splice(idx + 1, 0, 'En caso de menor de edad, aplican los mismos requisitos y debe estar acompañado de uno de los padres, hermano mayor de edad, abuelo o tío que consten inscritos como familiares.');
+                } else {
+                  sub.requisitos.push('En caso de menor de edad, aplican los mismos requisitos y debe estar acompañado de uno de los padres, hermano mayor de edad, abuelo o tío que consten inscritos como familiares.');
+                }
+              }
+            }
+            if (sub.id === 'ced_extranjero_duplicado_perdida') {
+              sub.descripcion = 'Reposición de la cédula de extranjero (PE) residente permanente debido a robo, extravío o deterioro.';
+              if (Array.isArray(sub.requisitos) && !sub.requisitos.some((r: string) => r.toLowerCase().includes('robo o hurto'))) {
+                const idx = sub.requisitos.indexOf('Presentarse personalmente');
+                if (idx !== -1) {
+                  sub.requisitos.splice(idx + 1, 0, 'En caso de robo o hurto del documento de identidad, se recomienda presente denuncia (no obligatorio)');
+                } else {
+                  sub.requisitos.unshift('En caso de robo o hurto del documento de identidad, se recomienda presente denuncia (no obligatorio)');
+                }
+              }
+            }
+            if (sub.id === 'ced_juvenil_primera' && Array.isArray(sub.requisitos)) {
+              sub.requisitos = sub.requisitos.filter((r: string) => !r.toLowerCase().includes('certificado de nacimiento del menor'));
+            }
+          });
+        }
+      });
       SERVICIOS_TRIBUNAL.length = 0;
       SERVICIOS_TRIBUNAL.push(...parsed);
     } else {
