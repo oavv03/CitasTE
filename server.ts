@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import helmet from "helmet";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import dns from "dns";
@@ -1471,6 +1472,26 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Configuración de Helmet para inyectar cabeceras de seguridad estándar de forma automática (CSP, XSS, etc.)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          "frame-ancestors": ["'self'", "https://*.google.com", "https://*.run.app", "https://ai.studio", "https://aistudio.google", "*"],
+          "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          "connect-src": ["'self'", "https://*", "http://*", "ws://*", "wss://*"],
+          "img-src": ["'self'", "data:", "https://*", "http://*"],
+          "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+        },
+      },
+      // Desactivamos frameguard (X-Frame-Options: SAMEORIGIN) para evitar que bloquee la carga del portal
+      // dentro de la vista previa del iframe en el entorno interactivo de Google AI Studio.
+      frameguard: false,
+    })
+  );
+
   // Middleware to parse requests
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -1596,7 +1617,7 @@ async function startServer() {
       return res.status(401).json({ success: false, error: "Credenciales incorrectas." });
     } catch (e: any) {
       console.error("Error during /api/login:", e);
-      return res.status(500).json({ success: false, error: e.message });
+      return res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2092,7 +2113,7 @@ async function startServer() {
 
     } catch (e: any) {
       console.error("[Email Service] Exception sending email:", e);
-      res.status(500).json({ error: "Surgió un error al procesar el envío por correo electrónico: " + e.message });
+      res.status(500).json({ error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2107,7 +2128,7 @@ async function startServer() {
       return res.json({ success: true, records });
     } catch (e: any) {
       console.error("Error fetching extranjería list:", e);
-      return res.status(500).json({ success: false, error: e.message });
+      return res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2183,7 +2204,7 @@ async function startServer() {
       }
     } catch (e: any) {
       console.error("Error verifying passport:", e);
-      return res.status(500).json({ success: false, error: e.message });
+      return res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2194,7 +2215,7 @@ async function startServer() {
       return res.json({ success: true, config });
     } catch (e: any) {
       console.error("Error fetching extranjería settings:", e);
-      return res.status(500).json({ success: false, error: e.message });
+      return res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2223,7 +2244,7 @@ async function startServer() {
       return res.json({ success: true, config });
     } catch (e: any) {
       console.error("Error fetching tardía settings:", e);
-      return res.status(500).json({ success: false, error: e.message });
+      return res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2253,7 +2274,7 @@ async function startServer() {
       return res.json({ success: true, config });
     } catch (e: any) {
       console.error("Error fetching CMS config:", e);
-      return res.status(500).json({ success: false, error: e.message });
+      return res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2616,7 +2637,7 @@ async function startServer() {
       return res.json({ success: true, appointment: serverCita });
     } catch (e: any) {
       console.error("Error registering appointment:", e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2633,7 +2654,7 @@ async function startServer() {
       return res.json({ success: true, appointments: results });
     } catch (e: any) {
       console.error("Error syncing appointments:", e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2659,7 +2680,7 @@ async function startServer() {
       }
     } catch (e: any) {
       console.error("Error fetching all appointments:", e);
-      res.status(500).json({ success: false, error: e.message });
+      res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2688,7 +2709,7 @@ async function startServer() {
       return res.status(404).json({ error: "Cita no encontrada en el servidor." });
     } catch (e: any) {
       console.error("Error canceling appointment:", e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -2714,7 +2735,7 @@ async function startServer() {
       return res.json({ success: true, message: "Cita eliminada correctamente" });
     } catch (e: any) {
       console.error("Error deleting appointment:", e);
-      res.status(500).json({ success: false, error: e.message });
+      res.status(500).json({ success: false, error: "Ocurrió un error interno en el servidor" });
     }
   });
 
@@ -3326,7 +3347,7 @@ async function startServer() {
 
     } catch (e: any) {
       console.error("[Email Service - Reminder] Error sending reminder:", e);
-      res.status(500).json({ error: "No se pudo procesar el recordatorio: " + e.message });
+      res.status(500).json({ error: "Ocurrió un error interno en el servidor" });
     }
   });
 
