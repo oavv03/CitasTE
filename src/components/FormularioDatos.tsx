@@ -43,6 +43,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
   const [correo, setCorreo] = useState(initialData?.correo || '');
   const [nombreCompleto, setNombreCompleto] = useState(initialData?.nombreCompleto || '');
   const [numeroSeguimiento, setNumeroSeguimiento] = useState(initialData?.numeroSeguimiento || '');
+  const [tieneDiscapacidad, setTieneDiscapacidad] = useState<boolean>(initialData?.tieneDiscapacidad || false);
 
   // Campos específicos para el trámite de extranjería
   const [primerNombre, setPrimerNombre] = useState(initialData?.primerNombre || '');
@@ -208,7 +209,8 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
         pasaporte: pasaporte.trim().toUpperCase(),
         nacionalidad: nacionalidad.trim(),
         fechaResolucion,
-        numeroResolucion: numeroResolucion.trim()
+        numeroResolucion: numeroResolucion.trim(),
+        tieneDiscapacidad
       });
       return;
     }
@@ -352,6 +354,7 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
       nombreCompleto: nombreCompleto.trim(),
       numeroSeguimiento: isPasadoEdad ? numeroSeguimiento.trim() : undefined,
       fechaVencimiento: isRenovacion ? fechaVencimiento : undefined,
+      tieneDiscapacidad,
     });
   };
 
@@ -594,6 +597,25 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
                   <AlertCircle className="w-3.5 h-3.5" /> {errors.fechaResolucion}
                 </span>
               )}
+            </div>
+          </div>
+
+          {/* Discapacidad Checkbox */}
+          <div className="flex items-start gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg transition hover:bg-slate-100">
+            <input
+              type="checkbox"
+              id="ext_tiene_discapacidad_id"
+              checked={tieneDiscapacidad}
+              onChange={(e) => setTieneDiscapacidad(e.target.checked)}
+              className="mt-1 h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+            />
+            <div className="flex flex-col gap-0.5 cursor-pointer select-none" onClick={() => setTieneDiscapacidad(!tieneDiscapacidad)}>
+              <label htmlFor="ext_tiene_discapacidad_id" className="text-xs font-bold text-slate-800 cursor-pointer">
+                Indique si tiene alguna discapacidad (marque la casilla si aplica)
+              </label>
+              <span className="text-[11px] text-slate-500">
+                Esta información nos ayuda a brindarle una atención preferencial y adecuada a sus necesidades.
+              </span>
             </div>
           </div>
         </div>
@@ -862,6 +884,25 @@ export default function FormularioDatos({ initialData, onSuccess, onBack, select
             ) : (
               <span className="text-[11px] text-slate-400 font-medium mt-1">Se enviará el comprobante digital a este email.</span>
             )}
+          </div>
+        </div>
+
+        {/* Discapacidad Checkbox */}
+        <div className="flex items-start gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg transition hover:bg-slate-100">
+          <input
+            type="checkbox"
+            id="tiene_discapacidad_id"
+            checked={tieneDiscapacidad}
+            onChange={(e) => setTieneDiscapacidad(e.target.checked)}
+            className="mt-1 h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+          />
+          <div className="flex flex-col gap-0.5 cursor-pointer select-none" onClick={() => setTieneDiscapacidad(!tieneDiscapacidad)}>
+            <label htmlFor="tiene_discapacidad_id" className="text-xs font-bold text-slate-800 cursor-pointer">
+              Indique si tiene alguna discapacidad (marque la casilla si aplica)
+            </label>
+            <span className="text-[11px] text-slate-500">
+              Esta información nos ayuda a brindarle una atención preferencial y adecuada a sus necesidades.
+            </span>
           </div>
         </div>
 

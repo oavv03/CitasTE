@@ -22,6 +22,7 @@ export default function VisitasGuiadasForm({ onBack }: VisitasGuiadasFormProps) 
     identificacion: '',
     correo: '',
     telefono: '',
+    tieneDiscapacidad: false,
     tipoVisitante: 'Persona individual',
     nombreInstitucion: '',
     cantidadPersonas: '1 persona',
@@ -359,6 +360,24 @@ export default function VisitasGuiadasForm({ onBack }: VisitasGuiadasFormProps) 
                   className={`w-full px-3.5 py-2.5 text-xs bg-slate-50 border ${errors.telefono ? 'border-red-400 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500'} rounded-lg focus:outline-none focus:ring-2 font-medium text-slate-800`}
                 />
                 {errors.telefono && <p className="text-[10px] font-bold text-red-500 mt-0.5">{errors.telefono}</p>}
+              </div>
+
+              <div id="field-discapacidad" className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg transition hover:bg-slate-100 col-span-1 md:col-span-2">
+                <input
+                  type="checkbox"
+                  id="visita_tiene_discapacidad"
+                  checked={formData.tieneDiscapacidad}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tieneDiscapacidad: e.target.checked }))}
+                  className="mt-1 h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                />
+                <div className="flex flex-col gap-0.5 cursor-pointer select-none" onClick={() => setFormData(prev => ({ ...prev, tieneDiscapacidad: !prev.tieneDiscapacidad }))}>
+                  <label htmlFor="visita_tiene_discapacidad" className="text-xs font-bold text-slate-800 cursor-pointer">
+                    Indique si tiene alguna discapacidad (marque la casilla si aplica)
+                  </label>
+                  <span className="text-[10px] text-slate-500">
+                    Esta información nos ayuda a brindarle una atención preferencial y adecuada a sus necesidades.
+                  </span>
+                </div>
               </div>
             </div>
           </div>

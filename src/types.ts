@@ -8,6 +8,7 @@ export interface DatosPersonales {
   correo: string;
   nombreCompleto?: string;
   numeroSeguimiento?: string;
+  tieneDiscapacidad?: boolean;
   // Campos específicos para el trámite de extranjería
   primerNombre?: string;
   segundoNombre?: string;
